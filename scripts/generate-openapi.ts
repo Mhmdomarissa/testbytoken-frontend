@@ -18,8 +18,14 @@ const document = generator.generateDocument({
   },
   servers: [
     {
-      url: "/api",
-      description: "Relative to wherever the backend is deployed.",
+      url: "{backendOrigin}",
+      description:
+        "The backend's own origin - a separate service the browser calls " +
+        "directly (CLAUDE.md: no Next.js proxy/BFF). Endpoint paths below " +
+        "have no additional prefix, matching the brief's own endpoint list.",
+      variables: {
+        backendOrigin: { default: "https://api.testbytoken.example" },
+      },
     },
   ],
 });
