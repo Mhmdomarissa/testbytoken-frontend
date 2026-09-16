@@ -69,8 +69,31 @@ actual framework+UI floor and would fail unconditionally on every route.
 This needs a real decision once actual screens exist — see the Phase A
 report and `docs/DESIGN_SYSTEM_APP.md`'s "shadcn theme mapping" section.
 
+## Mocking (no backend exists)
+
+`npm run dev` works today with no backend: MSW intercepts every endpoint in
+`docs/API_CONTRACT.md` and serves fixtures from `src/mocks/data.ts` -
+the contract's reference implementation, not a stub. Fixtures deliberately
+include the ugly cases real data produces: a failed run with a real
+failure message (`run_fail_1`), a 64-step run (`run_long_1`), a still-
+running job that streams live SSE events (`run_streaming_1`), a module
+where nothing is uniquely locatable (`mod_settings`), very long and
+unicode element labels, a target with no run history at all
+(`tgt_empty`), and a page title containing `<img src=x onerror=alert(1)>`,
+covered by a passing test (`src/mocks/xss-safety.test.tsx`) proving it
+renders as inert text, never markup.
+
+Handlers match wildcard paths (`*/runs/:id`, not `/runs/:id`) so they work
+against both same-origin dev requests and whatever absolute backend origin
+a later phase configures — `docs/API_CONTRACT.md`'s architecture rule is a
+separate backend origin the browser calls directly, not a Next.js proxy.
+
+`src/mocks/handlers.test.ts` exercises the mock over real HTTP (via MSW's
+node server + `fetch`, not by calling handler functions directly) and
+parses every response through its contract schema.
+
 ## What is not here yet
 
-No backend exists. Phase A is foundation only: no product screens. See
-`docs/PHASE_A.md` for the full four-phase plan and `CLAUDE.md` for the rules
-that govern everything built here.
+No backend exists — only the mock above. Phase A is foundation only: no
+product screens. See `docs/PHASE_A.md` for the full four-phase plan and
+`CLAUDE.md` for the rules that govern everything built here.
