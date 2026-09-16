@@ -19,19 +19,24 @@
  * manifest shape and will not parse here.
  *
  * PROVISIONAL BUDGET: on this Next 16 + Turbopack + React 19 baseline, a
- * completely empty route already costs ~186 KB gzipped before any app code
- * (React + Next framework runtime chunks). The brief's original 150 KB/route
- * figure is below that floor and would fail on every route unconditionally.
- * 220 KB is set here as a floor-plus-headroom placeholder pending sign-off -
- * see the Phase A report for the full explanation. Change this constant once
- * a real number is agreed.
+ * completely empty route cost ~186 KB gzipped before shadcn/Base UI existed
+ * (A1). The brief's original 150 KB/route figure is below that floor and
+ * would fail on every route unconditionally.
+ *
+ * A4 added `TooltipProvider` and `Toaster` at the root layout, so every
+ * route - not just ones using tooltips/toasts - now pays for that JS too.
+ * That moved the real floor to ~253 KB (measured on `/_not-found`, which
+ * imports none of the themed components). 300 KB is set here as
+ * floor-plus-headroom for actual per-route component usage, still a
+ * placeholder pending sign-off - see the Phase A report. Change this
+ * constant once a real number is agreed.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import path from "node:path";
 
-const BUDGET_BYTES = 220 * 1024; // provisional - see comment above
+const BUDGET_BYTES = 300 * 1024; // provisional - see comment above
 const NEXT_DIR = path.join(process.cwd(), ".next");
 const APP_DIR = path.join(NEXT_DIR, "server", "app");
 

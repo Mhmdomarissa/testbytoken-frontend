@@ -58,13 +58,16 @@ checks must be green, no force-push.
 `scripts/check-bundle-budget.mjs` reconstructs the old Next.js "First Load
 JS" metric per route (Next 16 removed it from build output — see the script's
 header comment for why and how). On this Next 16 + Turbopack + React 19
-baseline, **an empty route already costs ~186 KB gzipped before any app
-code** — that's pure framework runtime. The budget is currently set to
-**220 KB gzipped/route as a provisional placeholder** (floor + a small
-margin), not the 150 KB originally proposed in `docs/PHASE_A.md`, because
-150 KB is below the framework floor and would fail unconditionally on every
-route. This needs a real decision once actual screens exist — see the Phase A
-report handed back alongside this PR.
+baseline, an empty route cost ~186 KB gzipped before shadcn existed — pure
+framework runtime. Wiring shadcn's `TooltipProvider`/`Toaster` into the root
+layout (A4) moved that floor to **~253 KB, measured on `/_not-found`**,
+which imports none of the themed components — that JS now loads on every
+route because the providers wrap the whole app. The budget is currently set
+to **300 KB gzipped/route as a provisional placeholder**, not the 150 KB
+originally proposed in `docs/PHASE_A.md`, because 150 KB is well below the
+actual framework+UI floor and would fail unconditionally on every route.
+This needs a real decision once actual screens exist — see the Phase A
+report and `docs/DESIGN_SYSTEM_APP.md`'s "shadcn theme mapping" section.
 
 ## What is not here yet
 
