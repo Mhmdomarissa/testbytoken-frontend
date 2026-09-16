@@ -141,11 +141,64 @@ on encoded sRGB channels directly, which is what's measured here):
   `--control-height-inline` for toolbars. All on the 4px grid used
   throughout (`--space-1` = 4px).
 
+## shadcn theme mapping (A4)
+
+shadcn's CLI is `shadcn@4.21.0`, initialized with its default preset
+(`--defaults`, which resolves to `base-nova` at time of writing) — **Base
+UI**, not Radix, as the underlying primitive library. There was no existing
+Radix dependency to preserve and Base UI is the CLI's own current default
+for new projects, so this took the path of least resistance rather than a
+deliberated choice; the `migrate-radix-to-base` skill is installed if that
+ever needs reconsidering.
+
+`components.json` → `baseColor: "neutral"` is irrelevant here — every
+color slot below is overwritten to reference `styles/tokens.css`, none of
+shadcn's generated neutral scale survives:
+
+| shadcn slot                              | Maps to                                                                           | Note                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `background` / `foreground`              | `blue-deep` / `text-primary`                                                      |                                                                                                                                                                                                                                                                                                                                                                                  |
+| `card`, `popover` / `-foreground`        | `blue-mid` / `text-primary`                                                       | Raised surfaces                                                                                                                                                                                                                                                                                                                                                                  |
+| `primary` / `primary-foreground`         | `gold` / `blue-deep`                                                              | **Dark text on gold** — warm-white on gold measures 2.04:1 (fails); blue-deep measures 8.10:1                                                                                                                                                                                                                                                                                    |
+| `secondary`, `accent` / `-foreground`    | `blue-light` / `text-primary`                                                     |                                                                                                                                                                                                                                                                                                                                                                                  |
+| `muted` / `muted-foreground`             | `blue-mid` / `text-secondary`                                                     |                                                                                                                                                                                                                                                                                                                                                                                  |
+| `destructive` / `destructive-foreground` | `status-fail-fg` / `blue-deep`                                                    | Same dark-text logic: warm-white on the derived fail red measures 3.20:1 (fails AA text), blue-deep measures 5.18:1. In practice the installed Button/Badge `destructive` variants use `text-destructive` as a wash (`bg-destructive/10`), not a solid fill, so `-foreground` isn't exercised by anything installed yet — kept defined for whatever does need a solid fill later |
+| `border` / `input`                       | `border-default` / `border-strong`                                                | New tokens, not anchors — see below                                                                                                                                                                                                                                                                                                                                              |
+| `ring`                                   | `gold`                                                                            | Focus ring reuses the single accent                                                                                                                                                                                                                                                                                                                                              |
+| `chart-1..5`                             | `blue-bright`, `gold`, `status-pass-fg`, `status-running-fg`, `status-warning-fg` | Not exercised by any required A4 component; filled in so no default grey survives unused in committed CSS                                                                                                                                                                                                                                                                        |
+| `sidebar*`                               | `blue-deep` nav ground, `gold` accent, `border-default`                           | Ahead of A7's app shell                                                                                                                                                                                                                                                                                                                                                          |
+
+**New tokens this required, not in the A3 set:** `--border-default`
+(`rgb(248 244 238 / 0.14)`) and `--border-strong` (`/ 0.24`) — generic UI
+borders/dividers didn't exist yet because A3 only defined _status_ borders.
+Same opacity-on-warm-white method as the text hierarchy, extended to
+borders, so "no grey tokens" holds here too.
+
+**One theme, not two.** shadcn scaffolds a light `:root` + dark `.dark`
+pair by default. This product has no light mode — the entire palette in
+the brief is a single dark identity — so the light block and the
+`.dark` class selector are deleted outright rather than populated; every
+color lives directly in `:root`. If a light mode is ever wanted, this is
+the first thing that has to change and it isn't a small edit.
+
+**Bundle budget moved again.** Wiring `TooltipProvider` and `Toaster` into
+the root layout (needed so any route can trigger a toast or tooltip) put
+that JS on every route, not just ones using them. Measured floor moved
+from ~186 KB (A1, no shadcn) to ~253 KB (`/_not-found`, which imports none
+of the themed components). The provisional per-route budget in
+`scripts/check-bundle-budget.mjs` is now 300 KB — still a placeholder, but
+grounded in two real measurements instead of one.
+
 ## Radius
 
-`--radius: 0px`. shadcn's usual `calc(var(--radius) - 4px)` chain resolves
-to a negative length for its smaller radii; per the CSS Values spec this is
-clamped to `0px` at used-value time in evergreen browsers rather than
-making the declaration invalid, so the calc chain is safe to keep as-is
-when shadcn is wired in (A4) — noted here so nobody "fixes" it into a
-hardcoded `0px` per slot for no reason.
+`--radius: 0px`, set once in `styles/tokens.css` and never redeclared
+elsewhere (shadcn's `init` scaffolds its own `--radius: 0.625rem` in
+`globals.css`'s `:root` block - that line is deleted, not overridden, so
+there's a single source of truth). The `base-nova` style's radius chain
+(`--radius-sm/md/lg/xl/...`) is defined as `calc(var(--radius) * 0.6)`
+through `* 2.6` - multiplication, not subtraction - so at `--radius: 0px`
+every derived radius is exactly `0px` with no negative-value clamping to
+reason about. (An earlier draft of this doc assumed the older
+subtraction-based chain and a clamping edge case that turned out not to
+apply to this shadcn version - corrected here once the real generated CSS
+was in hand.)

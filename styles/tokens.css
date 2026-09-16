@@ -31,6 +31,11 @@
   --text-tertiary: rgb(248 244 238 / 0.5);
   --text-disabled: rgb(248 244 238 / 0.32);
 
+  /* Same opacity-on-warm-white approach, extended to UI borders/dividers -
+     no grey tokens here either. */
+  --border-default: rgb(248 244 238 / 0.14);
+  --border-strong: rgb(248 244 238 / 0.24);
+
   /* ---------------------------------------------------------------------
    * Semantic status scale - derived in OKLCH from the gold/blue anchors,
    * not from an unrelated color wheel. Every foreground below is AA
