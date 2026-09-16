@@ -3,3 +3,7 @@ node_modules
 coverage
 public
 package-lock.json
+
+# Pre-existing brief, authored outside this repo's tooling - leave its
+# formatting untouched rather than reformatting content we didn't write.
+docs/PHASE_A.md
