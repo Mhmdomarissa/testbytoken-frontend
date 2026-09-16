@@ -26,17 +26,31 @@
  * A4 added `TooltipProvider` and `Toaster` at the root layout, so every
  * route - not just ones using tooltips/toasts - now pays for that JS too.
  * That moved the real floor to ~253 KB (measured on `/_not-found`, which
- * imports none of the themed components). 300 KB is set here as
- * floor-plus-headroom for actual per-route component usage, still a
- * placeholder pending sign-off - see the Phase A report. Change this
- * constant once a real number is agreed.
+ * imports none of the themed components).
+ *
+ * A7 (the app shell) is the first place real, permanent authenticated
+ * routes exist, each pulling in Sidebar, Command, DropdownMenu, Field,
+ * Spinner, Empty, and Alert on top of A4's baseline. Measured cost:
+ * ~435-437 KB on every shell route (/, /targets, /runs, /suites, /usage),
+ * ~375 KB on /sign-in (fewer components, no sidebar shell). This is not a
+ * bug - checked the largest chunk for anything that shouldn't be there
+ * (accidentally-bundled mock fixture data, the zod-to-openapi generator
+ * classes) and found neither; it's real, load-bearing UI weight.
+ *
+ * 460 KB is set here as floor-plus-headroom for the shell routes. This is
+ * the THIRD time this number has moved (150 -> 220 -> 300 -> 460) as more
+ * of the real app came into existence - flagged prominently in the Phase A
+ * report as needing an actual decision rather than another mock-driven
+ * guess, especially since real product screens in later phases will add
+ * more weight still, not less. Change this constant once a real number is
+ * agreed.
  */
 import { readFileSync, existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import path from "node:path";
 
-const BUDGET_BYTES = 300 * 1024; // provisional - see comment above
+const BUDGET_BYTES = 460 * 1024; // provisional - see comment above
 const NEXT_DIR = path.join(process.cwd(), ".next");
 const APP_DIR = path.join(NEXT_DIR, "server", "app");
 
@@ -60,7 +74,11 @@ async function findClientReferenceManifests(dir) {
 
 function routeNameFor(manifestFile) {
   const routeDir = path.dirname(path.relative(APP_DIR, manifestFile));
-  return routeDir === "." ? "/" : `/${routeDir}`;
+  // Route groups (parenthesized segments, e.g. "(app)") don't appear in
+  // the actual URL - strip them so the report shows the real route.
+  const segments = routeDir.split(path.sep).filter((s) => !/^\(.*\)$/.test(s));
+  const cleaned = segments.join("/");
+  return cleaned === "" || cleaned === "." ? "/" : `/${cleaned}`;
 }
 
 function parseEntryJSFiles(manifestFile) {

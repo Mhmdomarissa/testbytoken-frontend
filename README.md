@@ -92,6 +92,39 @@ separate backend origin the browser calls directly, not a Next.js proxy.
 node server + `fetch`, not by calling handler functions directly) and
 parses every response through its contract schema.
 
+## Application shell
+
+Sidebar (`src/components/shell/AppSidebar.tsx`), top bar with a command
+palette (⌘K), a workspace/engine status pill, an offline/reconnecting
+banner, and the auth guard (`src/proxy.ts` — `middleware.ts` is deprecated
+in Next 16 in favor of this file). Sign in at `/sign-in` (magic link
+against the mock; a "Continue (dev)" button stands in for clicking the
+email link, since there's no real inbox).
+
+The real deliverable is the state-primitive set every future screen
+reuses: `ListSkeleton` (matches final layout, never a full-page spinner),
+`EmptyState` (always carries the action that fills it), and `ErrorState`
+(always retryable). `/targets`, `/runs`, `/suites`, and `/usage` are thin
+proof-of-primitive pages, not product screens — each demonstrates its
+loading, empty, and error state on demand (`/runs?target_id=tgt_empty`
+for empty, `?simulate_error=true` for error, both real mock behavior, not
+UI-only fakes).
+
+**Data fetching is client-side only, deliberately.** CLAUDE.md's
+architecture rule is that the browser talks to the backend directly, with
+no Next proxy/BFF — fetching backend resources from a Server Component
+would itself be exactly that, so every data-driven page here is a client
+component (`src/hooks/useResource.ts`).
+
+**Known mock-only limitation:** Service Workers cannot set cookies via a
+`Set-Cookie` response header (a browser/spec restriction, not an MSW bug).
+The mock's own `/auth/verify` and `/auth/logout` handlers set it anyway,
+correctly, because that's what a real backend's response will do; the
+sign-in/sign-out pages additionally set/clear the cookie via
+`document.cookie` as a mock-only workaround
+(`src/mocks/session-cookie-workaround.ts`). This entire file should be
+deleted once a real backend exists.
+
 ## What is not here yet
 
 No backend exists — only the mock above. Phase A is foundation only: no

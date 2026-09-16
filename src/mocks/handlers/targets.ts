@@ -1,7 +1,7 @@
 import { http } from "msw";
 import { z } from "zod";
 import { TargetSchema } from "@/lib/contract";
-import { json, errorResponse } from "../respond";
+import { json, errorResponse, checkSimulatedError } from "../respond";
 import { targets } from "../data";
 
 let store = [...targets];
@@ -26,8 +26,8 @@ export const targetHandlers = [
     return json(TargetSchema, created, { status: 201 });
   }),
 
-  http.get("*/targets", async () => {
-    return json(z.array(TargetSchema), store);
+  http.get("*/targets", async ({ request }) => {
+    return checkSimulatedError(request) ?? json(z.array(TargetSchema), store);
   }),
 
   http.get("*/targets/:id", async ({ params }) => {
