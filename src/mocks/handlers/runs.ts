@@ -1,6 +1,6 @@
 import { http } from "msw";
 import { RunDetailSchema, RunSummarySchema, paginated } from "@/lib/contract";
-import { json, errorResponse } from "../respond";
+import { json, errorResponse, checkSimulatedError } from "../respond";
 import { runs, runPassed } from "../data";
 
 const RunListResponseSchema = paginated(RunSummarySchema);
@@ -11,6 +11,9 @@ export const runHandlers = [
   }),
 
   http.get("*/runs", async ({ request }) => {
+    const simulatedError = checkSimulatedError(request);
+    if (simulatedError) return simulatedError;
+
     const url = new URL(request.url);
     const targetId = url.searchParams.get("target_id");
     const suiteId = url.searchParams.get("suite_id");

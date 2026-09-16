@@ -31,3 +31,21 @@ export function json<T extends z.ZodTypeAny>(
 export function errorResponse(status: number, code: string, message: string) {
   return HttpResponse.json({ error: { code, message } }, { status });
 }
+
+/**
+ * Lets the shell's error states be demonstrated on demand (A7's "every
+ * route renders ... an error state on demand") without pretending real
+ * backend instability - `?simulate_error=true` on any GET list endpoint
+ * that calls this first returns a real 500.
+ */
+export function checkSimulatedError(request: Request) {
+  const forced = new URL(request.url).searchParams.get("simulate_error");
+  if (forced === "true") {
+    return errorResponse(
+      500,
+      "simulated_error",
+      "Simulated failure - requested via ?simulate_error=true.",
+    );
+  }
+  return null;
+}
