@@ -8,10 +8,16 @@ const eslintConfig = defineConfig([
   ...nextTs,
   prettierConfig,
   {
-    // Hard rule from CLAUDE.md: this product renders text from websites we
-    // do not control. dangerouslySetInnerHTML is banned repo-wide, no exceptions.
     rules: {
+      // Hard rule from CLAUDE.md: this product renders text from websites
+      // we do not control. dangerouslySetInnerHTML is banned repo-wide, no exceptions.
       "react/no-danger": "error",
+      // Convention for an intentionally-unused destructured binding, e.g.
+      // omitting one field from a fixture via `const { x: _x, ...rest } = obj`.
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
+      ],
     },
   },
   // Override default ignores of eslint-config-next.

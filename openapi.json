@@ -1,0 +1,2438 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Test by Token API",
+    "version": "0.1.0",
+    "description": "The contract the backend team implements to match this frontend. Generated from Zod schemas in src/lib/contract/ - see docs/API_CONTRACT.md for essential/nice-to-have status per endpoint and two open decisions requiring sign-off (SSE auth, screenshot URL security)."
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Relative to wherever the backend is deployed."
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session",
+        "description": "httpOnly session cookie (CLAUDE.md: auth token lives in an httpOnly cookie, never localStorage). Recommended - not yet finalized - for SSE auth too; see docs/API_CONTRACT.md."
+      }
+    },
+    "schemas": {
+      "MagicLinkResponse": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sent"
+        ]
+      },
+      "MagicLinkRequest": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "VerifyResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "ok"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Stable machine-readable error code, e.g. `not_found`.",
+                "example": "not_found"
+              },
+              "message": {
+                "type": "string",
+                "description": "Human-readable message. Safe to show to the customer."
+              },
+              "details": {
+                "description": "Optional structured detail, error-specific."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "VerifyRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One-time token from the magic link email."
+          }
+        },
+        "required": [
+          "token"
+        ]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "created_at"
+        ]
+      },
+      "Workspace": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "booting",
+              "ready",
+              "resetting",
+              "error",
+              "terminated"
+            ],
+            "description": "Lifecycle state of the engine process backing this workspace."
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Populated when status is `error`."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "error",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "Scan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "crawling",
+              "parked",
+              "completed",
+              "failed"
+            ],
+            "description": "`parked` means the crawl is waiting on a manual sign-in."
+          },
+          "parked_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Set when status is `parked`, e.g. `login_required`."
+          },
+          "modules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Module"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "target_id",
+          "target_url",
+          "status",
+          "parked_reason",
+          "modules",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "Module": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "name": {
+            "type": "string"
+          },
+          "pages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Page"
+            }
+          },
+          "element_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "elements_uniquely_locatable_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Subset of element_count that Inspect would mark uniquely_locatable. The gap between the two is what the coverage.candidate/generated split on a Run ultimately explains to the customer."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "pages",
+          "element_count",
+          "elements_uniquely_locatable_count"
+        ]
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "title"
+        ]
+      },
+      "CreateScanRequest": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "target_id"
+        ]
+      },
+      "InspectResponse": {
+        "type": "object",
+        "properties": {
+          "module_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Element"
+            }
+          }
+        },
+        "required": [
+          "module_id",
+          "elements"
+        ]
+      },
+      "Element": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "page_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "label": {
+            "type": "string",
+            "description": "Best-effort human label - visible text, aria-label, or similar."
+          },
+          "locator": {
+            "type": "string"
+          },
+          "locator_strategy": {
+            "type": "string",
+            "enum": [
+              "css",
+              "xpath",
+              "role",
+              "text",
+              "test_id"
+            ],
+            "description": "How `locator` should be interpreted by the runner."
+          },
+          "uniquely_locatable": {
+            "type": "boolean",
+            "description": "False when the engine found more than one element matching this locator and can't disambiguate. A false here is why a test may not get generated for this element - see Run.coverage."
+          },
+          "reason_not_locatable": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Set when uniquely_locatable is false, e.g. `duplicate_locator`."
+          }
+        },
+        "required": [
+          "id",
+          "page_url",
+          "label",
+          "locator",
+          "locator_strategy",
+          "uniquely_locatable",
+          "reason_not_locatable"
+        ]
+      },
+      "InspectRequest": {
+        "type": "object",
+        "properties": {
+          "scan_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "module_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          }
+        },
+        "required": [
+          "scan_id",
+          "module_id"
+        ]
+      },
+      "RunDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "suite_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "passed",
+              "failed",
+              "cancelled"
+            ],
+            "description": "Overall run status."
+          },
+          "pass_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Fraction of generated scenarios that passed. Always present alongside coverage."
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "token_cost": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Compute cost in test-tokens."
+          },
+          "proof_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Set once the run has finished.",
+            "example": "run_8f2a1c9d"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "target_id",
+          "suite_id",
+          "status",
+          "pass_rate",
+          "coverage",
+          "token_cost",
+          "proof_id",
+          "started_at",
+          "finished_at",
+          "steps"
+        ]
+      },
+      "Coverage": {
+        "type": "object",
+        "properties": {
+          "generated": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Scenarios actually generated - i.e. elements that were uniquely locatable."
+          },
+          "candidate": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Total candidate elements the engine attempted to generate scenarios for."
+          }
+        },
+        "required": [
+          "generated",
+          "candidate"
+        ]
+      },
+      "Step": {
+        "type": "object",
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "type": "string",
+            "description": "Engine-defined action name, e.g. `click`, `fill`, `navigate`, `assert_visible`. Intentionally an open string, not an enum - the engine's action vocabulary evolves independently of this contract."
+          },
+          "target": {
+            "type": "string",
+            "description": "Locator or description of what the action acted on."
+          },
+          "assertion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "running",
+              "skipped",
+              "warning",
+              "queued"
+            ],
+            "description": "Per-step status. Matches the design system's status token names 1:1."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable outcome, e.g. the assertion failure detail. Rendered as inert text - never HTML (CLAUDE.md)."
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "screenshot_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Resolved, ready-to-fetch URL. Whether it's a signed expiring URL or a session-authenticated route is a backend decision, not fixed by this contract - see the open decision in docs/API_CONTRACT.md."
+          }
+        },
+        "required": [
+          "index",
+          "action",
+          "target",
+          "assertion",
+          "status",
+          "message",
+          "duration_ms",
+          "screenshot_url"
+        ]
+      },
+      "CreateRunRequest": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "suite_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "suite_id",
+          "target_id"
+        ]
+      },
+      "RunSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "suite_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "passed",
+              "failed",
+              "cancelled"
+            ],
+            "description": "Overall run status."
+          },
+          "pass_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Fraction of generated scenarios that passed. Always present alongside coverage."
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "token_cost": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Compute cost in test-tokens."
+          },
+          "proof_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "Set once the run has finished.",
+            "example": "run_8f2a1c9d"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "target_id",
+          "suite_id",
+          "status",
+          "pass_rate",
+          "coverage",
+          "token_cost",
+          "proof_id",
+          "started_at",
+          "finished_at"
+        ]
+      },
+      "JobEvent": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Monotonically increasing within the job; pass the last-seen value as `?since=` to resume."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "status"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "description": "New job-level status, e.g. a ScanStatus or RunStatus value."
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "progress"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "percent": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "message",
+              "percent"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "step"
+                ]
+              },
+              "step": {
+                "$ref": "#/components/schemas/Step"
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "step"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "log"
+                ]
+              },
+              "level": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "warning",
+                  "error"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "level",
+              "message"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "done"
+                ]
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "type",
+              "status"
+            ]
+          }
+        ]
+      },
+      "Suite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "name": {
+            "type": "string"
+          },
+          "latest_version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "target_id",
+          "name",
+          "latest_version",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "SuiteVersion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "suite_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source_scan_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The scan whose crawl produced this version.",
+            "example": "run_8f2a1c9d"
+          },
+          "scenario_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "suite_id",
+          "version",
+          "source_scan_id",
+          "scenario_count",
+          "created_at"
+        ]
+      },
+      "Target": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "name": {
+            "type": "string"
+          },
+          "base_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "dev",
+              "test",
+              "staging",
+              "production"
+            ],
+            "description": "Named environment a target belongs to."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "base_url",
+          "environment",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CreateTargetRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "base_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "dev",
+              "test",
+              "staging",
+              "production"
+            ],
+            "description": "Named environment a target belongs to."
+          }
+        },
+        "required": [
+          "name",
+          "base_url",
+          "environment"
+        ]
+      },
+      "UpdateTargetRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "base_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "dev",
+              "test",
+              "staging",
+              "production"
+            ],
+            "description": "Named environment a target belongs to."
+          }
+        }
+      },
+      "Proof": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "hash": {
+            "type": "string",
+            "description": "Tamper-evident hash over the canonical step sequence, e.g. sha256 hex digest.",
+            "example": "sha256:9f2c..."
+          },
+          "token_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            }
+          },
+          "share": {
+            "$ref": "#/components/schemas/Share"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "hash",
+          "token_cost",
+          "steps",
+          "share",
+          "created_at"
+        ]
+      },
+      "Share": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Full public URL, i.e. `{origin}/p/{token}`."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "token",
+          "url",
+          "enabled",
+          "expires_at"
+        ]
+      },
+      "CreateShareRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "description": "Omit for a non-expiring share link."
+          }
+        }
+      },
+      "Usage": {
+        "type": "object",
+        "properties": {
+          "period_start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "tokens_used": {
+            "type": "number",
+            "minimum": 0
+          },
+          "runs_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "period_start",
+          "period_end",
+          "tokens_used",
+          "runs_count"
+        ]
+      },
+      "UsageBudget": {
+        "type": "object",
+        "properties": {
+          "monthly_limit_tokens": {
+            "type": "number",
+            "minimum": 0
+          },
+          "tokens_remaining": {
+            "type": "number",
+            "minimum": 0
+          },
+          "alert_threshold_percent": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "monthly_limit_tokens",
+          "tokens_remaining",
+          "alert_threshold_percent"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/auth/magic-link": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Request a magic link email",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Link sent (always 200, regardless of whether the email is registered - do not leak account existence).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MagicLinkResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange a magic-link token for a session cookie",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session established via httpOnly cookie (Set-Cookie header, not in the JSON body).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Token invalid or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Current session",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed-in user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Clear the session",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session cookie cleared."
+          }
+        }
+      }
+    },
+    "/workspaces": {
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Create a workspace (boots the engine, warms a browser)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Workspace created and booting.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspace"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspaces/{id}": {
+      "get": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Get workspace status",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspace"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Tear down the workspace and its engine process",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Torn down."
+          }
+        }
+      }
+    },
+    "/workspaces/{id}/reset": {
+      "post": {
+        "tags": [
+          "workspace"
+        ],
+        "summary": "Reset the workspace's browser session (new profile, same workspace)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reset accepted; status returns to `booting`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Workspace"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scans": {
+      "post": {
+        "tags": [
+          "scan"
+        ],
+        "summary": "Start a scan of a target",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Scan queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scan"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scans/{id}": {
+      "get": {
+        "tags": [
+          "scan"
+        ],
+        "summary": "Get scan status and discovered structure so far",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The scan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/scans/{id}/continue": {
+      "post": {
+        "tags": [
+          "scan"
+        ],
+        "summary": "Resume a parked scan after the customer has signed in manually",
+        "description": "Called once the user has finished authenticating themselves inside the live browser view. Takes no credentials - the engine already has an authenticated browser session; this just tells it to keep crawling.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Crawl resumed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Scan"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Scan is not currently parked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inspect": {
+      "post": {
+        "tags": [
+          "inspect"
+        ],
+        "summary": "List one module's elements with locators",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InspectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Element inventory for the requested module.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InspectResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scan or module not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Start a run of a suite against a target",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Run queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "List runs, paginated and filtered",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "description": "Max items to return."
+            },
+            "required": false,
+            "description": "Max items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Opaque cursor from a previous response's `next_cursor`. Omit for the first page."
+            },
+            "required": false,
+            "description": "Opaque cursor from a previous response's `next_cursor`. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": false,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "target_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": false,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "suite_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "passed",
+                "failed",
+                "cancelled"
+              ],
+              "description": "Overall run status."
+            },
+            "required": false,
+            "description": "Overall run status.",
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RunSummary"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "Pass as `cursor` to fetch the next page. `null` on the last page."
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Get a run's full detail, including every step",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/runs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "Cancel a queued or running run",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancellation accepted; remaining scenarios are marked skipped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Run already finished.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/jobs/{id}/events": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "summary": "Subscribe to a job's events (SSE)",
+        "description": "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`. Reconnect with `?since=<last-seen id>` to resume without re-delivering earlier events. Authentication for this endpoint is an open decision - see docs/API_CONTRACT.md.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Last-seen event id. Resume the stream after this event."
+            },
+            "required": false,
+            "description": "Last-seen event id. Resume the stream after this event.",
+            "name": "since",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An open SSE stream of JobEvent frames.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobEvent"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suites": {
+      "get": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "List suites",
+        "description": "Unpaginated - suites are one-per-target, not expected to grow unbounded like runs.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All suites.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Suite"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suites/{id}": {
+      "get": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "Get a suite",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The suite.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Suite"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/suites/{id}/versions": {
+      "get": {
+        "tags": [
+          "suites"
+        ],
+        "summary": "List a suite's versions, newest first",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Version history.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SuiteVersion"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/targets": {
+      "post": {
+        "tags": [
+          "targets"
+        ],
+        "summary": "Create a target",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTargetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Target"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "targets"
+        ],
+        "summary": "List targets",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All targets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Target"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/targets/{id}": {
+      "get": {
+        "tags": [
+          "targets"
+        ],
+        "summary": "Get a target",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The target.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Target"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "targets"
+        ],
+        "summary": "Update a target",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTargetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Target"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "targets"
+        ],
+        "summary": "Delete a target",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          }
+        }
+      }
+    },
+    "/proofs/{id}": {
+      "get": {
+        "tags": [
+          "proofs"
+        ],
+        "summary": "Get a proof (authenticated)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proof.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proof"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/p/{token}": {
+      "get": {
+        "tags": [
+          "proofs"
+        ],
+        "summary": "Public, unauthenticated proof view",
+        "description": "No cookie required - this is the link a customer shares externally. Rendered by a public Next route handler/page per CLAUDE.md, not proxied to the API from a general-purpose route.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proof.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proof"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Token invalid, expired, or sharing disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/proofs/{id}/share": {
+      "post": {
+        "tags": [
+          "proofs"
+        ],
+        "summary": "Create or rotate a proof's public share link",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateShareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Share link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Share"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Current billing period usage",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage for the current period.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage/budget": {
+      "get": {
+        "tags": [
+          "usage"
+        ],
+        "summary": "Token budget and remaining balance",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Budget.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageBudget"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}
