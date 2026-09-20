@@ -20,7 +20,11 @@ maintains - read it before assuming prior Next.js knowledge still applies.
 - **No grey tokens.** Text hierarchy on dark grounds comes from
   `rgba(248, 244, 238, α)` at varying opacity, not a grey scale.
 - Fonts: Cormorant Garamond for headings, Montserrat for UI/body. Nothing
-  else, ever.
+  else, ever — this governs _display and body type_. It does not cover
+  code-like content (locators, ids, hashes, step output): that's the
+  platform's system monospace stack, no added webfont, confirmed correct
+  in the Phase A review. Don't read the absence of a third named
+  typeface here as a violation when you see `font-mono` in use.
 - Motion is color transitions only. No entrance animations, no parallax.
 
 ## Security

@@ -70,8 +70,12 @@ export function registerEventPaths(registry: OpenAPIRegistry) {
     description:
       "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`. " +
       "Reconnect with `?since=<last-seen id>` to resume without re-delivering " +
-      "earlier events. Authentication for this endpoint is an open decision - " +
-      "see docs/API_CONTRACT.md.",
+      "earlier events. Authenticated by cookie (EventSource sends it " +
+      "automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be " +
+      "served from a sibling subdomain of the app (e.g. app.<domain> / " +
+      "api.<domain>), cookie scoped to the parent domain, so this is same-site " +
+      "and EventSource needs no special handling. Never a token in the query " +
+      "string - see docs/API_CONTRACT.md.",
     security: [{ cookieAuth: [] }],
     request: { params: JobIdParam, query: EventsQuerySchema },
     responses: {

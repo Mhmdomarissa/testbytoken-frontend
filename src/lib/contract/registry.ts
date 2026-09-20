@@ -19,8 +19,9 @@ registry.registerComponent("securitySchemes", "cookieAuth", {
   name: "session",
   description:
     "httpOnly session cookie (CLAUDE.md: auth token lives in an httpOnly " +
-    "cookie, never localStorage). Recommended - not yet finalized - for SSE " +
-    "auth too; see docs/API_CONTRACT.md.",
+    "cookie, never localStorage). Also the decided auth mechanism for SSE " +
+    "(GET /jobs/{id}/events), with a deployment constraint attached - " +
+    "see docs/API_CONTRACT.md.",
 });
 
 registerAuthPaths(registry);

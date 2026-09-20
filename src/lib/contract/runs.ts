@@ -21,8 +21,17 @@ import {
  */
 
 export const RunStatusSchema = z
-  .enum(["queued", "running", "passed", "failed", "cancelled"])
-  .openapi({ description: "Overall run status." });
+  .enum(["queued", "running", "passed", "failed", "cancelled", "timed_out"])
+  .openapi({
+    description:
+      "Overall run status. `timed_out` is distinct from `failed`: a failure has " +
+      "a specific reason from a specific step; a timeout is the absence of " +
+      "information (the engine stopped responding) and carries no such reason. " +
+      "Added while building the mock's stateful lifecycle simulation (Phase A " +
+      'review, §5) - the review asked for "at least one [run] that stalls and ' +
+      'times out", and the original five-value enum had no way to represent ' +
+      "that outcome distinctly from an ordinary failure.",
+  });
 
 // Same six values as the app's design-token status scale
 // (styles/tokens.css --status-*) - one vocabulary for step status end to
@@ -56,9 +65,13 @@ export const StepSchema = z
       .nullable()
       .openapi({
         description:
-          "Resolved, ready-to-fetch URL. Whether it's a signed expiring URL or a " +
-          "session-authenticated route is a backend decision, not fixed by this " +
-          "contract - see the open decision in docs/API_CONTRACT.md.",
+          "Resolved, ready-to-fetch URL - never a token embedded in the URL itself " +
+          "(docs/API_CONTRACT.md). On GET /runs/{id} this is a session-authenticated " +
+          "route (same cookie as the rest of the API): this Step only ever appears " +
+          "here inside the authenticated app. When the same Step shape appears " +
+          "embedded in a Proof (GET /proofs/{id} or the public GET /p/{token}), see " +
+          "Proof's own screenshot authorization split in docs/API_CONTRACT.md - the " +
+          "field name and shape are identical, the backing authorization is not.",
       }),
   })
   .openapi("Step");

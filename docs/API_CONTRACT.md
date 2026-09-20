@@ -41,48 +41,73 @@ silently implement around.
   `docs/DESIGN_SYSTEM_APP.md`). One vocabulary, engine to pixel, so there's
   never a translation table to keep in sync.
 
-## Two decisions that need your agreement
+## Two decisions — settled
 
-These aren't implemented yet because they're not ours to decide alone.
+There is no backend team to sign these off (Phase A review, §3). These are
+the frontend's position, written into the contract as requirements, not
+suggestions. If a backend implementer later has a reason to push back,
+that's a real conversation to have — until then, this is the spec.
 
-### 1. SSE authentication for `GET /jobs/{id}/events`
+### 1. SSE authentication for `GET /jobs/{id}/events` — cookie, with a deployment constraint
 
 `EventSource` cannot send an `Authorization` header, and this product's
 auth token deliberately lives in an httpOnly cookie it can't read anyway.
-Two options:
+**Decision: cookie auth on the SSE request itself** — never a token in the
+query string (tokens in URLs end up in server access logs, proxy logs,
+and browser history; this is non-negotiable, not a style preference).
 
-- **Cookie auth on the SSE request itself** (the browser sends it
-  automatically, same-origin). **This is our recommendation.**
-- A short-lived token in the query string. Tokens in URLs end up in
-  server access logs, proxy logs, and browser history — a real exposure
-  for a job-events endpoint that streams live execution detail.
+This decision has a constraint attached, and it's a deployment
+requirement, not a suggestion: **`EventSource` does not send credentials
+cross-origin without `withCredentials` plus matching CORS credential
+headers**, and CLAUDE.md's architecture rule is that the browser talks to
+the backend directly with no proxy in between to paper over that. So:
+
+> **The API must be served from a sibling subdomain of the app** — e.g.
+> `app.<domain>` and `api.<domain>` — with the auth cookie scoped to the
+> parent domain. This makes the cookie same-site for both, and
+> `EventSource` needs no special credential handling at all.
+
+This is cheap to satisfy if the deployment topology is chosen with it in
+mind, and expensive to retrofit after the fact (moving a live API to a
+different subdomain, migrating cookie domain scope with users mid-session).
+Whoever makes the hosting decision needs to know about this constraint
+_before_ choosing where the API lives, not after.
 
 `registry.ts` registers `cookieAuth` as the security scheme for this
-endpoint already, anticipating this answer. If the backend needs the
-query-token approach instead (e.g. because of infrastructure that can't
-carry cookies to wherever SSE is terminated), that's a contract change,
-not just a backend implementation detail — it affects how the frontend
-opens the connection.
+endpoint; `src/lib/contract/events.ts`'s path description states the
+subdomain requirement directly.
 
-### 2. Screenshot URL security
+### 2. Screenshot URL security — two classes, authorization stated per endpoint, never a token in the URL
 
 A screenshot of a customer's authenticated application is not public
 data, even when it's embedded in a proof the customer chooses to share
-externally (`GET /p/{token}`). Two options:
+externally. **Decision: two classes of screenshot, by which endpoint
+serves them — never a bearer or session token embedded in the URL itself**
+(URLs leak via referrer headers, server logs, browser history, and
+copy-paste into tickets; this rules out "signed URL that's just a token in
+a query string" too, not only the obviously-bad "session token in a URL"
+case).
 
-- **Signed, expiring URLs** — the API returns a URL that's valid for a
-  bounded window regardless of session state. Works uniformly for both
-  the authenticated (`GET /proofs/{id}`) and public (`GET /p/{token}`)
-  cases.
-- **Session-authenticated routes** — the screenshot URL requires the same
-  cookie as the rest of the API. Doesn't work for the public share case
-  without a second mechanism layered on top.
+- **Session-scoped** (`GET /runs/{id}`, `GET /proofs/{id}` — inside the
+  authenticated app): screenshot URLs are served from an authenticated
+  endpoint, authorized by the session cookie exactly like any other API
+  call. No separate signing scheme.
+- **Proof-scoped** (`GET /p/{token}` — the public, unauthenticated proof
+  page): the proof's own share token is already the capability that
+  grants access to the page. Screenshots on it are **signed against that
+  same proof token**, scoped to that one run, and **revoked the instant
+  the proof is revoked**. A public proof page that still renders
+  screenshots after its share link has been revoked is a bug, not an edge
+  case to accept.
 
-The contract doesn't force either: `Step.screenshot_url` and any
-screenshot reference on a `Proof` are just `url` fields — fully resolved,
-ready-to-fetch strings. Whichever mechanism the backend picks, the shape
-doesn't change; this is called out so it gets decided deliberately rather
-than accidentally, given the public-sharing path.
+Same `Step`/`Proof` JSON shape either way — `screenshot_url` is always a
+resolved, ready-to-fetch `url` string (`src/lib/contract/runs.ts`). The
+backing authorization differs by which endpoint produced it, which is why
+it's stated on each path's own description
+(`src/lib/contract/runs.ts`'s `Step.screenshot_url`,
+`src/lib/contract/proofs.ts`'s `GET /proofs/{id}` and `GET /p/{token}`
+registrations) rather than once at the schema level — an implementer
+reading only one endpoint's docs cannot get it wrong by omission.
 
 ## Endpoints
 

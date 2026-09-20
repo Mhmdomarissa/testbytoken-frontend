@@ -1,13 +1,41 @@
 import { http } from "msw";
 import { RunDetailSchema, RunSummarySchema, paginated } from "@/lib/contract";
 import { json, errorResponse, checkSimulatedError } from "../respond";
-import { runs, runPassed } from "../data";
+import { runStore } from "../store";
+import {
+  resolveRun,
+  registerRunTimeline,
+  cancelRun,
+  LIVE_PASS_TIMELINE,
+} from "../lifecycle";
 
 const RunListResponseSchema = paginated(RunSummarySchema);
 
 export const runHandlers = [
   http.post("*/runs", async () => {
-    return json(RunDetailSchema, runPassed, { status: 201 });
+    // A fresh run always progresses normally (the common case) - the
+    // fail/stall scenarios are the three named, directly-fetchable
+    // run_live_* fixtures (src/mocks/lifecycle.ts), not something POST
+    // /runs picks at random. Real-time progress, not an instantly
+    // "passed" static payload - see the Phase A review, §5.
+    const id = `run_${Math.random().toString(36).slice(2, 10)}`;
+    const created = {
+      id,
+      workspace_id: "wksp_demo",
+      target_id: "tgt_checkout",
+      suite_id: "suite_checkout",
+      status: "running" as const,
+      pass_rate: 1,
+      coverage: { generated: 21, candidate: 24 },
+      token_cost: 1.1,
+      proof_id: null,
+      started_at: new Date().toISOString(),
+      finished_at: null,
+      steps: [],
+    };
+    runStore.set(id, created);
+    registerRunTimeline(id, LIVE_PASS_TIMELINE);
+    return json(RunDetailSchema, resolveRun(created), { status: 201 });
   }),
 
   http.get("*/runs", async ({ request }) => {
@@ -21,9 +49,11 @@ export const runHandlers = [
     const limit = Number(url.searchParams.get("limit") ?? "50");
     const cursor = Number(url.searchParams.get("cursor") ?? "0");
 
+    // Resolve live runs to their current state before filtering, so
+    // ?status= reflects what's true right now, not a placeholder.
+    let filtered = [...runStore.values()].map(resolveRun);
     // tgt_empty matches no runs at all - the honest "no runs yet" state,
     // not a fake empty page caused by an over-strict filter.
-    let filtered = runs;
     if (targetId) filtered = filtered.filter((r) => r.target_id === targetId);
     if (suiteId) filtered = filtered.filter((r) => r.suite_id === suiteId);
     if (status) filtered = filtered.filter((r) => r.status === status);
@@ -36,21 +66,19 @@ export const runHandlers = [
   }),
 
   http.get("*/runs/:id", async ({ params }) => {
-    const run = runs.find((r) => r.id === params.id);
+    const run = runStore.get(params.id as string);
     if (!run) return errorResponse(404, "not_found", "Run not found.");
-    return json(RunDetailSchema, run);
+    return json(RunDetailSchema, resolveRun(run));
   }),
 
   http.post("*/runs/:id/cancel", async ({ params }) => {
-    const run = runs.find((r) => r.id === params.id);
+    const run = runStore.get(params.id as string);
     if (!run) return errorResponse(404, "not_found", "Run not found.");
-    if (run.finished_at) {
+    const current = resolveRun(run);
+    if (current.finished_at) {
       return errorResponse(409, "already_finished", "Run already finished.");
     }
-    return json(RunDetailSchema, {
-      ...run,
-      status: "cancelled",
-      finished_at: new Date().toISOString(),
-    });
+    cancelRun(current.id);
+    return json(RunDetailSchema, resolveRun(run));
   }),
 ];

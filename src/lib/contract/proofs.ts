@@ -9,9 +9,16 @@ import { StepSchema } from "./runs";
  * screenshots, a hash, and its compute cost. It can optionally be shared
  * publicly via an opaque token - the public route is unauthenticated by
  * design (that's the point of sharing a proof), which is exactly why
- * screenshot URL security is an open decision (docs/API_CONTRACT.md):
- * a screenshot of the customer's authenticated app is not public data
- * even when the proof page around it is.
+ * screenshot authorization (docs/API_CONTRACT.md) is two classes, not one:
+ *   - GET /proofs/{id} (authenticated): session-scoped screenshot URLs,
+ *     same cookie as the rest of the API.
+ *   - GET /p/{token} (public): proof-scoped screenshot URLs, signed
+ *     against that proof's own share token, scoped to that one run, and
+ *     revoked the moment the proof is revoked. Never a bearer token in
+ *     the URL itself.
+ * Same Proof/Step shape either way - the backing authorization differs
+ * per endpoint, which is exactly why it's stated per endpoint below
+ * rather than once at the type level.
  */
 
 export const ShareSchema = z
@@ -62,6 +69,10 @@ export function registerProofPaths(registry: OpenAPIRegistry) {
     path: "/proofs/{id}",
     tags: ["proofs"],
     summary: "Get a proof (authenticated)",
+    description:
+      "Screenshot URLs on this response are session-scoped: authorized by the " +
+      "same session cookie as any other API call, not signed or token-bearing. " +
+      "See docs/API_CONTRACT.md's screenshot authorization section.",
     security: [{ cookieAuth: [] }],
     request: { params: ProofIdParam },
     responses: {
@@ -84,7 +95,11 @@ export function registerProofPaths(registry: OpenAPIRegistry) {
     description:
       "No cookie required - this is the link a customer shares externally. " +
       "Rendered by a public Next route handler/page per CLAUDE.md, not proxied " +
-      "to the API from a general-purpose route.",
+      "to the API from a general-purpose route. Screenshot URLs on this response " +
+      "are proof-scoped: signed against this proof's own share token, valid only " +
+      "for this one run, and revoked the moment the proof is revoked (a proof " +
+      "page that still renders screenshots after revocation is a bug). Never a " +
+      "bearer/session token in the URL - see docs/API_CONTRACT.md.",
     request: { params: ShareTokenParam },
     responses: {
       200: {

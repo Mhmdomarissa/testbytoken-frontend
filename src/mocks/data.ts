@@ -87,7 +87,7 @@ const pageSettings: z.infer<typeof PageSchema> = {
   title: PAGE_XSS_TITLE,
 };
 
-const modCheckout: z.infer<typeof ModuleSchema> = {
+export const modCheckout: z.infer<typeof ModuleSchema> = {
   id: "mod_checkout",
   name: "Checkout flow",
   pages: [pageHome],
@@ -97,7 +97,7 @@ const modCheckout: z.infer<typeof ModuleSchema> = {
 
 // The honest empty state: a module where nothing could be uniquely
 // located, so nothing got generated - zero, not "some".
-const modSettings: z.infer<typeof ModuleSchema> = {
+export const modSettings: z.infer<typeof ModuleSchema> = {
   id: "mod_settings",
   name: "Account settings",
   pages: [pageSettings],
@@ -329,23 +329,33 @@ export const runFailed: z.infer<typeof RunDetailSchema> = {
   ],
 };
 
-// Still executing - GET /jobs/{id}/events for this run's id streams new
-// step events in src/mocks/handlers/events.ts, so `npm run dev` has a
-// live SSE path to exercise without a real backend.
-export const runStreaming: z.infer<typeof RunDetailSchema> = {
-  id: "run_streaming_1",
-  workspace_id: workspace.id,
-  target_id: targetCheckout.id,
-  suite_id: suiteCheckout.id,
-  status: "running",
-  pass_rate: 1,
-  coverage: { generated: 21, candidate: 24 },
-  token_cost: 1.1,
-  proof_id: null,
-  started_at: "2026-09-16T12:00:00Z",
-  finished_at: null,
-  steps: [step(0, { action: "navigate", target: pageHome.url })],
-};
+// Three stateful, time-based scenarios (Phase A review, §5) - their
+// status/steps/pass_rate/finished_at below are placeholders overwritten by
+// src/mocks/lifecycle.ts's computeRunState() every time they're fetched;
+// what's here is just the part of the shape that doesn't change over
+// time (ids, target, suite, coverage). See lifecycle.ts's
+// LIVE_PASS_TIMELINE/LIVE_FAIL_TIMELINE/LIVE_STALL_TIMELINE for what
+// actually happens and when.
+function liveRunBase(id: string): z.infer<typeof RunDetailSchema> {
+  return {
+    id,
+    workspace_id: workspace.id,
+    target_id: targetCheckout.id,
+    suite_id: suiteCheckout.id,
+    status: "running",
+    pass_rate: 1,
+    coverage: { generated: 21, candidate: 24 },
+    token_cost: 1.1,
+    proof_id: null,
+    started_at: now,
+    finished_at: null,
+    steps: [],
+  };
+}
+
+export const runLivePass = liveRunBase("run_live_pass_1");
+export const runLiveFail = liveRunBase("run_live_fail_1");
+export const runLiveStall = liveRunBase("run_live_stall_1");
 
 const LONG_RUN_STEP_COUNT = 64;
 
@@ -387,7 +397,14 @@ export const runLong: z.infer<typeof RunDetailSchema> = {
   }),
 };
 
-export const runs = [runPassed, runFailed, runStreaming, runLong];
+export const runs = [
+  runPassed,
+  runFailed,
+  runLong,
+  runLivePass,
+  runLiveFail,
+  runLiveStall,
+];
 
 // ---------------------------------------------------------------------
 // Proofs

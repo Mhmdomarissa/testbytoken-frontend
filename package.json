@@ -23,6 +23,7 @@
     "test": "vitest run",
     "bundle-budget": "node scripts/check-bundle-budget.mjs",
     "generate:openapi": "tsx scripts/generate-openapi.ts",
+    "check:status-contrast": "node scripts/check-status-contrast.mjs",
     "contract-drift": "node scripts/check-contract-drift.mjs"
   },
   "dependencies": {

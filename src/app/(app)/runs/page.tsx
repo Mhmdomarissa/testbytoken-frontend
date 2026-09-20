@@ -10,6 +10,7 @@ import { useResource } from "@/hooks/useResource";
 import { ListSkeleton } from "@/components/state/ListSkeleton";
 import { EmptyState } from "@/components/state/EmptyState";
 import { ErrorState } from "@/components/state/ErrorState";
+import { StatusBadge, type Status } from "@/components/status/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -25,12 +26,16 @@ const RunListResponseSchema = paginated(RunSummarySchema);
 // Run status vocabulary differs slightly from the six-value step/design
 // status scale (a run additionally has "queued"/"running"/"passed"/
 // "failed"/"cancelled") - this maps each onto the closest status token.
-const STATUS_TOKEN: Record<z.infer<typeof RunStatusSchema>, string> = {
+const STATUS_TOKEN: Record<z.infer<typeof RunStatusSchema>, Status> = {
   queued: "queued",
   running: "running",
   passed: "pass",
   failed: "fail",
   cancelled: "skipped",
+  // Same color family as `failed` (both are bad outcomes) - the distinct
+  // "timed_out" text label (passed separately below) is what actually
+  // distinguishes it, not the color.
+  timed_out: "fail",
 };
 
 export default function RunsPage() {
@@ -107,16 +112,10 @@ function RunsList() {
               <TableRow key={run.id}>
                 <TableCell className="font-mono text-xs">{run.id}</TableCell>
                 <TableCell>
-                  <span
-                    className="inline-flex items-center border px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide"
-                    style={{
-                      color: `var(--status-${STATUS_TOKEN[run.status]}-fg)`,
-                      backgroundColor: `var(--status-${STATUS_TOKEN[run.status]}-bg)`,
-                      borderColor: `var(--status-${STATUS_TOKEN[run.status]}-border)`,
-                    }}
-                  >
-                    {run.status}
-                  </span>
+                  <StatusBadge
+                    status={STATUS_TOKEN[run.status]}
+                    label={run.status}
+                  />
                 </TableCell>
                 <TableCell className="tabular-nums">
                   {Math.round(run.pass_rate * 100)}%
