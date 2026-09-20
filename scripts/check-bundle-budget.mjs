@@ -67,6 +67,21 @@ const BASELINE_PATH = path.join(
 const PUBLIC_ROUTE_PREFIX = "/p/";
 const PUBLIC_ROUTE_BUDGET_BYTES = null;
 
+/**
+ * Discovered the hard way: this build is not perfectly byte-reproducible
+ * across environments. A baseline written locally (macOS, a given Node
+ * patch) failed every single route on CI (Ubuntu, a Node minor-version
+ * float) by a small, consistent amount (+0.4 to +2.2 KB, ~0.1-0.5%) - not
+ * a real regression, cross-build noise (exact cause not root-caused
+ * further: plausibly directory-iteration order affecting chunk
+ * concatenation, or a differing Node patch before CI's node-version was
+ * pinned to .nvmrc's exact version alongside this). A real regression
+ * from an added dependency or component is easily an order of magnitude
+ * bigger than this tolerance; this exists to absorb noise, not to hide
+ * genuine growth.
+ */
+const TOLERANCE_BYTES = 8 * 1024;
+
 const WRITE_MODE = process.argv.includes("--write");
 
 if (!existsSync(APP_DIR)) {
@@ -195,12 +210,12 @@ for (const { route, totalBytes, fileCount } of results) {
     continue;
   }
 
-  const over = totalBytes > ceiling;
+  const over = totalBytes > ceiling + TOLERANCE_BYTES;
   if (over) failed = true;
   const marker = over ? "FAIL" : "ok  ";
   const ceilingKb = (ceiling / 1024).toFixed(1);
   console.log(
-    `  [${marker}] ${route.padEnd(24)} ${kb.padStart(8)} KB  (baseline ${ceilingKb} KB, ${fileCount} files)`,
+    `  [${marker}] ${route.padEnd(24)} ${kb.padStart(8)} KB  (baseline ${ceilingKb} KB ±${(TOLERANCE_BYTES / 1024).toFixed(0)} KB, ${fileCount} files)`,
   );
 }
 
