@@ -2,7 +2,7 @@ import { http } from "msw";
 import { ScanSchema } from "@/lib/contract";
 import { json, errorResponse } from "../respond";
 import { loginSessionStore, scanStore, targetStore } from "../store";
-import { resolveScan, registerLiveScan } from "../lifecycle";
+import { LIVE_SCAN_IDS, resolveScan, registerLiveScan } from "../lifecycle";
 import { resolveLoginSession } from "../login";
 
 /**
@@ -93,11 +93,23 @@ export const scanHandlers = [
       const rejected = checkLoginSession(body.login_session_id);
       if (rejected) return rejected;
     }
-    return json(ScanSchema, {
-      ...current,
-      status: "completed",
-      parked_reason: null,
-      login_session_id: body.login_session_id ?? current.login_session_id,
+    // Continuing RECORDS the login session on the scan and it stays that way:
+    // a live scan then resolves as one that had a session all along (it
+    // completes), and a static parked fixture is stored as completed.
+    const loginSessionId = body.login_session_id ?? current.login_session_id;
+    const base = scanStore.get(current.id)!;
+    const continued = LIVE_SCAN_IDS.has(current.id)
+      ? { ...base, login_session_id: loginSessionId }
+      : {
+          ...base,
+          status: "completed" as const,
+          parked_reason: null,
+          login_session_id: loginSessionId,
+        };
+    scanStore.set(current.id, {
+      ...continued,
+      updated_at: new Date().toISOString(),
     });
+    return json(ScanSchema, resolveScan(scanStore.get(current.id)!));
   }),
 ];

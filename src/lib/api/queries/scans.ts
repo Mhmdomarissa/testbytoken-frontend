@@ -55,13 +55,19 @@ export function useCreateScan() {
   });
 }
 
-/** Resumes a `parked` scan once the customer has signed in themselves (B6). */
+/**
+ * Resumes a `parked` scan once the customer has signed in themselves (B6).
+ * The body is just the opaque id of a COMPLETED login session - there is
+ * nothing else to send, and no credential (docs/API_CONTRACT.md).
+ */
 export function useContinueScan(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => apiPost(`/scans/${id}/continue`, ScanSchema),
+    mutationFn: (body: { login_session_id: string }) =>
+      apiPost(`/scans/${id}/continue`, ScanSchema, body),
     onSuccess: (scan) => {
       queryClient.setQueryData(queryKeys.scans.detail(id), scan);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.targets.all() });
     },
   });
 }
