@@ -108,6 +108,8 @@ export const EventIdSchema = z
       "canonical decimal form (no sign, no leading zeros, at most " +
       "9007199254740991), STRICTLY increasing within a job. Compare " +
       "numerically. Gaps are permitted; reordering and reuse are not. " +
+      "Clients MUST NEVER infer a missing event from a numeric gap: ids " +
+      "are ordered, not dense, and `?since=` is the ONLY resume mechanism. " +
       "Pass the last-seen value as `?since=` to resume - events with a " +
       "greater id are delivered.",
     example: "42",

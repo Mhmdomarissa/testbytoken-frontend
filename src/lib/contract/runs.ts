@@ -117,7 +117,7 @@ const RunSharedFields = {
   target_id: IdSchema,
   suite_id: IdSchema.nullable().openapi({
     description:
-      "The suite this run executed, or null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set.",
+      "The suite this run executed: NULLABLE - non-null only for a suite-originated run, null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set. Suites survive alongside plans; no further suite semantics are defined until Phase C.",
   }),
   plan_id: IdSchema.nullable().openapi({
     description:
@@ -232,6 +232,15 @@ export function registerRunPaths(registry: OpenAPIRegistry) {
     path: "/runs/{id}",
     tags: ["runs"],
     summary: "Get a run's full detail, including every step",
+    description:
+      "AUTHORITATIVE. This response is the source of truth for a run's " +
+      "status and steps. `GET /jobs/{id}/events` is a delivery mechanism " +
+      "for changes to this state, never a second opinion about it: if the " +
+      "two ever disagree, this wins. Clients reconcile against it when a " +
+      "stream reconnects and when it delivers `done`. The server MUST " +
+      "derive both from the same state, so a step present here is present " +
+      "in the stream and vice versa - including the terminal step of a " +
+      "`timed_out` run and the `skipped` steps of a `cancelled` one.",
     security: [{ cookieAuth: [] }],
     request: { params: RunIdParam },
     responses: {

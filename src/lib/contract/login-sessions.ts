@@ -78,8 +78,17 @@ export const LoginSessionSchema = z
           "httpOnly cookie scoped to that origin, after which it is useless. " +
           "This is the one deliberate exception to 'never a token in a URL' " +
           "(docs/API_CONTRACT.md), and is what makes the live view usable " +
-          "cross-origin at all. Re-fetch the session to get a fresh one; " +
-          "never store it.",
+          "cross-origin at all. It is allowed ONLY under four conditions, " +
+          "each of which the server MUST satisfy: (1) CONSUMPTION IS ATOMIC " +
+          "AND SINGLE-USE, server-side - of two concurrent requests with " +
+          "the same ticket exactly one succeeds; (2) the landing page is " +
+          "served with `Referrer-Policy: no-referrer`, so the ticket cannot " +
+          "leak through a Referer header; (3) the landing page strips the " +
+          "ticket from the address bar (`history.replaceState`) as soon as " +
+          "it has been exchanged, so it does not survive in history or a " +
+          "copied URL; (4) the ticket's scope is that ONE session view - " +
+          "it grants nothing on any other login session, workspace or " +
+          "endpoint. Re-fetch the session to get a fresh one; never store it.",
       }),
     expires_at: TimestampSchema.openapi({
       description:

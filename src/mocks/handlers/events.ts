@@ -9,6 +9,8 @@ import { runStore, scanStore } from "../store";
 import {
   LIVE_RUN_TIMELINES,
   LIVE_SCAN_IDS,
+  onRunCancelled,
+  scanFailureFor,
   elapsedMsFor,
   runEventLog,
   pendingRunEvents,
@@ -105,9 +107,10 @@ export const eventHandlers = [
       pending = [];
     } else {
       const elapsed = elapsedMsFor(jobId);
-      backlog = scanEventLog(elapsed, scan?.target_id);
+      const fails = scan ? scanFailureFor(scan.target_url) !== null : false;
+      backlog = scanEventLog(elapsed, fails);
       pending = LIVE_SCAN_IDS.has(jobId)
-        ? pendingScanEvents(elapsed, scan?.target_id)
+        ? pendingScanEvents(elapsed, fails)
         : [];
     }
 
@@ -123,15 +126,20 @@ export const eventHandlers = [
       if (heartbeat !== undefined) clearInterval(heartbeat);
     };
 
+    let unsubscribeCancel = () => {};
     const stream = new ReadableStream({
       cancel() {
         for (const t of timers) clearTimeout(t);
         stopHeartbeat();
+        unsubscribeCancel();
       },
       start(controller) {
-        for (const event of backlog) {
+        let lastSentId = since;
+        const send = (event: JobEvent) => {
           controller.enqueue(encoder.encode(sseFrame(event)));
-        }
+          lastSentId = Number(event.id);
+        };
+        for (const event of backlog) send(event);
 
         if (pending.length === 0) {
           // Nothing left to happen (already resolved, or a static
@@ -160,7 +168,7 @@ export const eventHandlers = [
           // after the drop - the client has to get it via ?since=.
           if (dropThisConnection && delayMs >= DROP_AFTER_MS) continue;
           const t = setTimeout(() => {
-            controller.enqueue(encoder.encode(sseFrame(event)));
+            send(event);
             if (event.type === "done") {
               stopHeartbeat();
               controller.close();
@@ -178,9 +186,29 @@ export const eventHandlers = [
           );
         }
 
+        // A cancellation rewrites the run's timeline (lifecycle.ts). What
+        // was scheduled above is now stale: drop it, deliver what the NEW
+        // timeline says has happened since, which ends in `done: cancelled`.
+        const unsubscribe = run
+          ? onRunCancelled(run.id, () => {
+              for (const t of timers) clearTimeout(t);
+              stopHeartbeat();
+              const rewritten = LIVE_RUN_TIMELINES.get(run.id)!;
+              for (const event of runEventLog(
+                rewritten,
+                elapsedMsFor(run.id),
+              )) {
+                if (Number(event.id) > lastSentId) send(event);
+              }
+              controller.close();
+            })
+          : () => {};
+        unsubscribeCancel = unsubscribe;
+
         request.signal.addEventListener("abort", () => {
           for (const t of timers) clearTimeout(t);
           stopHeartbeat();
+          unsubscribe();
         });
       },
     });
