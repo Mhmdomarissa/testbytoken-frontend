@@ -37,6 +37,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
 import { StatusBadge, type Status } from "@/components/status/StatusBadge";
+import { PassRateCoverage } from "@/components/status/PassRateCoverage";
+import { ResultReason } from "@/components/status/ResultReason";
 
 const environmentItems = [
   { label: "Select environment", value: null },
@@ -146,6 +148,24 @@ export default function ThemePreviewPage() {
           {statusSwatches.map((s) => (
             <StatusBadge key={s} status={s} />
           ))}
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Two more honesty primitives from the Phase B brief (&sect;1.2,
+          &sect;1.3) &mdash; structural, not stylistic: pass rate can&apos;t
+          ship without coverage, and a skipped/ungrounded reason is always
+          shown, never hidden.
+        </p>
+        <div className="flex flex-col gap-2">
+          <PassRateCoverage
+            passRate={1}
+            coverage={{ generated: 3, candidate: 24 }}
+          />
+          <ResultReason
+            variant="ungrounded"
+            reason={
+              'More than one element matched this locator ("button.primary") - the engine can\'t reliably target it, so no scenario was generated.'
+            }
+          />
         </div>
       </section>
 
