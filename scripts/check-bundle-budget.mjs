@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Bundle budget gate for CI.
+ * Bundle budget gate for CI - a per-route RATCHET, not a fixed number.
  *
  * Next.js 16 removed the "First Load JS" column from `next build` output
  * (the team found it unreliable for RSC architectures - see the "Removed
@@ -18,41 +18,71 @@
  * and `next build`. A `next build --webpack` output uses a different
  * manifest shape and will not parse here.
  *
- * PROVISIONAL BUDGET: on this Next 16 + Turbopack + React 19 baseline, a
- * completely empty route cost ~186 KB gzipped before shadcn/Base UI existed
- * (A1). The brief's original 150 KB/route figure is below that floor and
- * would fail on every route unconditionally.
+ * HISTORY - why this is a ratchet and not a fixed number: this script used
+ * to enforce a single guessed KB-per-route ceiling. That number moved four
+ * times (150 -> 220 -> 300 -> 460 KB) across Phase A as more of the real
+ * app came into existence, each time invalidated by the next real
+ * measurement - a strong signal that guessing the "right" number in
+ * advance doesn't work here. Per the Phase A review (§2): replace the
+ * guess with a ratchet. `bundle-budget-baseline.json` (committed) records
+ * each route's own current measured size as ITS ceiling. This script fails
+ * if any route's build now exceeds ITS OWN recorded baseline - every
+ * regression is visible, and nothing is ever compared to another route's
+ * number or to a guessed target.
  *
- * A4 added `TooltipProvider` and `Toaster` at the root layout, so every
- * route - not just ones using tooltips/toasts - now pays for that JS too.
- * That moved the real floor to ~253 KB (measured on `/_not-found`, which
- * imports none of the themed components).
+ * A route with no baseline entry (new route) also fails, deliberately -
+ * run `node scripts/check-bundle-budget.mjs --write` to measure it and add
+ * it to the baseline, and say why in the PR body if you're deliberately
+ * accepting a larger number for an existing route (the baseline diff makes
+ * the size of that decision visible in review).
  *
- * A7 (the app shell) is the first place real, permanent authenticated
- * routes exist, each pulling in Sidebar, Command, DropdownMenu, Field,
- * Spinner, Empty, and Alert on top of A4's baseline. Measured cost:
- * ~435-437 KB on every shell route (/, /targets, /runs, /suites, /usage),
- * ~375 KB on /sign-in (fewer components, no sidebar shell). This is not a
- * bug - checked the largest chunk for anything that shouldn't be there
- * (accidentally-bundled mock fixture data, the zod-to-openapi generator
- * classes) and found neither; it's real, load-bearing UI weight.
- *
- * 460 KB is set here as floor-plus-headroom for the shell routes. This is
- * the THIRD time this number has moved (150 -> 220 -> 300 -> 460) as more
- * of the real app came into existence - flagged prominently in the Phase A
- * report as needing an actual decision rather than another mock-driven
- * guess, especially since real product screens in later phases will add
- * more weight still, not less. Change this constant once a real number is
- * agreed.
+ * PUBLIC PROOF PAGE: the review calls for a separate, tight budget for the
+ * public proof page (`/p/[token]`) specifically, well below the app
+ * shell's cost - it's opened cold, often on a phone, by someone who didn't
+ * run the test. That route doesn't exist yet (Phase A built no product
+ * screens), so there is nothing to measure and no honest number to write
+ * here - see PUBLIC_ROUTE_BUDGET_BYTES below. Set it for real, from a real
+ * measurement, when that route is built; don't invent a number now.
  */
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { gzipSync } from "node:zlib";
 import path from "node:path";
 
-const BUDGET_BYTES = 460 * 1024; // provisional - see comment above
-const NEXT_DIR = path.join(process.cwd(), ".next");
+const REPO_ROOT = path.join(import.meta.dirname, "..");
+const NEXT_DIR = path.join(REPO_ROOT, ".next");
 const APP_DIR = path.join(NEXT_DIR, "server", "app");
+const BASELINE_PATH = path.join(
+  import.meta.dirname,
+  "bundle-budget-baseline.json",
+);
+
+/**
+ * Deliberately tight cap for any public, unauthenticated proof route
+ * (path starting with "/p/"), enforced separately from - and well below -
+ * the ratcheted app-shell baselines below. NOT SET: there is no such
+ * route yet to measure honestly. When one exists, measure it, then set
+ * this to a real, deliberately tight number and explain the choice here.
+ */
+const PUBLIC_ROUTE_PREFIX = "/p/";
+const PUBLIC_ROUTE_BUDGET_BYTES = null;
+
+/**
+ * Discovered the hard way: this build is not perfectly byte-reproducible
+ * across environments. A baseline written locally (macOS, a given Node
+ * patch) failed every single route on CI (Ubuntu, a Node minor-version
+ * float) by a small, consistent amount (+0.4 to +2.2 KB, ~0.1-0.5%) - not
+ * a real regression, cross-build noise (exact cause not root-caused
+ * further: plausibly directory-iteration order affecting chunk
+ * concatenation, or a differing Node patch before CI's node-version was
+ * pinned to .nvmrc's exact version alongside this). A real regression
+ * from an added dependency or component is easily an order of magnitude
+ * bigger than this tolerance; this exists to absorb noise, not to hide
+ * genuine growth.
+ */
+const TOLERANCE_BYTES = 8 * 1024;
+
+const WRITE_MODE = process.argv.includes("--write");
 
 if (!existsSync(APP_DIR)) {
   console.error(`No build output found at ${APP_DIR}. Run "next build" first.`);
@@ -135,23 +165,67 @@ for (const manifestFile of manifests) {
 
 results.sort((a, b) => a.route.localeCompare(b.route));
 
+if (WRITE_MODE) {
+  const baseline = Object.fromEntries(
+    results.map((r) => [r.route, r.totalBytes]),
+  );
+  writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + "\n");
+  console.log(`Wrote ${BASELINE_PATH} with ${results.length} routes:\n`);
+  for (const { route, totalBytes } of results) {
+    console.log(`  ${route.padEnd(24)} ${(totalBytes / 1024).toFixed(1)} KB`);
+  }
+  console.log(
+    "\nCommit this file. If any number here is a deliberate increase over",
+  );
+  console.log("what was previously committed, say why in the PR body.");
+  process.exit(0);
+}
+
+const baseline = existsSync(BASELINE_PATH)
+  ? JSON.parse(readFileSync(BASELINE_PATH, "utf8"))
+  : {};
+
 let failed = false;
 console.log(
-  `Bundle budget: ${(BUDGET_BYTES / 1024).toFixed(0)} KB gzipped per route\n`,
+  "Bundle budget: per-route ratchet against bundle-budget-baseline.json\n",
 );
+
 for (const { route, totalBytes, fileCount } of results) {
   const kb = (totalBytes / 1024).toFixed(1);
-  const over = totalBytes > BUDGET_BYTES;
+  const isPublicProof = route.startsWith(PUBLIC_ROUTE_PREFIX);
+  const ceiling = isPublicProof ? PUBLIC_ROUTE_BUDGET_BYTES : baseline[route];
+
+  if (isPublicProof && ceiling === null) {
+    console.log(
+      `  [WARN] ${route.padEnd(24)} ${kb.padStart(8)} KB  - public proof route with no set budget yet; see PUBLIC_ROUTE_BUDGET_BYTES`,
+    );
+    continue;
+  }
+
+  if (ceiling === undefined) {
+    console.error(
+      `  [FAIL] ${route.padEnd(24)} ${kb.padStart(8)} KB  - no baseline entry. Run with --write to add it.`,
+    );
+    failed = true;
+    continue;
+  }
+
+  const over = totalBytes > ceiling + TOLERANCE_BYTES;
   if (over) failed = true;
   const marker = over ? "FAIL" : "ok  ";
+  const ceilingKb = (ceiling / 1024).toFixed(1);
   console.log(
-    `  [${marker}] ${route.padEnd(24)} ${kb.padStart(8)} KB  (${fileCount} files)`,
+    `  [${marker}] ${route.padEnd(24)} ${kb.padStart(8)} KB  (baseline ${ceilingKb} KB ±${(TOLERANCE_BYTES / 1024).toFixed(0)} KB, ${fileCount} files)`,
   );
 }
 
 if (failed) {
-  console.error("\nOne or more routes exceed the bundle budget.");
+  console.error(
+    "\nOne or more routes exceed their baseline, or have no baseline yet.\n" +
+      "If this is a deliberate increase: run with --write, commit the updated\n" +
+      "bundle-budget-baseline.json, and explain why in the PR body.",
+  );
   process.exit(1);
 }
 
-console.log("\nAll routes within budget.");
+console.log("\nAll routes at or under their baseline.");

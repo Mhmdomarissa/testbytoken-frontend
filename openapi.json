@@ -3,12 +3,12 @@
   "info": {
     "title": "Test by Token API",
     "version": "0.1.0",
-    "description": "The contract the backend team implements to match this frontend. Generated from Zod schemas in src/lib/contract/ - see docs/API_CONTRACT.md for essential/nice-to-have status per endpoint and two open decisions requiring sign-off (SSE auth, screenshot URL security)."
+    "description": "The contract the backend team implements to match this frontend. Generated from Zod schemas in src/lib/contract/ - see docs/API_CONTRACT.md for essential/nice-to-have status per endpoint and two settled requirements with a deployment constraint attached (SSE auth, screenshot URL security)."
   },
   "servers": [
     {
       "url": "{backendOrigin}",
-      "description": "The backend's own origin - a separate service the browser calls directly (CLAUDE.md: no Next.js proxy/BFF). Endpoint paths below have no additional prefix, matching the brief's own endpoint list.",
+      "description": "The backend's own origin - a separate service the browser calls directly (CLAUDE.md: no Next.js proxy/BFF). Endpoint paths below have no additional prefix, matching the brief's own endpoint list. MUST be a sibling subdomain of the app (e.g. api.<domain> alongside app.<domain>), cookie scoped to the parent domain - required for SSE auth to work without special credential handling; see docs/API_CONTRACT.md's SSE authentication section.",
       "variables": {
         "backendOrigin": {
           "default": "https://api.testbytoken.example"
@@ -22,7 +22,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "session",
-        "description": "httpOnly session cookie (CLAUDE.md: auth token lives in an httpOnly cookie, never localStorage). Recommended - not yet finalized - for SSE auth too; see docs/API_CONTRACT.md."
+        "description": "httpOnly session cookie (CLAUDE.md: auth token lives in an httpOnly cookie, never localStorage). Also the decided auth mechanism for SSE (GET /jobs/{id}/events), with a deployment constraint attached - see docs/API_CONTRACT.md."
       }
     },
     "schemas": {
@@ -460,9 +460,10 @@
               "running",
               "passed",
               "failed",
-              "cancelled"
+              "cancelled",
+              "timed_out"
             ],
-            "description": "Overall run status."
+            "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure."
           },
           "pass_rate": {
             "type": "number",
@@ -590,7 +591,7 @@
               "null"
             ],
             "format": "uri",
-            "description": "Resolved, ready-to-fetch URL. Whether it's a signed expiring URL or a session-authenticated route is a backend decision, not fixed by this contract - see the open decision in docs/API_CONTRACT.md."
+            "description": "Resolved, ready-to-fetch URL - never a token embedded in the URL itself (docs/API_CONTRACT.md). On GET /runs/{id} this is a session-authenticated route (same cookie as the rest of the API): this Step only ever appears here inside the authenticated app. When the same Step shape appears embedded in a Proof (GET /proofs/{id} or the public GET /p/{token}), see Proof's own screenshot authorization split in docs/API_CONTRACT.md - the field name and shape are identical, the backing authorization is not."
           }
         },
         "required": [
@@ -666,9 +667,10 @@
               "running",
               "passed",
               "failed",
-              "cancelled"
+              "cancelled",
+              "timed_out"
             ],
-            "description": "Overall run status."
+            "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure."
           },
           "pass_rate": {
             "type": "number",
@@ -1744,12 +1746,13 @@
                 "running",
                 "passed",
                 "failed",
-                "cancelled"
+                "cancelled",
+                "timed_out"
               ],
-              "description": "Overall run status."
+              "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure."
             },
             "required": false,
-            "description": "Overall run status.",
+            "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure.",
             "name": "status",
             "in": "query"
           }
@@ -1891,7 +1894,7 @@
           "events"
         ],
         "summary": "Subscribe to a job's events (SSE)",
-        "description": "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`. Reconnect with `?since=<last-seen id>` to resume without re-delivering earlier events. Authentication for this endpoint is an open decision - see docs/API_CONTRACT.md.",
+        "description": "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`. Reconnect with `?since=<last-seen id>` to resume without re-delivering earlier events. Authenticated by cookie (EventSource sends it automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be served from a sibling subdomain of the app (e.g. app.<domain> / api.<domain>), cookie scoped to the parent domain, so this is same-site and EventSource needs no special handling. Never a token in the query string - see docs/API_CONTRACT.md.",
         "security": [
           {
             "cookieAuth": []
@@ -2256,6 +2259,7 @@
           "proofs"
         ],
         "summary": "Get a proof (authenticated)",
+        "description": "Screenshot URLs on this response are session-scoped: authorized by the same session cookie as any other API call, not signed or token-bearing. See docs/API_CONTRACT.md's screenshot authorization section.",
         "security": [
           {
             "cookieAuth": []
@@ -2305,7 +2309,7 @@
           "proofs"
         ],
         "summary": "Public, unauthenticated proof view",
-        "description": "No cookie required - this is the link a customer shares externally. Rendered by a public Next route handler/page per CLAUDE.md, not proxied to the API from a general-purpose route.",
+        "description": "No cookie required - this is the link a customer shares externally. Rendered by a public Next route handler/page per CLAUDE.md, not proxied to the API from a general-purpose route. Screenshot URLs on this response are proof-scoped: signed against this proof's own share token, valid only for this one run, and revoked the moment the proof is revoked (a proof page that still renders screenshots after revocation is a bug). Never a bearer/session token in the URL - see docs/API_CONTRACT.md.",
         "parameters": [
           {
             "schema": {

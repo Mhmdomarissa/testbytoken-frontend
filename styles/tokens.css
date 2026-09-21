@@ -42,6 +42,19 @@
    * (>=4.5:1) against both --color-blue-deep and --color-blue-mid; every
    * border is AA non-text (>=3:1) against both. See DESIGN_SYSTEM_APP.md
    * for the OKLCH coordinates and how each was searched.
+   *
+   * Foreground lightness is deliberately spread (L 0.648-0.80), not
+   * independently minimized per state - the first derivation minimized
+   * each to its own AA floor and they converged to within 0.03 of each
+   * other, making every pair ~1.0:1 against each other (a WCAG 1.4.1
+   * failure caught in the Phase A review: colorblind and greyscale
+   * viewers could not tell pass from fail). Color is still only a
+   * secondary channel - every place a status renders, it must also carry
+   * a distinct-silhouette icon and a text label (StatusBadge component);
+   * this spread narrows the gap for full-color viewers, it does not
+   * replace the non-color channels. See DESIGN_SYSTEM_APP.md for the
+   * measured pairwise ratios, including under color-vision-deficiency
+   * simulation.
    * ------------------------------------------------------------------- */
   --status-warning-fg: var(
     --color-gold
@@ -49,23 +62,23 @@
   --status-warning-bg: #3a2b0d;
   --status-warning-border: #85682d;
 
-  --status-fail-fg: #db6368;
+  --status-fail-fg: #db6368; /* L=0.648 (at its AA floor - deepest/most saturated of the five) */
   --status-fail-bg: #472021;
   --status-fail-border: #b04c50;
 
-  --status-pass-fg: #48995d;
+  --status-pass-fg: #83d494; /* L=0.80 (lightest of the five - pass and fail are the deliberate extremes) */
   --status-pass-bg: #1a3520;
   --status-pass-border: #387949;
 
-  --status-running-fg: #0095bc;
+  --status-running-fg: #49c1ea; /* L=0.76 */
   --status-running-bg: #0a3341;
   --status-running-border: #007695;
 
-  --status-queued-fg: #998674;
+  --status-queued-fg: #a89482; /* L=0.68 */
   --status-queued-bg: #362c22;
   --status-queued-border: #796a5b;
 
-  --status-skipped-fg: #85889a;
+  --status-skipped-fg: #a1a3b6; /* L=0.72 */
   --status-skipped-bg: #2c2d37;
   --status-skipped-border: #6a6b7a;
 

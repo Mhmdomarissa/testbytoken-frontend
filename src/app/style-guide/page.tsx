@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/toast";
+import { StatusBadge, type Status } from "@/components/status/StatusBadge";
 
 const environmentItems = [
   { label: "Select environment", value: null },
@@ -44,43 +45,13 @@ const environmentItems = [
   { label: "Production", value: "production" },
 ];
 
-const statusSwatches = [
-  {
-    name: "pass",
-    fg: "var(--status-pass-fg)",
-    bg: "var(--status-pass-bg)",
-    border: "var(--status-pass-border)",
-  },
-  {
-    name: "fail",
-    fg: "var(--status-fail-fg)",
-    bg: "var(--status-fail-bg)",
-    border: "var(--status-fail-border)",
-  },
-  {
-    name: "running",
-    fg: "var(--status-running-fg)",
-    bg: "var(--status-running-bg)",
-    border: "var(--status-running-border)",
-  },
-  {
-    name: "queued",
-    fg: "var(--status-queued-fg)",
-    bg: "var(--status-queued-bg)",
-    border: "var(--status-queued-border)",
-  },
-  {
-    name: "skipped",
-    fg: "var(--status-skipped-fg)",
-    bg: "var(--status-skipped-bg)",
-    border: "var(--status-skipped-border)",
-  },
-  {
-    name: "warning",
-    fg: "var(--status-warning-fg)",
-    bg: "var(--status-warning-bg)",
-    border: "var(--status-warning-border)",
-  },
+const statusSwatches: Status[] = [
+  "pass",
+  "fail",
+  "running",
+  "queued",
+  "skipped",
+  "warning",
 ];
 
 const runRows = [
@@ -165,22 +136,14 @@ export default function ThemePreviewPage() {
           <Badge variant="destructive">Destructive</Badge>
         </div>
         <p className="text-xs text-muted-foreground">
-          Semantic status scale from A3 (fg / bg wash / border, not a Badge
-          variant yet &mdash; that comes with real run UI):
+          Semantic status scale (StatusBadge) &mdash; color, icon, and label
+          together. Per the Phase A review, color alone is a WCAG 1.4.1 bug:
+          every status must carry a distinct-silhouette icon and a text label,
+          not just a swatch.
         </p>
         <div className="flex flex-wrap gap-2">
           {statusSwatches.map((s) => (
-            <span
-              key={s.name}
-              className="inline-flex items-center border px-2 py-0.5 text-xs font-medium uppercase tracking-wide"
-              style={{
-                color: s.fg,
-                backgroundColor: s.bg,
-                borderColor: s.border,
-              }}
-            >
-              {s.name}
-            </span>
+            <StatusBadge key={s} status={s} />
           ))}
         </div>
       </section>
@@ -202,16 +165,7 @@ export default function ThemePreviewPage() {
                 <TableCell className="font-mono text-xs">{row.id}</TableCell>
                 <TableCell>{row.target}</TableCell>
                 <TableCell>
-                  <span
-                    className="inline-flex items-center border px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide"
-                    style={{
-                      color: `var(--status-${row.status}-fg)`,
-                      backgroundColor: `var(--status-${row.status}-bg)`,
-                      borderColor: `var(--status-${row.status}-border)`,
-                    }}
-                  >
-                    {row.status}
-                  </span>
+                  <StatusBadge status={row.status} />
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
                   {row.duration}

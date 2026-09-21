@@ -13,6 +13,7 @@ import {
   RunDetailSchema,
   InspectResponseSchema,
   ProofSchema,
+  ScanSchema,
 } from "@/lib/contract";
 
 /**
@@ -89,7 +90,7 @@ describe("ugly-case fixtures are real, schema-valid data", () => {
   });
 
   it("a still-running job streams live SSE events", async () => {
-    const res = await fetch(`${base}/jobs/run_streaming_1/events`);
+    const res = await fetch(`${base}/jobs/run_live_pass_1/events`);
     expect(res.headers.get("content-type")).toContain("text/event-stream");
 
     // Deliberately not calling reader.cancel() here: this MSW version's
@@ -109,5 +110,44 @@ describe("ugly-case fixtures are real, schema-valid data", () => {
     const proof = ProofSchema.parse(await res.json());
     expect(proof.hash).toMatch(/^sha256:/);
     expect(proof.steps.length).toBeGreaterThan(0);
+  });
+
+  it("POST /scans starts a scan queued, not instantly completed", async () => {
+    const res = await fetch(`${base}/scans`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspace_id: "wksp_demo",
+        target_id: "tgt_checkout",
+      }),
+    });
+    const scan = ScanSchema.parse(await res.json());
+    expect(scan.status).toBe("queued");
+    expect(scan.modules).toEqual([]);
+
+    // The same job, fetched again immediately, reflects the same live
+    // computation - polling and the initial POST response agree.
+    const again = ScanSchema.parse(
+      await (await fetch(`${base}/scans/${scan.id}`)).json(),
+    );
+    expect(again.status).toBe("queued");
+  });
+
+  it("POST /runs starts a run actually running, with real SSE events available immediately", async () => {
+    const res = await fetch(`${base}/runs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspace_id: "wksp_demo",
+        suite_id: "suite_checkout",
+        target_id: "tgt_checkout",
+      }),
+    });
+    const run = RunDetailSchema.parse(await res.json());
+    expect(run.status).toBe("running");
+    expect(run.finished_at).toBeNull();
+
+    const events = await fetch(`${base}/jobs/${run.id}/events`);
+    expect(events.headers.get("content-type")).toContain("text/event-stream");
   });
 });

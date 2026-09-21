@@ -1,7 +1,16 @@
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
-import { JobEventSchema } from "@/lib/contract";
-import { runs, runStreaming } from "../data";
+import { JobEventSchema, RunDetailSchema } from "@/lib/contract";
+import { runStore, scanStore } from "../store";
+import {
+  LIVE_RUN_TIMELINES,
+  LIVE_SCAN_IDS,
+  elapsedMsFor,
+  runEventLog,
+  pendingRunEvents,
+  scanEventLog,
+  pendingScanEvents,
+} from "../lifecycle";
 
 type JobEvent = z.infer<typeof JobEventSchema>;
 
@@ -9,8 +18,8 @@ function sseFrame(event: JobEvent): string {
   return `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
-/** Static replay log for a finished (or currently-known) run's steps. */
-function eventLogFor(run: (typeof runs)[number]): JobEvent[] {
+/** Static replay log for a run with no lifecycle (already finished). */
+function staticRunEventLog(run: z.infer<typeof RunDetailSchema>): JobEvent[] {
   const events: JobEvent[] = run.steps.map((s, i) => ({
     id: String(i),
     type: "step",
@@ -28,10 +37,22 @@ function eventLogFor(run: (typeof runs)[number]): JobEvent[] {
 
 const encoder = new TextEncoder();
 
+/**
+ * One handler for every job kind (scan or run) - both are "jobs" per the
+ * contract (docs/API_CONTRACT.md), and both now have the same shape of
+ * answer: a backlog of what's already happened, resumable via `?since=`,
+ * plus - for anything not yet resolved - real-time delivery of what's
+ * still to come, computed from the same timeline src/mocks/lifecycle.ts
+ * uses for polling. A client polling GET /runs/{id} and one subscribed
+ * here see the exact same progression, because both read the same clock.
+ */
 export const eventHandlers = [
   http.get("*/jobs/:id/events", async ({ params, request }) => {
-    const run = runs.find((r) => r.id === params.id);
-    if (!run) {
+    const jobId = params.id as string;
+    const run = runStore.get(jobId);
+    const scan = scanStore.get(jobId);
+
+    if (!run && !scan) {
       return HttpResponse.json(
         { error: { code: "not_found", message: "Job not found." } },
         { status: 404 },
@@ -41,70 +62,63 @@ export const eventHandlers = [
     const since = Number(
       new URL(request.url).searchParams.get("since") ?? "-1",
     );
-    const log = eventLogFor(run);
-    const backlog = log.filter((e) => Number(e.id) > since);
 
-    const isLive = run.id === runStreaming.id;
-    let timer: ReturnType<typeof setInterval> | undefined;
+    let backlog: JobEvent[];
+    let pending: { delayMs: number; event: JobEvent }[];
+
+    if (run && LIVE_RUN_TIMELINES.has(run.id)) {
+      const timeline = LIVE_RUN_TIMELINES.get(run.id)!;
+      const elapsed = elapsedMsFor(run.id);
+      backlog = runEventLog(timeline, elapsed);
+      pending = pendingRunEvents(timeline, elapsed);
+    } else if (run) {
+      backlog = staticRunEventLog(run);
+      pending = [];
+    } else {
+      const elapsed = elapsedMsFor(jobId);
+      backlog = scanEventLog(elapsed);
+      pending = LIVE_SCAN_IDS.has(jobId) ? pendingScanEvents(elapsed) : [];
+    }
+
+    backlog = backlog.filter((e) => Number(e.id) > since);
+
+    // Declared before the ReadableStream below, not after: `start()` runs
+    // synchronously inside the ReadableStream constructor (per the streams
+    // spec), so a `const` declared after the constructor call would still
+    // be in its temporal dead zone when `start()` tries to use it.
+    const timers: ReturnType<typeof setTimeout>[] = [];
 
     const stream = new ReadableStream({
       cancel() {
-        // Fires when the reader is cancelled directly - distinct from
-        // request.signal's "abort" below, which only covers the
-        // underlying HTTP request being aborted (the real-EventSource
-        // case). Without this, a direct reader.cancel() leaks the timer.
-        clearInterval(timer);
+        for (const t of timers) clearTimeout(t);
       },
       start(controller) {
         for (const event of backlog) {
           controller.enqueue(encoder.encode(sseFrame(event)));
         }
 
-        if (!isLive) {
-          // Finished job: the backlog is the whole story. Closing here is a
-          // known simplification for a mock server - a real EventSource
-          // will attempt to reconnect on close, get an empty backlog
-          // (since is already caught up), and close again. Harmless, if
-          // slightly noisy, until the real client explicitly stops
-          // watching a job whose last event was `done`.
+        if (pending.length === 0) {
+          // Nothing left to happen (already resolved, or a static
+          // finished job). Known simplification: a real EventSource will
+          // attempt to reconnect on close, get an empty backlog (since is
+          // already caught up), and close again - harmless, if slightly
+          // noisy, until the client explicitly stops watching a job whose
+          // last event was `done`.
           controller.close();
           return;
         }
 
-        // The one "still running" job: keep emitting synthetic step
-        // events so the SSE path has something live to exercise in dev.
-        let index = log.length;
-        timer = setInterval(() => {
-          index += 1;
-          const event: JobEvent = {
-            id: String(index),
-            type: "step",
-            step: {
-              index,
-              action: index % 2 === 0 ? "click" : "assert_visible",
-              target: `#step-${index}`,
-              assertion: null,
-              status: "pass",
-              message: "OK",
-              duration_ms: 380,
-              screenshot_url: null,
-            },
-          };
-          controller.enqueue(encoder.encode(sseFrame(event)));
+        for (const { delayMs, event } of pending) {
+          const t = setTimeout(() => {
+            controller.enqueue(encoder.encode(sseFrame(event)));
+            if (event.type === "done") controller.close();
+          }, delayMs);
+          timers.push(t);
+        }
 
-          if (index >= log.length + 5) {
-            const done: JobEvent = {
-              id: String(index + 1),
-              type: "done",
-              status: "passed",
-            };
-            controller.enqueue(encoder.encode(sseFrame(done)));
-            clearInterval(timer);
-            controller.close();
-          }
-        }, 1500);
-
-        request.signal.addEventListener("abort", () => clearInterval(timer));
+        request.signal.addEventListener("abort", () => {
+          for (const t of timers) clearTimeout(t);
+        });
       },
     });
 

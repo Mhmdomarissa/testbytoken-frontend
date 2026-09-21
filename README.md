@@ -48,26 +48,38 @@ Open http://localhost:3000.
 
 ## CI
 
-Every PR runs six required checks (`.github/workflows/ci.yml`): `typecheck`,
-`lint`, `format`, `unit`, `build`, `bundle-budget`. All are wired to fail on
-any warning, not just errors. `main` is protected: PRs required, all six
-checks must be green, no force-push.
+Every PR runs seven required checks (`.github/workflows/ci.yml`): `typecheck`,
+`lint`, `format`, `unit`, `build`, `bundle-budget`, `contract-drift`. All are
+wired to fail on any warning, not just errors. `main` is protected: PRs
+required, all seven checks must be green, no force-push.
 
-### Bundle budget — read before changing the number
+### Bundle budget — a per-route ratchet, not a guessed number
 
 `scripts/check-bundle-budget.mjs` reconstructs the old Next.js "First Load
-JS" metric per route (Next 16 removed it from build output — see the script's
-header comment for why and how). On this Next 16 + Turbopack + React 19
-baseline, an empty route cost ~186 KB gzipped before shadcn existed — pure
-framework runtime. Wiring shadcn's `TooltipProvider`/`Toaster` into the root
-layout (A4) moved that floor to **~253 KB, measured on `/_not-found`**,
-which imports none of the themed components — that JS now loads on every
-route because the providers wrap the whole app. The budget is currently set
-to **300 KB gzipped/route as a provisional placeholder**, not the 150 KB
-originally proposed in `docs/PHASE_A.md`, because 150 KB is well below the
-actual framework+UI floor and would fail unconditionally on every route.
-This needs a real decision once actual screens exist — see the Phase A
-report and `docs/DESIGN_SYSTEM_APP.md`'s "shadcn theme mapping" section.
+JS" metric per route (Next 16 removed it from build output — see the
+script's header comment for why and how).
+
+This used to be a single guessed KB-per-route ceiling. That number moved
+four times across Phase A (150 → 220 → 300 → 460 KB) as more of the real
+app came into existence, invalidated by the next real measurement every
+time. Per the Phase A review, it's now a **ratchet**:
+`scripts/bundle-budget-baseline.json` (committed) records each route's own
+current measured size as its ceiling. CI fails if a route's build exceeds
+_its own_ recorded baseline, or if a route has no baseline entry at all
+(new routes must be added deliberately). Nothing is compared to another
+route's number or to a guessed target — every regression is visible
+without pretending anyone can predict the right figure in advance.
+
+**Deliberately increasing a route's budget:** run
+`npm run bundle-budget -- --write`, inspect the diff to
+`bundle-budget-baseline.json`, commit it, and say why in the PR body.
+
+**The public proof page** (`/p/[token]`, not built yet) gets its own
+separate, tight budget once it exists — it's opened cold, often on a
+phone, by someone who didn't run the test, and shouldn't pay for the
+console's dependencies. See `PUBLIC_ROUTE_BUDGET_BYTES` in the script:
+intentionally unset, because there's no honest number to write for a
+route that doesn't exist yet.
 
 ## Mocking (no backend exists)
 
@@ -75,13 +87,39 @@ report and `docs/DESIGN_SYSTEM_APP.md`'s "shadcn theme mapping" section.
 `docs/API_CONTRACT.md` and serves fixtures from `src/mocks/data.ts` -
 the contract's reference implementation, not a stub. Fixtures deliberately
 include the ugly cases real data produces: a failed run with a real
-failure message (`run_fail_1`), a 64-step run (`run_long_1`), a still-
-running job that streams live SSE events (`run_streaming_1`), a module
+failure message (`run_fail_1`), a 64-step run (`run_long_1`), a module
 where nothing is uniquely locatable (`mod_settings`), very long and
 unicode element labels, a target with no run history at all
 (`tgt_empty`), and a page title containing `<img src=x onerror=alert(1)>`,
 covered by a passing test (`src/mocks/xss-safety.test.tsx`) proving it
 renders as inert text, never markup.
+
+**Stateful lifecycle simulation** (`src/mocks/lifecycle.ts`, added per the
+Phase A review, §5 — a mock that only returns static payloads can't
+exercise the state transitions a console actually depends on). Every
+scan/run's current state is _computed_ from elapsed time since it
+started, replayed against a fixed timeline, so polling and SSE always
+agree:
+
+- `POST /scans` progresses `queued` → `crawling` → `completed` in real
+  time, not an instantly-finished fixture.
+- `POST /runs` starts a genuinely `running` run that emits ordered step
+  events over time, both via polling `GET /runs/{id}` and via
+  `GET /jobs/{id}/events` (SSE).
+- `run_live_fail_1` fails partway through, live, with the same real
+  failure message pattern as the static `run_fail_1`.
+- `run_live_stall_1` stops emitting step events after two steps - a real
+  stall, indistinguishable from a healthy slow run until the timeout
+  fires - then resolves to a new `timed_out` status (distinct from
+  `failed`: a failure has a reason from a specific step, a timeout is the
+  _absence_ of one). This is a contract change
+  (`RunStatusSchema` gained a sixth value) surfaced by actually building
+  the simulation, not decided in the abstract.
+
+`src/mocks/lifecycle.test.ts` tests the computation directly at explicit
+elapsed times (the stall scenario alone spans 15s of simulated time - far
+too slow to wait out in a unit suite); `src/mocks/handlers.test.ts` proves
+the HTTP/SSE wiring around it.
 
 Handlers match wildcard paths (`*/runs/:id`, not `/runs/:id`) so they work
 against both same-origin dev requests and whatever absolute backend origin

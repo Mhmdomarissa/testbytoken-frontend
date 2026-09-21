@@ -39,9 +39,10 @@ had to be invented rather than copied:
    fixed-width alignment, ambiguous `l`/`1`/`I`). This uses the _platform's_
    monospace stack (`ui-monospace, "SF Mono", ... monospace`) — no
    additional webfont, no additional brand voice, just the OS's utilitarian
-   code font. This is a judgment call, not a literal reading of the rule —
-   flagged in the Phase A report for explicit sign-off rather than decided
-   silently.
+   code font. Flagged in the Phase A report as a judgment call rather than
+   a literal reading of CLAUDE.md's rule; **confirmed correct in the Phase
+   A review** — the two-font rule governs display/body type, and
+   `CLAUDE.md` now says so explicitly.
 4. **A 4px density system** for table rows and form controls at two
    densities (comfortable / compact). Marketing has no data-dense surfaces
    at all.
@@ -55,32 +56,38 @@ than introducing an unrelated color."_ Taken literally: no plain red for
 OKLCH coordinates with the hue rotated and lightness re-solved for
 contrast — not a color-wheel pick.
 
-**Method:** convert each anchor to OKLCH (Björn Ottosson's reference
-formulas — sRGB → linear → OKLab → OKLCH). Pick a target hue by rotating
-away from gold (H≈82°) or blue (H≈258°); hold chroma in the same
-intensity band the anchors already use (0.03–0.16); binary-search the
-minimum lightness `L` that clears the target contrast ratio against
-**both** `blue-deep` and `blue-mid` simultaneously (`blue-mid` is lighter
-and is almost always the binding constraint). Foreground text targets
-AA normal text (≥4.5:1); border targets AA non-text / UI components
-(≥3:1, WCAG 1.4.11). The wash background is a fill, not text, so it has no
-contrast requirement — it's the same hue at low chroma, lightness ≈0.30,
-picked to read as a raised tint over either ground.
+**Method (corrected — Phase A review, A1-FIX-2):** convert each anchor to
+OKLCH (Björn Ottosson's reference formulas — sRGB → linear → OKLab →
+OKLCH). Pick a target hue by rotating away from gold (H≈82°) or blue
+(H≈258°). The first version of this document said chroma stayed "in the
+same intensity band the anchors already use" for every state; that's true
+for `queued` and `skipped` (both disclosed as chroma _cuts_, toward
+0.03–0.04) but not for `fail`, whose chroma moved from gold's 0.0854 to
+0.1508 — nearly double, undisclosed. The honest statement of the method
+is: **hue and chroma are both re-derived per state (queued/skipped cut
+toward the anchors' low end, fail and pass/running raised toward the
+anchors' high end), and lightness is solved for contrast** — not a fixed
+chroma band with only hue changing. Foreground text targets AA normal
+text (≥4.5:1); border targets AA non-text / UI components (≥3:1, WCAG
+1.4.11). The wash background is a fill, not text, so it has no contrast
+requirement — it's the same hue at low chroma, lightness ≈0.30, picked to
+read as a raised tint over either ground.
 
-| State     | Role       | Hue (rotated from)                 | Hex       | vs `blue-deep` | vs `blue-mid` |
-| --------- | ---------- | ---------------------------------- | --------- | -------------- | ------------- |
-| `warning` | foreground | gold anchor, unrotated (H=82°)     | `#c9a96e` | **8.10:1**     | **7.06:1**    |
-| `fail`    | foreground | gold → H=20° (toward red)          | `#db6368` | **5.18:1**     | **4.51:1**    |
-| `pass`    | foreground | blue → H=150° (toward green)       | `#48995d` | **5.17:1**     | **4.51:1**    |
-| `running` | foreground | blue → H=225° (toward cyan)        | `#0095bc` | **5.20:1**     | **4.53:1**    |
-| `queued`  | foreground | gold → H=65°, chroma cut to 0.035  | `#998674` | **5.19:1**     | **4.53:1**    |
-| `skipped` | foreground | blue → H=280°, chroma cut to 0.028 | `#85889a` | **5.17:1**     | **4.50:1**    |
+| State     | Role       | Hue (rotated from)             | Chroma                                 | Hex       | vs `blue-deep` | vs `blue-mid` |
+| --------- | ---------- | ------------------------------ | -------------------------------------- | --------- | -------------- | ------------- |
+| `warning` | foreground | gold anchor, unrotated (H=82°) | 0.085 (gold's own)                     | `#c9a96e` | **8.10:1**     | **7.06:1**    |
+| `fail`    | foreground | gold → H=20° (toward red)      | 0.15 (raised from gold's 0.085)        | `#db6368` | **5.18:1**     | **4.51:1**    |
+| `pass`    | foreground | blue → H=150° (toward green)   | 0.12 (raised from blue-bright's 0.116) | `#83d494` | **10.20:1**    | **8.88:1**    |
+| `running` | foreground | blue → H=225° (toward cyan)    | 0.12                                   | `#49c1ea` | **8.72:1**     | **7.60:1**    |
+| `queued`  | foreground | gold → H=65°, chroma cut       | 0.035 (cut from gold's 0.085)          | `#a89482` | **6.24:1**     | **5.43:1**    |
+| `skipped` | foreground | blue → H=280°, chroma cut      | 0.028 (cut from blue-bright's 0.116)   | `#a1a3b6` | **7.28:1**     | **6.34:1**    |
 
-All six clear AA (4.5:1) on both grounds with 0.5–0.7:1 of headroom — deliberate,
-since these grounds are also used as `<body>` backgrounds where the actual
-rendered surface can shift slightly from color management, and because
-`blue-mid` was consistently the tighter constraint by ~0.6:1 across every
-hue tested.
+All six clear AA (4.5:1) on both grounds — `fail` sits closest to its
+floor (5.18:1 / 4.51:1) because it's deliberately the deepest, most
+saturated color in the scale; the other four carry more headroom because
+their lightness was placed for separation from `fail` and from each
+other, not minimized to the AA floor. See "Isoluminance" below for why
+that placement changed.
 
 Borders (non-text, AA ≥3:1) — same hues, lower lightness:
 
@@ -96,7 +103,89 @@ Borders (non-text, AA ≥3:1) — same hues, lower lightness:
 Backgrounds (wash fills, L=0.30, no contrast requirement — for badge/row
 tinting, always paired with the matching foreground for the actual text):
 `warning #3a2b0d` · `fail #472021` · `pass #1a3520` · `running #0a3341` ·
-`queued #362c22` · `skipped #2c2d37`.
+`queued #362c22` · `skipped #2c2d37`. Border and background hexes above
+are unchanged from the first version of this scale — the isoluminance bug
+and its fix (below) affect only the foreground lightness placement.
+
+## Isoluminance — a WCAG 1.4.1 failure, found in Phase A review (A1-FIX-1, BLOCKING)
+
+The first derivation of `fail`/`pass`/`running`/`queued`/`skipped`
+searched each state **independently** for the minimum lightness clearing
+AA against both grounds. Independent floors converge: `pass` needed
+L=0.615, `running` L=0.621, `skipped` L=0.629, `queued` L=0.631, `fail`
+L=0.648 — a 0.033 spread. Every pairwise contrast between them was
+1.00–1.01:1. That's not a rounding artifact; it means, for anyone who
+can't use hue to distinguish them — colorblindness, a greyscale print, a
+screenshot pasted into a ticket without color management — **pass and
+fail rendered as literally the same color.** Measured with a
+Viénot/Brettel-style dichromacy simulation (linear-RGB matrices, the same
+family Chrome DevTools' vision-deficiency emulation uses):
+
+| CVD type     | pass renders as | fail renders as | contrast between them |
+| ------------ | --------------- | --------------- | --------------------- |
+| protanopia   | `#acada6`       | `#b4b367`       | 1.03:1                |
+| deuteranopia | `#a7a1ab`       | `#bac167`       | 1.31:1                |
+| tritanopia   | `#89b3b6`       | `#d76666`       | 1.54:1                |
+
+(Reproducible: `npm run check:status-contrast` recomputes every number on
+this page from the committed `styles/tokens.css`, including this CVD
+simulation — Viénot/Brettel-style linear-RGB matrices, the same family
+Chrome DevTools' vision-deficiency emulation uses. Ratios here are for
+the _fixed_ colors, `#83d494`/`#db6368`, recorded so the improvement is
+checkable.
+The original, isoluminant pair's CVD contrast was ~1.0:1 across all three
+types — genuinely indistinguishable — matching the review's own
+measurement almost exactly.)
+
+**The fix, all three parts the review required:**
+
+1. **Color is no longer the only channel, anywhere.** Every status now
+   renders through `StatusBadge` (`src/components/status/StatusBadge.tsx`)
+   — color, a distinct-_silhouette_ icon (not six colored circles: pass
+   is a checkmark, fail an octagon-X, running a spinner, queued a clock,
+   skipped a slash-circle, warning a triangle), and a text label, always
+   together. This is the actual fix for WCAG 1.4.1 — it holds regardless
+   of what the color values are, including under CVD or in greyscale.
+   Every call site that used to paint an inline colored `<span>` (the
+   style-guide page, the runs table) now goes through this component;
+   there is no remaining place in the app that renders a status as color
+   alone.
+2. **Lightness is now placed for separation, not minimized to a floor.**
+   `fail` stays at its own floor (0.648 — the deepest, most saturated
+   color in the scale, appropriate for the state that most needs
+   attention) and `pass` moves to 0.80, with `queued`/`skipped`/`running`
+   spaced between (0.68 / 0.72 / 0.76). `pass` and `fail` are the
+   deliberate extremes, per the review's instruction.
+3. **Regression test:** `src/lib/color/contrast.test.ts` parses the
+   actual committed `styles/tokens.css` (not a hardcoded copy of the hex
+   values) and asserts every status foreground still clears AA on both
+   grounds, that `pass`/`fail` clear 1.8:1 against each other, and that no
+   pair falls back under 1.1:1. Verified to actually fail: reverted
+   `pass` to its original isoluminant value locally and confirmed the
+   test caught it (`expected 1.001 to be greater than or equal to 1.8`)
+   before restoring the fix.
+
+New pairwise contrast, normal vision (all six meaningfully separated;
+`pass`/`fail` roughly doubled from ~1.0:1 to the value below):
+
+|             | fail | queued | skipped | running | pass     |
+| ----------- | ---- | ------ | ------- | ------- | -------- |
+| **fail**    | —    | 1.20   | 1.41    | 1.68    | **1.97** |
+| **queued**  |      | —      | 1.17    | 1.40    | 1.64     |
+| **skipped** |      |        | —       | 1.20    | 1.40     |
+| **running** |      |        |         | —       | 1.17     |
+
+**Honest limit, stated plainly:** pass/fail contrast under deuteranopia
+simulation for the _fixed_ colors is still only ~1.3:1 — lightness
+separation alone cannot fully solve a red/green pair for red-green
+colorblindness, because deuteranopia collapses exactly that hue
+distinction regardless of lightness. This is exactly why part 1 (icon +
+label, not color, on every status) is the real fix and part 2 (lightness
+spread) is a secondary improvement for full-color viewers, not a claim
+that color alone is now sufficient. If the intent is to be rigorously
+CVD-safe through color alone, that requires abandoning a red/green pair
+entirely (e.g. blue/orange), which is a larger palette change than this
+review asked for — flagging it rather than deciding it unilaterally.
 
 **Why `skipped` and `muted` (the existing marketing secondary-text token,
 `#8a9ab5`) look similar:** that's intentional, not a derivation accident.
@@ -181,13 +270,15 @@ the brief is a single dark identity — so the light block and the
 color lives directly in `:root`. If a light mode is ever wanted, this is
 the first thing that has to change and it isn't a small edit.
 
-**Bundle budget moved again.** Wiring `TooltipProvider` and `Toaster` into
-the root layout (needed so any route can trigger a toast or tooltip) put
-that JS on every route, not just ones using them. Measured floor moved
-from ~186 KB (A1, no shadcn) to ~253 KB (`/_not-found`, which imports none
-of the themed components). The provisional per-route budget in
-`scripts/check-bundle-budget.mjs` is now 300 KB — still a placeholder, but
-grounded in two real measurements instead of one.
+**Bundle budget.** Wiring `TooltipProvider` and `Toaster` into the root
+layout (needed so any route can trigger a toast or tooltip) put that JS on
+every route, not just ones using them. Measured floor moved from ~186 KB
+(A1, no shadcn) to ~253 KB (`/_not-found`, which imports none of the
+themed components) here, then to ~435-437 KB once A7's real shell
+(Sidebar/Command/DropdownMenu/Field) existed. After a fourth guessed
+number in a row turned out wrong, the Phase A review replaced the fixed
+budget with a per-route ratchet — see README's "Bundle budget" section and
+`scripts/check-bundle-budget.mjs`.
 
 ## Radius
 
