@@ -31,17 +31,15 @@ export const TimestampSchema = z.iso.datetime().openapi({
  * description, and marked machine-readably with `x-extensible-enum`, so an
  * implementer reading any single enum in openapi.json sees it.
  */
-export const EXTENSIBLE_ENUM_NOTE =
-  "Extensible: new members MAY be added without a version bump. Clients " +
-  "MUST tolerate unknown members - render them as unrecognised, never " +
-  "drop the record or fail the response.";
-
 export function extensibleEnum<const T extends readonly [string, ...string[]]>(
   values: T,
   description: string,
 ) {
   return z.enum(values).openapi({
-    description: `${description} ${EXTENSIBLE_ENUM_NOTE}`,
+    description:
+      `${description} Extensible: new members MAY be added without a version bump. ` +
+      "Clients MUST tolerate unknown members - render them as unrecognised, never " +
+      "drop the record or fail the response.",
     "x-extensible-enum": true,
   });
 }
@@ -110,6 +108,8 @@ export const EventIdSchema = z
       "canonical decimal form (no sign, no leading zeros, at most " +
       "9007199254740991), STRICTLY increasing within a job. Compare " +
       "numerically. Gaps are permitted; reordering and reuse are not. " +
+      "Clients MUST NEVER infer a missing event from a numeric gap: ids " +
+      "are ordered, not dense, and `?since=` is the ONLY resume mechanism. " +
       "Pass the last-seen value as `?since=` to resume - events with a " +
       "greater id are delivered.",
     example: "42",

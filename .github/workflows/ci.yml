@@ -76,6 +76,9 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run bundle-budget
+      # Contract prose (written for the backend team) must not ship to the
+      # browser - see scripts/openapi-strip-loader.cjs.
+      - run: npm run check:contract-prose
 
   contract-drift:
     runs-on: ubuntu-latest

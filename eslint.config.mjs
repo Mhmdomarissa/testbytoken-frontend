@@ -8,6 +8,11 @@ const eslintConfig = defineConfig([
   ...nextTs,
   prettierConfig,
   {
+    // Same scope eslint-config-next loads its React plugin for. Without it
+    // this block also applied to scripts/*.cjs (the Turbopack strip
+    // loader), where the plugin isn't defined, and ESLint refused to run.
+    // Every file that can contain JSX is still covered.
+    files: ["**/*.{js,jsx,mjs,ts,tsx,mts,cts}"],
     rules: {
       // Hard rule from CLAUDE.md: this product renders text from websites
       // we do not control. dangerouslySetInnerHTML is banned repo-wide, no exceptions.
@@ -19,6 +24,12 @@ const eslintConfig = defineConfig([
         { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
       ],
     },
+  },
+  {
+    // The Turbopack strip loader must be CommonJS (webpack's loader-runner
+    // `require`s it), so `require()` is the correct import style there.
+    files: ["**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([

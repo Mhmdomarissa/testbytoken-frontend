@@ -80,6 +80,21 @@ run, and copy the exact byte counts it prints (every line includes them,
 not just the rounded KB) into `bundle-budget-baseline.json` — commit
 those numbers, and say why in the PR body.
 
+**Contract prose doesn't ship.** `src/lib/contract/*` is the single source
+of truth for the runtime Zod schemas _and_ for the documentation that
+becomes `openapi.json` — descriptions, rationale and cost notes written for
+the backend team, next to the field they describe so they can't drift.
+The app never reads any of it, and it used to cost ~5 KB gzip on every
+route (the public proof page included), plus the `zod-to-openapi` library
+itself. `scripts/openapi-strip-loader.cjs` (a Turbopack loader configured
+in `next.config.ts`) removes `.openapi(...)` calls, the `extensibleEnum`
+prose argument, the setup import and the `register*Paths` functions from
+every application bundle, and `npm run check:contract-prose` fails CI if any
+description from `openapi.json` still appears in the built output — so new
+prose is covered automatically and a pattern the loader doesn't understand
+can't silently reintroduce the cost. `openapi.json` itself is generated from
+the _unstripped_ sources and is unchanged.
+
 **The public proof page** (`/p/[token]`, not built yet) gets its own
 separate, tight budget once it exists — it's opened cold, often on a
 phone, by someone who didn't run the test, and shouldn't pay for the

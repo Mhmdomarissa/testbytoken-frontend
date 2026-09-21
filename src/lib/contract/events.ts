@@ -105,7 +105,9 @@ export function registerEventPaths(registry: OpenAPIRegistry) {
       "connection is dead, not merely that the job is quiet - the two are " +
       "distinguishable facts. " +
       "EVENT ORDERING (B0.5 B2, required): frame ids are the numeric " +
-      "`EventId` sequence; deliver in increasing order, never reuse. " +
+      "`EventId` sequence; deliver in increasing order, never reuse. A gap " +
+      "in the numbers is NOT evidence of a missing event - `?since=` is the " +
+      "only resume mechanism. " +
       "Reconnect with `?since=<last-seen id>` to resume without re-delivering " +
       "earlier events. Authenticated by cookie (EventSource sends it " +
       "automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be " +
