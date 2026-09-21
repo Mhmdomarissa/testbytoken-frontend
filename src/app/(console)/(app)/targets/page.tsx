@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useState } from "react";
+import Link from "next/link";
 import { GlobeIcon, PlusIcon } from "lucide-react";
 import type { z } from "zod";
 import type { TargetSchema } from "@/lib/contract";
@@ -15,7 +16,7 @@ import { ErrorState } from "@/components/state/ErrorState";
 import { LastScan } from "@/components/targets/LastScan";
 import { ScanFailurePanel } from "@/components/targets/ScanFailurePanel";
 import { TargetFormDialog } from "@/components/targets/TargetFormDialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -154,14 +155,26 @@ function TargetRows({
           <LastScan scan={target.last_scan} />
         </TableCell>
         <TableCell className="text-right">
-          <Button
-            size="sm"
-            variant={target.last_scan === null ? "default" : "outline"}
-            onClick={scan}
-            disabled={active || createScan.isPending}
-          >
-            Scan
-          </Button>
+          <div className="flex justify-end gap-2">
+            {target.last_scan !== null &&
+              !isUnrecognised(target.last_scan.status) &&
+              target.last_scan.status === "completed" && (
+                <Link
+                  href={`/targets/${target.id}/inventory`}
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                >
+                  Inventory
+                </Link>
+              )}
+            <Button
+              size="sm"
+              variant={target.last_scan === null ? "default" : "outline"}
+              onClick={scan}
+              disabled={active || createScan.isPending}
+            >
+              Scan
+            </Button>
+          </div>
           {createScan.isError && (
             <p role="alert" className="mt-1 text-xs text-destructive">
               {createScan.error instanceof ApiError

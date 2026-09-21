@@ -151,3 +151,31 @@ describe("ugly-case fixtures are real, schema-valid data", () => {
     expect(events.headers.get("content-type")).toContain("text/event-stream");
   });
 });
+
+describe("inspect fixtures agree with the modules that describe them", () => {
+  it.each(["mod_checkout", "mod_settings"])(
+    "%s: element_count and elements_uniquely_locatable_count match the inventory",
+    async (moduleId) => {
+      const scan = ScanSchema.parse(
+        await (await fetch(`${base}/scans/scan_checkout_1`)).json(),
+      );
+      const mod = scan.modules.find((m) => m.id === moduleId)!;
+      const inv = InspectResponseSchema.parse(
+        await (
+          await fetch(`${base}/inspect`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ scan_id: scan.id, module_id: moduleId }),
+          })
+        ).json(),
+      );
+      expect(inv.elements.length).toBe(mod.element_count);
+      expect(inv.elements.filter((e) => e.uniquely_locatable).length).toBe(
+        mod.elements_uniquely_locatable_count,
+      );
+      for (const e of inv.elements) {
+        expect(e.uniquely_locatable).toBe(e.reason_not_locatable === null);
+      }
+    },
+  );
+});

@@ -6,6 +6,7 @@ import {
   pendingRunEvents,
   scanEventLog,
   scanFailureFor,
+  scanFindsNothing,
   pendingScanEvents,
   LIVE_PASS_TIMELINE,
   LIVE_FAIL_TIMELINE,
@@ -245,5 +246,36 @@ describe("scanFailureFor: every failure kind in the contract is reachable from a
     "https://example.com:8443/app",
   ])("%s completes", (url) => {
     expect(scanFailureFor(url)).toBeNull();
+  });
+});
+
+describe("scan outcomes that are not failures", () => {
+  it("an empty.* host completes with no modules; anything else finds the fixtures", () => {
+    const base = {
+      id: "scan_x",
+      workspace_id: "w",
+      target_id: "t",
+      status: "queued" as const,
+      parked_reason: null,
+      failure: null,
+      login_session_id: null,
+      modules: [],
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    };
+    const done = SCAN_TIMELINE.completedAt;
+    const empty = computeScanState(
+      { ...base, target_url: "https://empty.example.com" },
+      done,
+    );
+    expect(empty.status).toBe("completed");
+    expect(empty.modules).toEqual([]);
+    expect(scanFindsNothing("https://shop.example.com")).toBe(false);
+    expect(
+      computeScanState(
+        { ...base, target_url: "https://shop.example.com" },
+        done,
+      ).modules.length,
+    ).toBeGreaterThan(0);
   });
 });

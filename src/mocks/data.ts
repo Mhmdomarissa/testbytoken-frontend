@@ -187,6 +187,60 @@ const longLabel =
   "entered above matches the cardholder's statement address exactly as " +
   "issued by their bank or financial institution";
 
+/**
+ * Fills modCheckout's inventory out to the 24 elements (21 uniquely
+ * locatable) that the module itself and the run coverage figures
+ * (`coverage: { generated: 21, candidate: 24 }`) already claim - the fixture
+ * used to disagree with itself. Includes one hostile label: it must reach
+ * the screen as inert text.
+ */
+function extraCheckoutElements(): z.infer<typeof ElementSchema>[] {
+  const named: [string, string, string][] = [
+    ["Email address", "textbox", "#email"],
+    ["Card number", "textbox", "#card-number"],
+    ["Expiry", "textbox", "#expiry"],
+    ["CVC", "textbox", "#cvc"],
+    ["Billing address", "textbox", "#billing"],
+    ["Country", "combobox", "#country"],
+    ["Same as shipping", "checkbox", "#same-as-shipping"],
+    ["Apply promo code", "button", "#apply-promo"],
+    ["Promo code", "textbox", "#promo"],
+    ["Order summary", "heading", "h2.summary"],
+    ["Back to cart", "link", "a.back"],
+    ["Privacy Policy", "link", "a[href='/privacy']"],
+    ["Terms of Service", "link", "a[href='/terms']"],
+    ["Secure checkout", "img", "img.lock"],
+    ["Place order", "button", "#place-order"],
+    ["<img src=x onerror=alert(1)> Gift note", "textbox", "#gift-note"],
+    ["Shipping method", "radiogroup", "#shipping-method"],
+  ];
+  const extra: z.infer<typeof ElementSchema>[] = named.map(
+    ([label, role, locator], i) => ({
+      id: `el_checkout_${i}`,
+      page_url: pageHome.url,
+      label,
+      role,
+      locator,
+      locator_strategy: "css" as const,
+      uniquely_locatable: true,
+      reason_not_locatable: null,
+    }),
+  );
+  // One more, with a locator far longer than any layout expects.
+  extra.push({
+    id: "el_checkout_long_locator",
+    page_url: pageHome.url,
+    label: "Newsletter",
+    role: "checkbox",
+    locator:
+      "form#checkout > fieldset:nth-of-type(3) > div.row > label > input[type='checkbox'][name='newsletter_opt_in_marketing_communications_and_partner_offers']",
+    locator_strategy: "css",
+    uniquely_locatable: true,
+    reason_not_locatable: null,
+  });
+  return extra;
+}
+
 const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
   [modCheckout.id]: [
     {
@@ -229,6 +283,27 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       uniquely_locatable: false,
       reason_not_locatable: "duplicate_locator",
     },
+    {
+      id: "el_qty",
+      page_url: pageHome.url,
+      label: "Quantity",
+      role: "textbox",
+      locator: "input.qty",
+      locator_strategy: "css",
+      uniquely_locatable: false,
+      reason_not_locatable: "duplicate_locator",
+    },
+    {
+      id: "el_generic",
+      page_url: pageHome.url,
+      label: "",
+      role: null,
+      locator: "div.card > div",
+      locator_strategy: "css",
+      uniquely_locatable: false,
+      reason_not_locatable: "no_stable_attribute",
+    },
+    ...extraCheckoutElements(),
   ],
   // Zero locatable, on purpose - every element here is false.
   [modSettings.id]: [
@@ -252,6 +327,18 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       uniquely_locatable: false,
       reason_not_locatable: "duplicate_locator",
     },
+    ...["Display name", "Email", "Password", "Delete account"].map(
+      (label, i) => ({
+        id: `el_settings_${i + 3}`,
+        page_url: pageSettings.url,
+        label,
+        role: i === 3 ? "button" : "textbox",
+        locator: `.settings-row:nth-child(${i + 1}) .control`,
+        locator_strategy: "css" as const,
+        uniquely_locatable: false,
+        reason_not_locatable: "duplicate_locator",
+      }),
+    ),
   ],
 };
 

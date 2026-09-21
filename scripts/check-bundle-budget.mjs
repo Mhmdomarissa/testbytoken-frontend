@@ -228,7 +228,7 @@ for (const { route, totalBytes, fileCount } of results) {
 
   if (ceiling === undefined) {
     console.error(
-      `  [FAIL] ${route.padEnd(24)} ${kb.padStart(8)} KB  - no baseline entry. Run with --write to add it.`,
+      `  [FAIL] ${route.padEnd(24)} ${kb.padStart(8)} KB  (${totalBytes} bytes; ${fileCount} files) - no baseline entry. Run with --write to add it.`,
     );
     failed = true;
     continue;
