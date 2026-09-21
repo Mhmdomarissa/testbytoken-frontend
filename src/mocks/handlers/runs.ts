@@ -4,7 +4,7 @@ import { HttpResponse } from "msw";
 import { json, errorResponse, checkSimulatedError } from "../respond";
 import { loginSessionStore, runStore } from "../store";
 import { resolveLoginSession } from "../login";
-import { resolvePlan } from "../planning";
+import { planCoverage, resolvePlan } from "../planning";
 import {
   resolveRun,
   registerRunTimeline,
@@ -54,6 +54,7 @@ export const runHandlers = [
     }
 
     let timeline = LIVE_PASS_TIMELINE;
+    let coverage = { generated: 21, candidate: 24 };
     if (body.plan_id) {
       const plan = resolvePlan(body.plan_id);
       if (!plan) return errorResponse(404, "not_found", "Plan not found.");
@@ -65,6 +66,7 @@ export const runHandlers = [
         );
       }
       timeline = timelineForPlan(plan);
+      coverage = planCoverage(plan);
     }
 
     const id = `run_${Math.random().toString(36).slice(2, 10)}`;
@@ -78,7 +80,7 @@ export const runHandlers = [
       report_url: null,
       status: "running" as const,
       pass_rate: 1,
-      coverage: { generated: 21, candidate: 24 },
+      coverage,
       token_cost: 1.1,
       proof_id: null,
       started_at: new Date().toISOString(),

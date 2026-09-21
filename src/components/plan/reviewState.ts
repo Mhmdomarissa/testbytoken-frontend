@@ -92,3 +92,22 @@ export function humanise(code: string | { raw: string }): string {
   const text = typeof code === "string" ? code : code.raw;
   return text.replace(/_/g, " ");
 }
+
+export type ExclusionReason = "removed_by_user" | "ungrounded" | "blocked";
+
+/**
+ * Why a step is NOT in an approval, and WHO excluded it - a different fact
+ * for the person's choice than for the system's refusal, kept apart
+ * everywhere it is shown. Same precedence the server uses for the proof
+ * (docs/API_CONTRACT.md, "Plan runs"): ungrounded, else blocked, else absent
+ * from the approval = the person left it out.
+ */
+export function exclusionReason(
+  step: PlanStep,
+  approvedIds: string[],
+): ExclusionReason | null {
+  if (approvedIds.includes(step.id)) return null;
+  if (step.binding.type === "ungrounded") return "ungrounded";
+  if (step.blocked !== null) return "blocked";
+  return "removed_by_user";
+}

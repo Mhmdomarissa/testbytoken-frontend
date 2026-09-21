@@ -102,11 +102,11 @@ export const CoverageSchema = z
   .object({
     generated: z.number().int().min(0).openapi({
       description:
-        "Scenarios actually generated - i.e. elements that were uniquely locatable.",
+        "Scenarios actually generated - i.e. elements that were uniquely locatable. FOR A PLAN RUN (`plan_id` non-null): the number of plan steps approved to run.",
     }),
     candidate: z.number().int().min(0).openapi({
       description:
-        "Total candidate elements the engine attempted to generate scenarios for.",
+        "Total candidate elements the engine attempted to generate scenarios for. FOR A PLAN RUN (`plan_id` non-null): the number of steps the plan PROPOSED, so everything left out of the approval - by the person, or because it could not be approved - is inside the denominator and shows as not covered.",
     }),
   })
   .openapi("Coverage");
@@ -130,7 +130,7 @@ const RunSharedFields = {
   status: RunStatusSchema,
   pass_rate: z.number().min(0).max(1).openapi({
     description:
-      "Fraction of generated scenarios that passed. Always present alongside coverage.",
+      "Fraction of the scenarios/steps that RAN which passed. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5.",
   }),
   coverage: CoverageSchema,
   token_cost: z

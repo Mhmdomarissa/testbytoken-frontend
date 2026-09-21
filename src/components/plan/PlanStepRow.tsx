@@ -42,15 +42,33 @@ export function PlanStepRow({
     <li
       data-testid={`plan-step-${step.id}`}
       data-position={position.kind}
-      className={`flex flex-col gap-2 border border-border p-3 text-sm ${
+      role="group"
+      aria-labelledby={`${step.id}-title`}
+      aria-describedby={`${step.id}-state`}
+      // A step that can't be approved has NO controls, so without this it has
+      // no keyboard stop at all and a keyboard or switch user would tab
+      // straight past the very steps this screen exists to surface. Steps with
+      // controls are already reached through them (and announced as part of
+      // this group).
+      tabIndex={approvable.ok ? undefined : 0}
+      className={`flex flex-col gap-2 border border-border p-3 text-sm focus-visible:outline-2 focus-visible:outline-ring ${
         approvable.ok ? "" : "bg-card"
       } ${leftOut ? "opacity-70" : ""}`}
     >
+      <span id={`${step.id}-state`} className="sr-only">
+        {stateText(step, position)}
+      </span>
       <div className="flex flex-wrap items-start gap-2">
-        <span className="min-w-6 font-mono text-xs text-muted-foreground">
+        <span
+          aria-hidden="true"
+          className="min-w-6 font-mono text-xs text-muted-foreground"
+        >
           {position.kind === "will-run" ? `#${position.nth}` : "-"}
         </span>
-        <p className="min-w-0 flex-1 break-words font-medium">
+        <p
+          id={`${step.id}-title`}
+          className="min-w-0 flex-1 break-words font-medium"
+        >
           {step.description}
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -117,14 +135,14 @@ export function PlanStepRow({
                 size="sm"
                 variant="outline"
                 onClick={controls.onToggle}
-                aria-pressed={leftOut}
+                aria-label={`${leftOut ? "Put back" : "Leave out"}: ${step.description}`}
               >
                 {leftOut ? "Put back" : "Leave out"}
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                aria-label={`Move step ${step.index + 1} up`}
+                aria-label={`Move up: ${step.description}`}
                 disabled={!controls.canMoveUp}
                 onClick={() => controls.onMove(-1)}
               >
@@ -133,7 +151,7 @@ export function PlanStepRow({
               <Button
                 size="sm"
                 variant="ghost"
-                aria-label={`Move step ${step.index + 1} down`}
+                aria-label={`Move down: ${step.description}`}
                 disabled={!controls.canMoveDown}
                 onClick={() => controls.onMove(1)}
               >
@@ -183,4 +201,25 @@ function Binding({ step }: { step: PlanStep }) {
       ({humanise(b.reason_code as string | { raw: string })}): {b.reason}
     </span>
   );
+}
+
+/**
+ * What a screen reader hears when it lands on the step: the state first
+ * (whether it will run, and if not, why), because that is the fact the
+ * person is here to learn. Plain text; the visible chips say the same.
+ */
+export function stateText(step: PlanStep, position: Position): string {
+  const approvable = approvability(step);
+  if (!approvable.ok && approvable.why === "blocked" && step.blocked) {
+    return `Blocked, cannot be approved: ${step.blocked.message}`;
+  }
+  if (!approvable.ok) {
+    const b = step.binding;
+    return b.type === "ungrounded"
+      ? `Not grounded, cannot be approved: ${humanise(b.reason_code as string | { raw: string })}. ${b.reason}`
+      : "Cannot be approved";
+  }
+  if (position.kind === "left-out") return "Left out by you, will not run";
+  if (position.kind === "will-run") return `Will run, number ${position.nth}`;
+  return "";
 }
