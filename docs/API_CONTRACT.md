@@ -174,6 +174,13 @@ from — see B7.
 integer in canonical decimal form (`0` or `[1-9][0-9]*`, no sign, no leading
 zeros, at most 9007199254740991), **strictly increasing within a job**,
 compared numerically. Gaps are permitted; reordering and reuse are not.
+**Clients must never infer a missing event from a numeric gap.** Ids are
+ordered, not dense (`5` then `8` does not mean `6` and `7` were lost —
+they may not exist, or belong to another consumer of a shared counter), so
+a gap is not evidence of anything. The only way to recover events a client
+may have missed is to reconnect with `?since=<last id it applied>`, which is
+the **only** resume mechanism; there is no "request event N" and no
+client-side gap detection.
 `?since=N` delivers events with id **greater than** N. The schema
 (`EventId`) is a regex, so a value a client could mis-order fails
 validation rather than being guessed at.
@@ -300,6 +307,13 @@ what a machine proposed before it executes.
   `plan_not_approved`. The run executes the plan's approved steps in the
   approved order, and each executed `Step.plan_step_id` points back at its
   plan step.
+- **Suites survive.** Plans do not replace suites. On a `Run`, `plan_id` is
+  a **required field** (always present; non-null for a run that came from a
+  plan) and `suite_id` is **nullable** (non-null only for a run that
+  originated from a suite; `plan_id` is then null). No further suite
+  semantics are defined until Phase C: no suite↔plan conversion, no
+  editing suites through plans, no plan-derived suite versions. A client
+  must not build behaviour that assumes any.
 
 **Inspectable before, immutable after.** A plan's `steps` never change once
 it leaves `generating` — not during review, not after approval. Edits live
@@ -333,6 +347,21 @@ customer's sign-in, which is why they could not carry it.
   exception to "never a token in a URL" (above); a live remote browser
   cannot be embedded cross-origin any other way. Re-fetch the session for a
   fresh one; never store it.
+
+  **The exception is approved on four conditions, all required of the
+  server** — without them it is just a token in a URL:
+  1. **Atomic, single-use consumption, server-side.** Two concurrent
+     requests presenting the same ticket: exactly one succeeds. A
+     read-then-mark implementation is not compliant.
+  2. **`Referrer-Policy: no-referrer` on the landing page**, so the ticket
+     cannot leak in a `Referer` header to anything the page loads or links.
+  3. **The URL is stripped after exchange.** The landing page removes the
+     ticket from the address bar (`history.replaceState`) as soon as it has
+     been exchanged, so it is not left in history or in a copied URL.
+  4. **Scope: that one session view.** The ticket, and the cookie it is
+     exchanged for, grant access to that single login session's live view
+     and nothing else — no other session, workspace or API endpoint.
+
 - `expires_at`: one field, stage-dependent — before completion, the
   deadline to finish signing in; after, when the captured session lapses.
 - `GET /login-sessions/{id}`: poll for readiness, completion and expiry
@@ -415,11 +444,13 @@ snapshot    { verdict, pass_rate, coverage{generated,candidate},
   — no run id, no workspace or user ids, no share token, no id that
   resolves to authenticated data. `GET /proofs/{id}` (authenticated)
   returns `Proof`.
-- **Revocation is whole.** `POST /proofs/{id}/share` with `enabled: false`
-  kills the public page and every proof-scoped screenshot URL at once; a
-  revoked proof renders nothing. (The proof itself, in the owner's
-  authenticated view, is permanent — revoking _sharing_ does not delete
-  the record.)
+- **Revocation is whole, and it kills sharing only.**
+  `POST /proofs/{id}/share` with `enabled: false` kills the public page and
+  every proof-scoped screenshot URL at once; a revoked link renders nothing.
+  It does **not** delete, alter or hide the proof: in the owner's
+  authenticated view it is permanent and unchanged, and sharing can be
+  re-enabled (which mints a new token — the old link stays dead). There is
+  no "delete proof" operation in this contract.
 
 _Why._ As first specified, the public page couldn't show the pass rate
 _and_ coverage §1.2 requires, or what wasn't covered, because that data

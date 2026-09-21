@@ -539,7 +539,7 @@
               "null"
             ],
             "minLength": 1,
-            "description": "The suite this run executed, or null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set.",
+            "description": "The suite this run executed: NULLABLE - non-null only for a suite-originated run, null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set. Suites survive alongside plans; no further suite semantics are defined until Phase C.",
             "example": "run_8f2a1c9d"
           },
           "plan_id": {
@@ -809,7 +809,7 @@
               "null"
             ],
             "minLength": 1,
-            "description": "The suite this run executed, or null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set.",
+            "description": "The suite this run executed: NULLABLE - non-null only for a suite-originated run, null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set. Suites survive alongside plans; no further suite semantics are defined until Phase C.",
             "example": "run_8f2a1c9d"
           },
           "plan_id": {
@@ -906,7 +906,7 @@
               "id": {
                 "type": "string",
                 "pattern": "^(0|[1-9][0-9]*)$",
-                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Clients MUST NEVER infer a missing event from a numeric gap: ids are ordered, not dense, and `?since=` is the ONLY resume mechanism. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
                 "example": "42"
               },
               "type": {
@@ -944,7 +944,7 @@
               "id": {
                 "type": "string",
                 "pattern": "^(0|[1-9][0-9]*)$",
-                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Clients MUST NEVER infer a missing event from a numeric gap: ids are ordered, not dense, and `?since=` is the ONLY resume mechanism. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
                 "example": "42"
               },
               "type": {
@@ -981,7 +981,7 @@
               "id": {
                 "type": "string",
                 "pattern": "^(0|[1-9][0-9]*)$",
-                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Clients MUST NEVER infer a missing event from a numeric gap: ids are ordered, not dense, and `?since=` is the ONLY resume mechanism. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
                 "example": "42"
               },
               "type": {
@@ -1006,7 +1006,7 @@
               "id": {
                 "type": "string",
                 "pattern": "^(0|[1-9][0-9]*)$",
-                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Clients MUST NEVER infer a missing event from a numeric gap: ids are ordered, not dense, and `?since=` is the ONLY resume mechanism. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
                 "example": "42"
               },
               "type": {
@@ -1042,7 +1042,7 @@
               "id": {
                 "type": "string",
                 "pattern": "^(0|[1-9][0-9]*)$",
-                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Clients MUST NEVER infer a missing event from a numeric gap: ids are ordered, not dense, and `?since=` is the ONLY resume mechanism. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
                 "example": "42"
               },
               "type": {
@@ -1748,7 +1748,7 @@
               "null"
             ],
             "format": "uri",
-            "description": "Where the customer reaches the live browser. Non-null only while `ready` / `in_progress`. MUST be on a separate origin from the app (a remote-browser stream is an untrusted-content origin) and MUST NOT be a long-lived bearer link: it MAY carry a single-use ticket, valid for at most 60 seconds, exchanged on first load for an httpOnly cookie scoped to that origin, after which it is useless. This is the one deliberate exception to 'never a token in a URL' (docs/API_CONTRACT.md), and is what makes the live view usable cross-origin at all. Re-fetch the session to get a fresh one; never store it."
+            "description": "Where the customer reaches the live browser. Non-null only while `ready` / `in_progress`. MUST be on a separate origin from the app (a remote-browser stream is an untrusted-content origin) and MUST NOT be a long-lived bearer link: it MAY carry a single-use ticket, valid for at most 60 seconds, exchanged on first load for an httpOnly cookie scoped to that origin, after which it is useless. This is the one deliberate exception to 'never a token in a URL' (docs/API_CONTRACT.md), and is what makes the live view usable cross-origin at all. It is allowed ONLY under four conditions, each of which the server MUST satisfy: (1) CONSUMPTION IS ATOMIC AND SINGLE-USE, server-side - of two concurrent requests with the same ticket exactly one succeeds; (2) the landing page is served with `Referrer-Policy: no-referrer`, so the ticket cannot leak through a Referer header; (3) the landing page strips the ticket from the address bar (`history.replaceState`) as soon as it has been exchanged, so it does not survive in history or a copied URL; (4) the ticket's scope is that ONE session view - it grants nothing on any other login session, workspace or endpoint. Re-fetch the session to get a fresh one; never store it."
           },
           "expires_at": {
             "type": "string",
@@ -2970,7 +2970,7 @@
           "events"
         ],
         "summary": "Subscribe to a job's events (SSE)",
-        "description": "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`, except `heartbeat`, which has no `id:` line (it is not part of the job's event sequence and never advances `Last-Event-ID` / `?since=`). HEARTBEAT (B0.5 B3, required): the server MUST send a `heartbeat` frame every 15 seconds for as long as the stream is open, whether or not the job is doing anything. A client that has received no frame of any kind for 2.5x the interval (37.5s) can therefore conclude the connection is dead, not merely that the job is quiet - the two are distinguishable facts. EVENT ORDERING (B0.5 B2, required): frame ids are the numeric `EventId` sequence; deliver in increasing order, never reuse. Reconnect with `?since=<last-seen id>` to resume without re-delivering earlier events. Authenticated by cookie (EventSource sends it automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be served from a sibling subdomain of the app (e.g. app.<domain> / api.<domain>), cookie scoped to the parent domain, so this is same-site and EventSource needs no special handling. Never a token in the query string - see docs/API_CONTRACT.md.",
+        "description": "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`, except `heartbeat`, which has no `id:` line (it is not part of the job's event sequence and never advances `Last-Event-ID` / `?since=`). HEARTBEAT (B0.5 B3, required): the server MUST send a `heartbeat` frame every 15 seconds for as long as the stream is open, whether or not the job is doing anything. A client that has received no frame of any kind for 2.5x the interval (37.5s) can therefore conclude the connection is dead, not merely that the job is quiet - the two are distinguishable facts. EVENT ORDERING (B0.5 B2, required): frame ids are the numeric `EventId` sequence; deliver in increasing order, never reuse. A gap in the numbers is NOT evidence of a missing event - `?since=` is the only resume mechanism. Reconnect with `?since=<last-seen id>` to resume without re-delivering earlier events. Authenticated by cookie (EventSource sends it automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be served from a sibling subdomain of the app (e.g. app.<domain> / api.<domain>), cookie scoped to the parent domain, so this is same-site and EventSource needs no special handling. Never a token in the query string - see docs/API_CONTRACT.md.",
         "security": [
           {
             "cookieAuth": []
@@ -3783,7 +3783,7 @@
           "proofs"
         ],
         "summary": "Public, unauthenticated proof view",
-        "description": "No cookie required - this is the link a customer shares externally. Rendered by a public Next route handler/page per CLAUDE.md, not proxied to the API from a general-purpose route. Screenshot URLs on this response are proof-scoped: signed against this proof's own share token, valid only for this one run, and revoked the moment the proof is revoked (a proof page that still renders screenshots after revocation is a bug). Never a bearer/session token in the URL - see docs/API_CONTRACT.md.",
+        "description": "No cookie required - this is the link a customer shares externally. Revoking sharing (`POST /proofs/{id}/share` with `enabled: false`) kills THIS page and its screenshot URLs and nothing else: the proof itself stays, unchanged, in the owner's authenticated view. Rendered by a public Next route handler/page per CLAUDE.md, not proxied to the API from a general-purpose route. Screenshot URLs on this response are proof-scoped: signed against this proof's own share token, valid only for this one run, and revoked the moment the proof is revoked (a proof page that still renders screenshots after revocation is a bug). Never a bearer/session token in the URL - see docs/API_CONTRACT.md.",
         "parameters": [
           {
             "schema": {
