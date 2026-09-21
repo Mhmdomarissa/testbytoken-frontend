@@ -61,6 +61,15 @@ export interface UseJobEventsResult extends JobEventsState {
    * render as unrecognised.
    */
   unreadableFrameCount: number;
+  /**
+   * True once the server has sent `done` - the stream is closed on purpose
+   * and nothing more will arrive. `finishedAt` is `Date.now()` then, so a
+   * consumer can tell whether a fetch it made afterwards is later than the
+   * end of the stream (docs/API_CONTRACT.md: reconcile against GET on
+   * `done`).
+   */
+  finished: boolean;
+  finishedAt: number | null;
   /** How many times the connection dropped and was re-established - a dropped stream is visible data, not something a consumer has to infer from `connectionStatus` flickering. */
   reconnectCount: number;
 }
@@ -103,6 +112,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
   const [lastFrameAt, setLastFrameAt] = useState<number | null>(null);
   const [unreadableFrameCount, setUnreadableFrameCount] = useState(0);
   const [reconnectCount, setReconnectCount] = useState(0);
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
 
   // Reset during render, not in the effect below, when `jobId` itself
   // changes - the React-recommended way to "adjust state when a prop
@@ -116,6 +126,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     setLastFrameAt(null);
     setUnreadableFrameCount(0);
     setReconnectCount(0);
+    setFinishedAt(null);
   }
 
   useEffect(() => {
@@ -179,6 +190,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
         setState((prev) => applyJobEvent(prev, event));
         if (event.type === "done") {
           finished = true;
+          setFinishedAt(Date.now());
           source?.close();
           setConnectionStatus("closed");
         }
@@ -231,6 +243,8 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     lastEventAt,
     lastFrameAt,
     unreadableFrameCount,
+    finished: finishedAt !== null,
+    finishedAt,
     reconnectCount,
   };
 }
