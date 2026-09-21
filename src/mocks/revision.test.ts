@@ -565,3 +565,109 @@ describe("plan runs: the numbers are OF the plan, and the exclusions travel with
     expect(res.status).toBe(404);
   });
 });
+
+describe("B6: a scan that needs a sign-in parks, and only a completed login session continues it", () => {
+  async function loginTargetScan() {
+    const target = TargetSchema.parse(
+      await (
+        await post("/targets", {
+          name: "Members area",
+          base_url: "https://login.example.com",
+          environment: "staging",
+        })
+      ).json(),
+    );
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const scan = ScanSchema.parse(
+      await (
+        await post("/scans", {
+          workspace_id: "wksp_demo",
+          target_id: target.id,
+        })
+      ).json(),
+    );
+    return { target, scan };
+  }
+  const getScan = async (id: string) =>
+    ScanSchema.parse(await (await fetch(`${base}/scans/${id}`)).json());
+
+  async function completedSession(targetId: string) {
+    const created = LoginSessionSchema.parse(
+      await (
+        await post("/login-sessions", {
+          workspace_id: "wksp_demo",
+          target_id: targetId,
+        })
+      ).json(),
+    );
+    vi.setSystemTime(Date.now() + CONNECT_AFTER_MS + 100);
+    const done = LoginSessionSchema.parse(
+      await (await post(`/login-sessions/${created.id}/complete`)).json(),
+    );
+    expect(done.status).toBe("completed");
+    return done;
+  }
+
+  it("crawls, then parks with login_required and stays parked", async () => {
+    const { scan } = await loginTargetScan();
+    expect(scan.status).toBe("queued");
+    vi.setSystemTime(Date.now() + 60_000);
+    const later = await getScan(scan.id);
+    expect(later.status).toBe("parked");
+    expect(later.parked_reason).toBe("login_required");
+    expect(later.login_session_id).toBeNull();
+  });
+
+  it("cannot continue without a session (422), or with one that isn't completed (409)", async () => {
+    const { target, scan } = await loginTargetScan();
+    vi.setSystemTime(Date.now() + 60_000);
+    expect((await post(`/scans/${scan.id}/continue`, {})).status).toBe(422);
+    const pending = LoginSessionSchema.parse(
+      await (
+        await post("/login-sessions", {
+          workspace_id: "wksp_demo",
+          target_id: target.id,
+        })
+      ).json(),
+    );
+    const res = await post(`/scans/${scan.id}/continue`, {
+      login_session_id: pending.id,
+    });
+    expect(res.status).toBe(409);
+    expect((await getScan(scan.id)).status).toBe("parked");
+  });
+
+  it("continues with a completed session, records it, and the scan then completes and stays completed", async () => {
+    const { target, scan } = await loginTargetScan();
+    vi.setSystemTime(Date.now() + 60_000);
+    const session = await completedSession(target.id);
+    const res = await post(`/scans/${scan.id}/continue`, {
+      login_session_id: session.id,
+    });
+    expect(res.status).toBe(200);
+    const continued = ScanSchema.parse(await res.json());
+    expect(continued.login_session_id).toBe(session.id);
+    expect(continued.status).toBe("completed");
+    vi.setSystemTime(Date.now() + 3_600_000);
+    const later = await getScan(scan.id);
+    expect(later.status).toBe("completed");
+    expect(later.modules.length).toBeGreaterThan(0);
+    expect(later.login_session_id).toBe(session.id);
+  });
+
+  it("a scan started WITH a completed session doesn't park", async () => {
+    const { target } = await loginTargetScan();
+    const session = await completedSession(target.id);
+    const created = ScanSchema.parse(
+      await (
+        await post("/scans", {
+          workspace_id: "wksp_demo",
+          target_id: target.id,
+          login_session_id: session.id,
+        })
+      ).json(),
+    );
+    vi.setSystemTime(Date.now() + 60_000);
+    expect((await getScan(created.id)).status).toBe("completed");
+  });
+});
