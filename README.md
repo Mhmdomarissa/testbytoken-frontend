@@ -70,9 +70,15 @@ _its own_ recorded baseline, or if a route has no baseline entry at all
 route's number or to a guessed target — every regression is visible
 without pretending anyone can predict the right figure in advance.
 
-**Deliberately increasing a route's budget:** run
-`npm run bundle-budget -- --write`, inspect the diff to
-`bundle-budget-baseline.json`, commit it, and say why in the PR body.
+**Deliberately increasing a route's budget:** gzip output isn't perfectly
+platform-invariant (a systematic macOS-vs-Ubuntu offset, not
+run-to-run noise — see `TOLERANCE_BYTES` in the script), so the
+committed baseline has to be measured on CI, not a contributor's
+machine. Run `npm run bundle-budget -- --write` locally first to see the
+size of your own diff, then open the PR, let CI's `bundle-budget` job
+run, and copy the exact byte counts it prints (every line includes them,
+not just the rounded KB) into `bundle-budget-baseline.json` — commit
+those numbers, and say why in the PR body.
 
 **The public proof page** (`/p/[token]`, not built yet) gets its own
 separate, tight budget once it exists — it's opened cold, often on a

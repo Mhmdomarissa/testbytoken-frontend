@@ -34,7 +34,11 @@
  * run `node scripts/check-bundle-budget.mjs --write` to measure it and add
  * it to the baseline, and say why in the PR body if you're deliberately
  * accepting a larger number for an existing route (the baseline diff makes
- * the size of that decision visible in review).
+ * the size of that decision visible in review). One caveat: gzip output is
+ * not perfectly platform-invariant (see TOLERANCE_BYTES below), so the
+ * committed baseline must be the numbers CI itself measured, not a local
+ * `--write` - use `--write` locally to see the size of your own diff, then
+ * read the real numbers to commit from the CI log.
  *
  * PUBLIC PROOF PAGE: the review calls for a separate, tight budget for the
  * public proof page (`/p/[token]`) specifically, well below the app
@@ -68,26 +72,34 @@ const PUBLIC_ROUTE_PREFIX = "/p/";
 const PUBLIC_ROUTE_BUDGET_BYTES = null;
 
 /**
- * Measured, not guessed (pre-Phase-B review, item 4). This was 8 KB, a
- * hedge added when CI (Ubuntu, a floating Node minor version) first
- * failed every route by +0.4-2.2 KB against a baseline written locally
- * (macOS, a specific Node patch). A follow-up PR pinned CI to that exact
- * same .nvmrc version, which raised the question: was Node-version drift
- * the actual cause, making this tolerance redundant? Tested directly by
- * setting it to 0 and pushing - CI run 35565089141 still failed every
- * route, by +0.4 to +1.7 KB, always CI-higher than local, never lower.
- * That rules out Node-version float as the cause (it's now pinned
- * identically on both sides) and confirms this is genuine macOS/Ubuntu
- * build non-determinism (not root-caused further - plausibly the native
- * zlib linked into each platform's Node binary producing slightly
- * different gzip output for identical input, or filesystem
- * directory-iteration order affecting Turbopack's chunk concatenation).
- * 4 KB is ~2.3x the largest single-route drift actually observed
- * (1.7 KB on /runs) - enough margin to absorb this specific noise
- * without hiding a real regression, which for an added dependency or
- * component is easily an order of magnitude bigger than 4 KB.
+ * ZERO - not a hedge, because the drift this used to hedge against is not
+ * noise (pre-Phase-B review, item 4, second pass). History: this was 8 KB
+ * when CI (Ubuntu, a floating Node minor version) first failed every
+ * route by +0.4-2.2 KB against a baseline written locally (macOS). A
+ * follow-up PR pinned CI to the exact same .nvmrc version and re-tested
+ * at 0 KB tolerance - CI still failed every route, by +0.4 to +1.7 KB,
+ * always CI-higher than local, never lower, never a different sign. That
+ * consistency is the tell: a same-direction, every-route offset is a
+ * systematic macOS-vs-Ubuntu difference (almost certainly the native
+ * zlib each platform's Node binary links against producing slightly
+ * different gzip bytes for identical input - gzip's output isn't fully
+ * platform-invariant), not run-to-run non-determinism. Non-determinism
+ * needs a tolerance band; a systematic offset needs the baseline measured
+ * on the platform that actually gates the check. So: `bundle-budget-baseline.json`
+ * is now generated ON CI (Ubuntu), not on a contributor's machine, and
+ * this tolerance goes back to 0 - a real regression should fail exactly
+ * at the byte it happens, not somewhere inside a margin.
+ *
+ * Consequence for `--write`: running it locally (macOS) still measures
+ * correctly for *comparing before/after your own change* (the review
+ * question - "did I add N KB" - is platform-invariant), but the absolute
+ * number will read slightly low relative to what CI will actually
+ * enforce. To regenerate the committed baseline for real: open a PR,
+ * let CI's `bundle-budget` job run and read the exact byte counts from
+ * its log (each line prints them, not just the rounded KB), and commit
+ * those numbers - not a local `--write` output - as `bundle-budget-baseline.json`.
  */
-const TOLERANCE_BYTES = 4 * 1024;
+const TOLERANCE_BYTES = 0;
 
 const WRITE_MODE = process.argv.includes("--write");
 
@@ -179,7 +191,9 @@ if (WRITE_MODE) {
   writeFileSync(BASELINE_PATH, JSON.stringify(baseline, null, 2) + "\n");
   console.log(`Wrote ${BASELINE_PATH} with ${results.length} routes:\n`);
   for (const { route, totalBytes } of results) {
-    console.log(`  ${route.padEnd(24)} ${(totalBytes / 1024).toFixed(1)} KB`);
+    console.log(
+      `  ${route.padEnd(24)} ${(totalBytes / 1024).toFixed(1)} KB  (${totalBytes} bytes)`,
+    );
   }
   console.log(
     "\nCommit this file. If any number here is a deliberate increase over",
@@ -221,8 +235,13 @@ for (const { route, totalBytes, fileCount } of results) {
   if (over) failed = true;
   const marker = over ? "FAIL" : "ok  ";
   const ceilingKb = (ceiling / 1024).toFixed(1);
+  // Exact bytes are printed alongside the rounded KB so a human accepting
+  // a deliberate increase can read the real number straight out of a CI
+  // log and hand-write it into bundle-budget-baseline.json - the baseline
+  // must be measured on CI's platform (see TOLERANCE_BYTES above), so a
+  // locally-run --write is not a substitute for this.
   console.log(
-    `  [${marker}] ${route.padEnd(24)} ${kb.padStart(8)} KB  (baseline ${ceilingKb} KB ±${(TOLERANCE_BYTES / 1024).toFixed(0)} KB, ${fileCount} files)`,
+    `  [${marker}] ${route.padEnd(24)} ${kb.padStart(8)} KB  (${totalBytes} bytes; baseline ${ceilingKb} KB / ${ceiling} bytes${TOLERANCE_BYTES ? ` ±${(TOLERANCE_BYTES / 1024).toFixed(0)} KB` : ""}, ${fileCount} files)`,
   );
 }
 
