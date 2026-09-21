@@ -197,3 +197,21 @@ test("Change address from a failed scan edits the target, and the next scan comp
     row.locator("xpath=following-sibling::tr[1]").getByTestId("scan-failure"),
   ).toHaveCount(0);
 });
+
+test("navigating between pages does not throw away what you just created", async ({
+  page,
+}) => {
+  await register(page, {
+    name: "Survivor",
+    url: "https://survivor.example.com",
+  });
+  await page.getByRole("link", { name: "Runs", exact: true }).click();
+  await expect(page).toHaveURL(/\/runs$/);
+  await expect(page.getByRole("heading", { name: "Runs" })).toBeVisible();
+  await page.getByRole("link", { name: "Targets", exact: true }).click();
+  await expect(page).toHaveURL(/\/targets$/);
+  // A client-side navigation keeps the in-memory mock; a hard reload would have reset it.
+  await expect(
+    page.getByRole("row").filter({ hasText: "Survivor" }),
+  ).toBeVisible();
+});

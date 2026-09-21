@@ -18,7 +18,7 @@ describe("Run: pass_rate and coverage are both required, everywhere", () => {
     login_session_id: null,
     status: "passed",
     pass_rate: 0.8,
-    coverage: { generated: 8, candidate: 10 },
+    coverage: { basis: "inventory", generated: 8, candidate: 10 },
     token_cost: 12.5,
     proof_id: "proof_1",
     started_at: "2026-01-01T00:00:00Z",
@@ -33,6 +33,13 @@ describe("Run: pass_rate and coverage are both required, everywhere", () => {
   it("RunSummary rejects a run missing pass_rate", () => {
     const { pass_rate: _passRate, ...withoutPassRate } = base;
     expect(RunSummarySchema.safeParse(withoutPassRate).success).toBe(false);
+  });
+
+  it("coverage must say what it counts: a coverage figure without a basis is rejected", () => {
+    const { basis: _basis, ...unlabelled } = base.coverage;
+    expect(
+      RunSummarySchema.safeParse({ ...base, coverage: unlabelled }).success,
+    ).toBe(false);
   });
 
   it("RunSummary accepts a run with both", () => {

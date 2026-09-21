@@ -1,5 +1,11 @@
 import { http } from "msw";
-import { RunDetailSchema, RunSummarySchema, paginated } from "@/lib/contract";
+import type { z } from "zod";
+import {
+  CoverageSchema,
+  RunDetailSchema,
+  RunSummarySchema,
+  paginated,
+} from "@/lib/contract";
 import { HttpResponse } from "msw";
 import { json, errorResponse, checkSimulatedError } from "../respond";
 import { loginSessionStore, runStore } from "../store";
@@ -54,7 +60,11 @@ export const runHandlers = [
     }
 
     let timeline = LIVE_PASS_TIMELINE;
-    let coverage = { generated: 21, candidate: 24 };
+    let coverage: z.infer<typeof CoverageSchema> = {
+      basis: "inventory",
+      generated: 21,
+      candidate: 24,
+    };
     if (body.plan_id) {
       const plan = resolvePlan(body.plan_id);
       if (!plan) return errorResponse(404, "not_found", "Plan not found.");

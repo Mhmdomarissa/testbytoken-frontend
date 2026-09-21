@@ -335,6 +335,17 @@ the whole proposal. For a run with `plan_id` set:
   immutable plan: ungrounded → `ungrounded`; else blocked → `blocked`; else
   absent from the approval → `removed_by_user`.
 
+**`coverage.basis` says what is being counted.** `inventory` (a suite
+run: elements found / uniquely locatable) or `plan` (a plan run: steps
+proposed / approved). Same fields, different denominators - **not
+comparable**, and a client must label a coverage figure with its basis (the
+`PassRateCoverage` component requires it). `2 of 5 plan steps` also says
+nothing about how much of the application was tested: a plan is written
+from an intent and need not propose every groundable element. The proof's
+`plan.grounded_against` (`elements`, `uniquely_locatable` of the inventory
+the plan was grounded against, and `elements_proposed`, the distinct
+elements the proposal touches) is what shows that reduction.
+
 Found by the reference mock, which returned the suite fixture's 21 of 24
 for a plan run — a number unrelated to the plan.
 

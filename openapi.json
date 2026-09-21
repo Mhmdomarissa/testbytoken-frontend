@@ -647,6 +647,15 @@
       "Coverage": {
         "type": "object",
         "properties": {
+          "basis": {
+            "type": "string",
+            "enum": [
+              "inventory",
+              "plan"
+            ],
+            "description": "What `generated` and `candidate` COUNT. `inventory` (a suite run): `candidate` = elements the engine found, `generated` = those it could uniquely locate and so generate a scenario for. `plan` (a run from a plan): `candidate` = steps the plan proposed, `generated` = steps approved to run. The two are different denominators and are NOT comparable: 2 of 5 plan steps says nothing about how much of the application was tested - see the proof's `plan.grounded_against` for that. A client MUST label a coverage figure with its basis. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
           "generated": {
             "type": "integer",
             "minimum": 0,
@@ -659,6 +668,7 @@
           }
         },
         "required": [
+          "basis",
           "generated",
           "candidate"
         ]
@@ -1941,6 +1951,36 @@
                 "description": "ISO 8601 UTC timestamp.",
                 "example": "2026-09-16T14:32:00Z"
               },
+              "grounded_against": {
+                "type": "object",
+                "properties": {
+                  "scan_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+                    "example": "run_8f2a1c9d"
+                  },
+                  "elements": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "uniquely_locatable": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "elements_proposed": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "scan_id",
+                  "elements",
+                  "uniquely_locatable",
+                  "elements_proposed"
+                ],
+                "description": "How big the application's inventory was when the plan was made, so 'N steps proposed' can be read against it: `elements` and `uniquely_locatable` are the inventory (scan) the plan was grounded against; `elements_proposed` is how many DISTINCT inventory elements the proposed steps touch. A plan is written from an intent, so it need not propose every groundable element - this is the number that shows the reduction, which `coverage` (proposed vs approved) does not."
+              },
               "approved_steps": {
                 "type": "array",
                 "items": {
@@ -2019,6 +2059,7 @@
               "id",
               "intent",
               "approved_at",
+              "grounded_against",
               "approved_steps",
               "excluded_steps"
             ],

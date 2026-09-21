@@ -46,7 +46,7 @@ const run = {
   login_session_id: null,
   status: "passed",
   pass_rate: 1,
-  coverage: { generated: 3, candidate: 24 },
+  coverage: { basis: "inventory", generated: 3, candidate: 24 },
   token_cost: 1,
   proof_id: null,
   started_at: "2026-09-16T14:32:00Z",
@@ -123,7 +123,11 @@ describe("site 2: run status", () => {
       report_url: null,
       steps: [],
     });
-    expect(parsed.coverage).toEqual({ generated: 3, candidate: 24 });
+    expect(parsed.coverage).toEqual({
+      basis: "inventory",
+      generated: 3,
+      candidate: 24,
+    });
   });
 });
 

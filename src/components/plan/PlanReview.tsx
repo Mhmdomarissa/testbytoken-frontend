@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { InventoryContext } from "./InventoryContext";
 import { PlanStepRow } from "./PlanStepRow";
 import {
   approvability,
@@ -26,6 +27,7 @@ import {
 export function PlanReview({
   intent,
   steps,
+  inventoryElements,
   busy,
   error,
   onApprove,
@@ -33,6 +35,7 @@ export function PlanReview({
 }: {
   intent: string;
   steps: PlanStep[];
+  inventoryElements: number | null;
   busy: boolean;
   error: string | null;
   onApprove: (stepIds: string[]) => void;
@@ -57,6 +60,8 @@ export function PlanReview({
           {intent}
         </p>
       </div>
+
+      <InventoryContext steps={steps} inventoryElements={inventoryElements} />
 
       <ol className="flex flex-col gap-2" aria-label="Proposed steps">
         {review.order.map((id, i) => {
