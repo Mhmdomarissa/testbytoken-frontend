@@ -6,7 +6,9 @@ import path from "node:path";
 import ts from "typescript";
 
 /**
- * Phase B B9: the public proof page "does not import the app shell". This
+ * The boundary is signed-in vs not, in two tiers. Phase B B9: the public
+ * proof page "does not import the app shell" (`(public)`, strictest). Pre-auth
+ * pages (`(auth)`: sign-in) get the dev mock gate and nothing else. This
  * makes that a checked fact rather than a promise. Anything under
  * `src/app/(public)/` - and the root layout every route inherits - must not
  * reach, by any chain of imports, the console's client runtime: the shell,
@@ -22,15 +24,40 @@ import ts from "typescript";
 
 const SRC = path.join(import.meta.dirname, "..");
 
-const FORBIDDEN_PATHS = [
+interface Tier {
+  forbiddenPaths: string[];
+  forbiddenPackages: string[];
+  /** Files an entry MAY import, and which are not walked into (their own imports are their business). */
+  leaves: string[];
+}
+
+const CONSOLE_ONLY = [
   "components/shell",
-  "mocks",
   "lib/api/queries",
   "lib/api/QueryProvider.tsx",
   "hooks/useResource.ts",
   "app/(console)",
 ];
-const FORBIDDEN_PACKAGES = ["@tanstack/react-query", "msw"];
+
+/** A public page (the proof page): none of the console, and no mock plumbing at all. */
+export const PUBLIC_TIER: Tier = {
+  forbiddenPaths: [...CONSOLE_ONLY, "mocks"],
+  forbiddenPackages: ["@tanstack/react-query", "msw"],
+  leaves: [],
+};
+
+/**
+ * A pre-auth page (sign-in): still none of the console, but it talks to the
+ * mock backend directly in development, so it may use the mock gate and the
+ * mock-only session-cookie workaround - as leaves, so what THEY import (the
+ * MSW worker, handlers) is not walked and the Query client can't ride in
+ * through them unnoticed.
+ */
+export const AUTH_TIER: Tier = {
+  forbiddenPaths: [...CONSOLE_ONLY, "mocks"],
+  forbiddenPackages: ["@tanstack/react-query", "msw"],
+  leaves: ["mocks/MockingProvider.tsx", "mocks/session-cookie-workaround.ts"],
+};
 
 function specifiers(file: string): string[] {
   const source = ts.createSourceFile(
@@ -82,16 +109,21 @@ function resolve(from: string, spec: string, src: string): string | null {
 }
 
 /** Every violation reachable from `entries`, each as the chain of files that leads to it. */
-export function findViolations(entries: string[], src: string): string[] {
+export function findViolations(
+  entries: string[],
+  src: string,
+  tier: Tier = PUBLIC_TIER,
+): string[] {
   const violations: string[] = [];
   const seen = new Set<string>();
-  const forbidden = FORBIDDEN_PATHS.map((p) => path.join(src, p));
+  const forbidden = tier.forbiddenPaths.map((p) => path.join(src, p));
+  const leaves = tier.leaves.map((p) => path.join(src, p));
 
   const walk = (file: string, chain: string[]) => {
     if (seen.has(file)) return;
     seen.add(file);
     for (const spec of specifiers(file)) {
-      const pkg = FORBIDDEN_PACKAGES.find(
+      const pkg = tier.forbiddenPackages.find(
         (p) => spec === p || spec.startsWith(`${p}/`),
       );
       const next = resolve(file, spec, src);
@@ -101,6 +133,7 @@ export function findViolations(entries: string[], src: string): string[] {
           [...chain, file].map(label).join(" -> ") + ` -> ${pkg}`,
         );
       } else if (next) {
+        if (leaves.includes(next)) continue;
         if (
           forbidden.some((f) => next === f || next.startsWith(f + path.sep))
         ) {
@@ -133,6 +166,12 @@ describe("the public route boundary", () => {
     expect(
       findViolations(filesUnder(path.join(SRC, "app/(public)")), SRC),
     ).toEqual([]);
+  });
+
+  it("nothing under (auth) reaches the shell or the query client (the mock gate is allowed)", () => {
+    const entries = filesUnder(path.join(SRC, "app/(auth)"));
+    expect(entries.length).toBeGreaterThan(0); // sign-in lives here: not vacuous
+    expect(findViolations(entries, SRC, AUTH_TIER)).toEqual([]);
   });
 
   it("the console providers live in the (console) group, not the root layout", () => {
@@ -183,6 +222,26 @@ describe("findViolations (so the checks above can't pass by walking nothing)", (
     });
     expect(findViolations([path.join(dir, "a.tsx")], dir)).toHaveLength(1);
     expect(findViolations([path.join(dir, "b.tsx")], dir)).toHaveLength(1);
+  });
+
+  it("the auth tier allows the mock gate as a leaf, but not what a console page would bring", () => {
+    const dir = tree({
+      "auth/page.tsx": `import { MockingProvider } from "@/mocks/MockingProvider";`,
+      "mocks/MockingProvider.tsx": `import("./browser");`,
+      "mocks/browser.ts": `import { setupWorker } from "msw";`,
+      "auth/bad.tsx": `import { QueryProvider } from "@/lib/api/QueryProvider";`,
+      "lib/api/QueryProvider.tsx": ``,
+    });
+    expect(
+      findViolations([path.join(dir, "auth/page.tsx")], dir, AUTH_TIER),
+    ).toEqual([]);
+    expect(
+      findViolations([path.join(dir, "auth/bad.tsx")], dir, AUTH_TIER),
+    ).toHaveLength(1);
+    // ...while the public tier refuses even the mock gate.
+    expect(
+      findViolations([path.join(dir, "auth/page.tsx")], dir, PUBLIC_TIER),
+    ).toHaveLength(1);
   });
 
   it("passes a clean tree", () => {
