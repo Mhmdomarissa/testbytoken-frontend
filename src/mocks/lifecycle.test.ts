@@ -5,6 +5,7 @@ import {
   runEventLog,
   pendingRunEvents,
   scanEventLog,
+  scanFailureFor,
   pendingScanEvents,
   LIVE_PASS_TIMELINE,
   LIVE_FAIL_TIMELINE,
@@ -217,5 +218,32 @@ describe("runEventLog", () => {
     const log = runEventLog(LIVE_PASS_TIMELINE, LIVE_PASS_TIMELINE.resolvesAt);
     expect(log.map((e) => e.id)).toEqual(log.map((_, i) => String(i)));
     expect(log.at(-1)?.type).toBe("done");
+  });
+});
+
+describe("scanFailureFor: every failure kind in the contract is reachable from a URL", () => {
+  it.each([
+    ["https://refused.example.com", "refused"],
+    ["https://slow.example.com", "timeout"],
+    ["https://broken.example.com", "internal"],
+    ["https://unreachable.example.com", "unreachable"],
+    ["https://legacy-admin.example.com", "unreachable"],
+    ["http://localhost:3000", "blocked_by_guardrail"],
+    ["http://127.0.0.1", "blocked_by_guardrail"],
+    ["http://10.1.2.3", "blocked_by_guardrail"],
+    ["http://172.20.0.1", "blocked_by_guardrail"],
+    ["http://192.168.1.10", "blocked_by_guardrail"],
+    ["http://169.254.169.254", "blocked_by_guardrail"],
+    ["https://staging.corp.internal", "blocked_by_guardrail"],
+  ])("%s -> %s", (url, kind) => {
+    expect(scanFailureFor(url)?.kind).toBe(kind);
+  });
+
+  it.each([
+    "https://shop.example.com",
+    "http://172.32.0.1", // just outside 172.16/12
+    "https://example.com:8443/app",
+  ])("%s completes", (url) => {
+    expect(scanFailureFor(url)).toBeNull();
   });
 });

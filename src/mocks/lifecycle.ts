@@ -62,27 +62,81 @@ export const SCAN_TIMELINE: ScanTimeline = {
   completedAt: 4000,
 };
 
+type ScanFailure = NonNullable<Scan["failure"]>;
+
+function isPrivateHost(host: string): boolean {
+  if (host === "localhost" || host.endsWith(".localhost")) return true;
+  if (host.endsWith(".internal") || host.endsWith(".local")) return true;
+  const ipv4 = host.match(/^(\d+)\.(\d+)\.\d+\.\d+$/);
+  if (!ipv4) return host === "[::1]";
+  const a = Number(ipv4[1]);
+  const b = Number(ipv4[2]);
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 0 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
 /**
- * A target named tgt_unreachable never resolves: its scan crawls, then FAILS
- * with a structured reason (B0.5 B4) - the designed scan-failure state.
+ * How a scan of this target ends. Keyed on the target's URL so every
+ * failure kind in the contract (B0.5 B4) can be reached from a browser by
+ * registering a target with a recognisable host - a screen can't be driven
+ * through a state the mock can't produce:
+ *
+ *   refused.*   -> refused        slow.*      -> timeout
+ *   broken.*    -> internal       unreachable.* / legacy-admin.example.com -> unreachable
+ *   a private, loopback or link-local address -> blocked_by_guardrail
+ *                                  (the server's guardrail, not the client's)
+ *
+ * Anything else completes. Messages are written the way the contract asks:
+ * safe to show as-is, no page content.
  */
-const UNREACHABLE_TARGET_ID = "tgt_unreachable";
+export function scanFailureFor(targetUrl: string): ScanFailure | null {
+  const host = new URL(targetUrl).hostname.toLowerCase();
+  if (isPrivateHost(host)) {
+    return {
+      kind: "blocked_by_guardrail",
+      message: `${host} is a private or internal address. We only scan sites reachable from the public internet.`,
+    };
+  }
+  if (host.startsWith("refused.")) {
+    return {
+      kind: "refused",
+      message: `${host} answered our request with 403 Forbidden.`,
+    };
+  }
+  if (host.startsWith("slow.")) {
+    return {
+      kind: "timeout",
+      message: `${host} did not respond within 30 seconds.`,
+    };
+  }
+  if (host.startsWith("broken.")) {
+    return {
+      kind: "internal",
+      message: "The crawler stopped unexpectedly. This was our fault.",
+    };
+  }
+  if (host.startsWith("unreachable.") || host === UNREACHABLE_FIXTURE_HOST) {
+    return {
+      kind: "unreachable",
+      message: `We couldn't reach ${host} - the name did not resolve. Check the address, or that the site is up.`,
+    };
+  }
+  return null;
+}
+
+/** The seeded "Legacy admin" target (data.ts): keyed on its address, so fixing the address fixes the scan. */
+const UNREACHABLE_FIXTURE_HOST = "legacy-admin.example.com";
 
 export function computeScanState(base: Scan, elapsedMs: number): Scan {
-  if (
-    base.target_id === UNREACHABLE_TARGET_ID &&
-    elapsedMs >= SCAN_TIMELINE.completedAt
-  ) {
-    return {
-      ...base,
-      status: "failed",
-      modules: [],
-      failure: {
-        kind: "unreachable",
-        message:
-          "We couldn't reach legacy-admin.example.com - the name did not resolve. Check the address, or that the site is up.",
-      },
-    };
+  const failure = scanFailureFor(base.target_url);
+  if (failure && elapsedMs >= SCAN_TIMELINE.completedAt) {
+    return { ...base, status: "failed", modules: [], failure };
   }
   if (elapsedMs >= SCAN_TIMELINE.completedAt) {
     return {
@@ -109,8 +163,8 @@ export function resolveScan(base: Scan): Scan {
   return computeScanState(base, elapsedMsFor(base.id));
 }
 
-function scanTerminalStatus(scanTargetId?: string): "completed" | "failed" {
-  return scanTargetId === UNREACHABLE_TARGET_ID ? "failed" : "completed";
+function scanTerminalStatus(fails: boolean): "completed" | "failed" {
+  return fails ? "failed" : "completed";
 }
 
 function scanStatusEvent(id: string, status: Scan["status"]): JobEvent {
@@ -118,15 +172,12 @@ function scanStatusEvent(id: string, status: Scan["status"]): JobEvent {
 }
 
 /** Ordered JobEvents for a scan's progress so far, for SSE backlog. */
-export function scanEventLog(
-  elapsedMs: number,
-  scanTargetId?: string,
-): JobEvent[] {
+export function scanEventLog(elapsedMs: number, fails = false): JobEvent[] {
   const events: JobEvent[] = [scanStatusEvent("0", "queued")];
   if (elapsedMs >= SCAN_TIMELINE.crawlingAt)
     events.push(scanStatusEvent("1", "crawling"));
   if (elapsedMs >= SCAN_TIMELINE.completedAt) {
-    const terminal = scanTerminalStatus(scanTargetId);
+    const terminal = scanTerminalStatus(fails);
     events.push(scanStatusEvent(String(events.length), terminal));
     events.push({
       id: String(events.length + 1),
@@ -140,10 +191,10 @@ export function scanEventLog(
 /** Every future scan transition still to come, for scheduling live SSE. */
 export function pendingScanEvents(
   elapsedMs: number,
-  scanTargetId?: string,
+  fails = false,
 ): { delayMs: number; event: JobEvent }[] {
   const pending: { delayMs: number; event: JobEvent }[] = [];
-  let nextId = scanEventLog(elapsedMs, scanTargetId).length;
+  let nextId = scanEventLog(elapsedMs, fails).length;
 
   if (elapsedMs < SCAN_TIMELINE.crawlingAt) {
     pending.push({
@@ -155,7 +206,7 @@ export function pendingScanEvents(
   if (elapsedMs < SCAN_TIMELINE.completedAt) {
     pending.push({
       delayMs: SCAN_TIMELINE.completedAt - elapsedMs,
-      event: scanStatusEvent(String(nextId), scanTerminalStatus(scanTargetId)),
+      event: scanStatusEvent(String(nextId), scanTerminalStatus(fails)),
     });
     nextId += 1;
     pending.push({
@@ -163,7 +214,7 @@ export function pendingScanEvents(
       event: {
         id: String(nextId),
         type: "done",
-        status: scanTerminalStatus(scanTargetId),
+        status: scanTerminalStatus(fails),
       },
     });
   }

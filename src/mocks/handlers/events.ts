@@ -10,6 +10,7 @@ import {
   LIVE_RUN_TIMELINES,
   LIVE_SCAN_IDS,
   onRunCancelled,
+  scanFailureFor,
   elapsedMsFor,
   runEventLog,
   pendingRunEvents,
@@ -106,9 +107,10 @@ export const eventHandlers = [
       pending = [];
     } else {
       const elapsed = elapsedMsFor(jobId);
-      backlog = scanEventLog(elapsed, scan?.target_id);
+      const fails = scan ? scanFailureFor(scan.target_url) !== null : false;
+      backlog = scanEventLog(elapsed, fails);
       pending = LIVE_SCAN_IDS.has(jobId)
-        ? pendingScanEvents(elapsed, scan?.target_id)
+        ? pendingScanEvents(elapsed, fails)
         : [];
     }
 

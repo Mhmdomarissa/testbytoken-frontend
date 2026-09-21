@@ -49,6 +49,8 @@ export function useCreateScan() {
       apiPost("/scans", ScanSchema, body),
     onSuccess: (scan) => {
       queryClient.setQueryData(queryKeys.scans.detail(scan.id), scan);
+      // The target's `last_scan` is now this scan.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.targets.all() });
     },
   });
 }
