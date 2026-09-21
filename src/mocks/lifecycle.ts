@@ -88,6 +88,7 @@ function isPrivateHost(host: string): boolean {
  * through a state the mock can't produce:
  *
  *   empty.*     -> completes with no modules
+ *   login.*     -> parks (login_required) until continued with a completed login session
  *   refused.*   -> refused        slow.*      -> timeout
  *   broken.*    -> internal       unreachable.* / legacy-admin.example.com -> unreachable
  *   a private, loopback or link-local address -> blocked_by_guardrail
@@ -139,10 +140,42 @@ export function scanFindsNothing(targetUrl: string): boolean {
   return new URL(targetUrl).hostname.toLowerCase().startsWith("empty.");
 }
 
+/**
+ * `login.*` hosts need a sign-in: their scan crawls, then PARKS
+ * (`login_required`) and stays parked until continued with a completed
+ * login session - or, if it was started with one, sails through.
+ */
+export function scanNeedsLogin(targetUrl: string): boolean {
+  return new URL(targetUrl).hostname.toLowerCase().startsWith("login.");
+}
+
+export type ScanOutcome = "completed" | "failed" | "parked";
+
+export function scanOutcomeFor(
+  targetUrl: string,
+  loginSessionId: string | null,
+): ScanOutcome {
+  if (scanFailureFor(targetUrl)) return "failed";
+  if (scanNeedsLogin(targetUrl) && loginSessionId === null) return "parked";
+  return "completed";
+}
+
 export function computeScanState(base: Scan, elapsedMs: number): Scan {
   const failure = scanFailureFor(base.target_url);
   if (failure && elapsedMs >= SCAN_TIMELINE.completedAt) {
     return { ...base, status: "failed", modules: [], failure };
+  }
+  if (
+    scanOutcomeFor(base.target_url, base.login_session_id) === "parked" &&
+    elapsedMs >= SCAN_TIMELINE.completedAt
+  ) {
+    return {
+      ...base,
+      status: "parked",
+      parked_reason: "login_required",
+      failure: null,
+      modules: [],
+    };
   }
   if (elapsedMs >= SCAN_TIMELINE.completedAt) {
     return {
@@ -171,8 +204,8 @@ export function resolveScan(base: Scan): Scan {
   return computeScanState(base, elapsedMsFor(base.id));
 }
 
-function scanTerminalStatus(fails: boolean): "completed" | "failed" {
-  return fails ? "failed" : "completed";
+function scanTerminalStatus(outcome: ScanOutcome): ScanOutcome {
+  return outcome;
 }
 
 function scanStatusEvent(id: string, status: Scan["status"]): JobEvent {
@@ -180,18 +213,25 @@ function scanStatusEvent(id: string, status: Scan["status"]): JobEvent {
 }
 
 /** Ordered JobEvents for a scan's progress so far, for SSE backlog. */
-export function scanEventLog(elapsedMs: number, fails = false): JobEvent[] {
+export function scanEventLog(
+  elapsedMs: number,
+  outcome: ScanOutcome = "completed",
+): JobEvent[] {
   const events: JobEvent[] = [scanStatusEvent("0", "queued")];
   if (elapsedMs >= SCAN_TIMELINE.crawlingAt)
     events.push(scanStatusEvent("1", "crawling"));
   if (elapsedMs >= SCAN_TIMELINE.completedAt) {
-    const terminal = scanTerminalStatus(fails);
+    const terminal = scanTerminalStatus(outcome);
     events.push(scanStatusEvent(String(events.length), terminal));
-    events.push({
-      id: String(events.length + 1),
-      type: "done",
-      status: terminal,
-    });
+    // `parked` is not the end of the job: it waits on a person, so there is
+    // no `done` until the scan is continued.
+    if (terminal !== "parked") {
+      events.push({
+        id: String(events.length + 1),
+        type: "done",
+        status: terminal,
+      });
+    }
   }
   return events;
 }
@@ -199,10 +239,10 @@ export function scanEventLog(elapsedMs: number, fails = false): JobEvent[] {
 /** Every future scan transition still to come, for scheduling live SSE. */
 export function pendingScanEvents(
   elapsedMs: number,
-  fails = false,
+  outcome: ScanOutcome = "completed",
 ): { delayMs: number; event: JobEvent }[] {
   const pending: { delayMs: number; event: JobEvent }[] = [];
-  let nextId = scanEventLog(elapsedMs, fails).length;
+  let nextId = scanEventLog(elapsedMs, outcome).length;
 
   if (elapsedMs < SCAN_TIMELINE.crawlingAt) {
     pending.push({
@@ -214,17 +254,19 @@ export function pendingScanEvents(
   if (elapsedMs < SCAN_TIMELINE.completedAt) {
     pending.push({
       delayMs: SCAN_TIMELINE.completedAt - elapsedMs,
-      event: scanStatusEvent(String(nextId), scanTerminalStatus(fails)),
+      event: scanStatusEvent(String(nextId), scanTerminalStatus(outcome)),
     });
     nextId += 1;
-    pending.push({
-      delayMs: SCAN_TIMELINE.completedAt - elapsedMs,
-      event: {
-        id: String(nextId),
-        type: "done",
-        status: scanTerminalStatus(fails),
-      },
-    });
+    if (outcome !== "parked") {
+      pending.push({
+        delayMs: SCAN_TIMELINE.completedAt - elapsedMs,
+        event: {
+          id: String(nextId),
+          type: "done",
+          status: scanTerminalStatus(outcome),
+        },
+      });
+    }
   }
   return pending;
 }
