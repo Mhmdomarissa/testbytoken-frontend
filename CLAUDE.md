@@ -118,6 +118,17 @@ password into our UI. Authenticated testing hands the customer an
 interactive browser session where they sign in themselves (MFA and SSO
 included). A credential form means the product has been misread.
 
+## Workarounds with an expiry
+
+- **`scripts/zod-locale-trim-loader.cjs`** (added 2026-09-21) strips zod's
+  unused locales out of the client bundle to work around Turbopack not
+  shaking `export * as` (vercel/next.js#88643, colinhacks/zod#6050). **On
+  every zod or Next.js upgrade, re-check whether upstream fixed it, and if so
+  delete the loader, its `next.config.ts` rule, `scripts/check-zod-trim.mjs`,
+  its CI step, `e2e/zod-messages.spec.ts` and `dev/zod-messages`.** The
+  loader fails the build loudly if zod's source no longer matches - that is
+  a prompt to check upstream, not to loosen the pattern.
+
 ## Process
 
 - Small, reviewable commits, one concern each, and explain _why_ in the

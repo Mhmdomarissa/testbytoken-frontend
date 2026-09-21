@@ -79,6 +79,7 @@ jobs:
       # Contract prose (written for the backend team) must not ship to the
       # browser - see scripts/openapi-strip-loader.cjs.
       - run: npm run check:contract-prose
+      - run: npm run check:zod-trim
 
   contract-drift:
     runs-on: ubuntu-latest

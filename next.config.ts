@@ -16,6 +16,20 @@ const nextConfig: NextConfig = {
           path.resolve(import.meta.dirname, "scripts/openapi-strip-loader.cjs"),
         ],
       },
+      // TEMPORARY (2026-09-21): keep zod's 60+ unused locales out of the
+      // client bundle. Explained, with upstream links and the delete-when
+      // condition, in scripts/zod-locale-trim-loader.cjs.
+      "*.js": {
+        condition: {
+          path: /node_modules\/zod\/v4\/(classic\/external|core\/index)\.js$/,
+        },
+        loaders: [
+          path.resolve(
+            import.meta.dirname,
+            "scripts/zod-locale-trim-loader.cjs",
+          ),
+        ],
+      },
     },
   },
 };
