@@ -7,12 +7,36 @@ import {
 } from "@/lib/contract";
 import { json, errorResponse } from "../respond";
 import { proofs } from "../data";
+import { resolveRun } from "../lifecycle";
+import { proofForPlanRun, resolvePlan } from "../planning";
+import { runStore, targetStore } from "../store";
 
 let store = [...proofs];
 
+/**
+ * A finished PLAN run's proof does not exist until someone asks for it; then
+ * it is built once from the run and its immutable plan and kept - frozen -
+ * so a second read (or a later change to anything) can't alter it. Runs
+ * that aren't finished, or didn't come from an approved plan, have none.
+ */
+function findProof(id: string) {
+  const existing = store.find((p) => p.id === id);
+  if (existing || !id.startsWith("proof_run_")) return existing;
+  const stored = runStore.get(id.slice("proof_".length));
+  if (!stored) return undefined;
+  const run = resolveRun(stored);
+  if (!run.plan_id || run.proof_id !== id) return undefined;
+  const plan = resolvePlan(run.plan_id);
+  const target = targetStore.get(run.target_id);
+  if (!plan || plan.status !== "approved" || !target) return undefined;
+  const proof = proofForPlanRun(run, plan, target);
+  store = [...store, proof];
+  return proof;
+}
+
 export const proofHandlers = [
   http.get("*/proofs/:id", async ({ params }) => {
-    const proof = store.find((p) => p.id === params.id);
+    const proof = findProof(params.id as string);
     if (!proof) return errorResponse(404, "not_found", "Proof not found.");
     return json(ProofSchema, proof);
   }),

@@ -315,6 +315,29 @@ what a machine proposed before it executes.
   editing suites through plans, no plan-derived suite versions. A client
   must not build behaviour that assumes any.
 
+**Plan runs: what the pass rate is a rate _of_.** A run from a plan
+executes only the approved steps, so its numbers must not read as if it ran
+the whole proposal. For a run with `plan_id` set:
+
+- `coverage.candidate` = the number of steps the plan **proposed**;
+  `coverage.generated` = the number **approved** to run. Approving 2 of 5
+  steps and both passing reports **`pass_rate` 1, coverage 2 of 5** — never
+  2 of 2. Everything left out is inside the denominator.
+- `pass_rate` is the fraction of the steps that **ran** which passed.
+- The run's proof carries the plan: `plan.approved_steps` and
+  `plan.excluded_steps`, and `uncovered[]` has **one entry per excluded
+  step** with the same reason (`uncovered_total` = the number excluded =
+  `candidate − generated`).
+- The reason **distinguishes who excluded it**: `removed_by_user` (the
+  person left it out) versus `ungrounded` / `blocked` (the system could not
+  approve it). Never merged into one "excluded" bucket. The approval records
+  only the approved ids, so the **server derives** the reason from the
+  immutable plan: ungrounded → `ungrounded`; else blocked → `blocked`; else
+  absent from the approval → `removed_by_user`.
+
+Found by the reference mock, which returned the suite fixture's 21 of 24
+for a plan run — a number unrelated to the plan.
+
 **Inspectable before, immutable after.** A plan's `steps` never change once
 it leaves `generating` — not during review, not after approval. Edits live
 in the client until the single approval write. So a Proof can say exactly

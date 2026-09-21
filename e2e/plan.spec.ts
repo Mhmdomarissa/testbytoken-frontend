@@ -157,10 +157,10 @@ test("approval sends exactly the chosen steps in the chosen order, then starts a
 
   // Reorder: move step 3 to the top of the approvable steps.
   await step(page, 3)
-    .getByRole("button", { name: /Move step 3 up/ })
+    .getByRole("button", { name: /^Move up:/ })
     .click();
   await step(page, 3)
-    .getByRole("button", { name: /Move step 3 up/ })
+    .getByRole("button", { name: /^Move up:/ })
     .click();
   await expect(step(page, 3)).toContainText("#1");
 
@@ -197,11 +197,17 @@ test("an approved plan is a permanent record: what ran and what did not, with wh
   const record = page.getByTestId("approved-plan");
   await expect(record).toBeVisible();
   await expect(record).toContainText("Approved to run (2)");
-  await expect(page.getByTestId("excluded-steps")).toContainText("Not run (3)");
-  await expect(page.getByTestId("excluded-steps")).toContainText(
+  await expect(page.getByTestId("plan-scope")).toContainText(
+    "2 of 5 proposed steps approved to run. 3 did not run: 0 left out by you, 3 the system could not approve.",
+  );
+  await expect(page.getByTestId("excluded-by-system")).toContainText(
+    "The system could not approve (3)",
+  );
+  await expect(page.getByTestId("excluded-by-system")).toContainText(
     "Not grounded",
   );
-  await expect(page.getByTestId("excluded-steps")).toContainText("Blocked");
+  await expect(page.getByTestId("excluded-by-system")).toContainText("Blocked");
+  await expect(page.getByTestId("excluded-by-user")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Leave out" })).toHaveCount(0);
   await page.screenshot({
     path: "test-results/plan-approved.png",
@@ -246,4 +252,91 @@ test("compose needs a finished scan; unknown targets say so", async ({
   await expect(page.getByText("Scan this target first")).toBeVisible();
   await page.goto("/targets/tgt_nope/compose");
   await expect(page.getByText("Target not found")).toBeVisible();
+});
+
+test("keyboard: every step - including the ones that can't run - is reachable by Tab, and announced with why", async ({
+  page,
+}) => {
+  await propose(page, "Buy something");
+  await expect(page.getByText("Proposed - nothing has run")).toBeVisible({
+    timeout: 10_000,
+  });
+
+  const list = page.getByRole("list", { name: "Proposed steps" });
+  await list.getByRole("button").first().focus();
+
+  const visited = new Set<string>();
+  for (let i = 0; i < 16; i++) {
+    const id = await page.evaluate(
+      () =>
+        document.activeElement
+          ?.closest("li[data-testid]")
+          ?.getAttribute("data-testid") ?? null,
+    );
+    if (id) visited.add(id);
+    await page.keyboard.press("Tab");
+  }
+  // All five steps got a keyboard stop, not just the two with buttons.
+  expect([...visited].sort()).toEqual(
+    [1, 2, 3, 4, 5].map((n) => `plan-step-pstp_${n}`),
+  );
+
+  // The blocked step, focused by keyboard, is named and described with the reason.
+  const blockedRow = step(page, 2);
+  await blockedRow.focus();
+  await expect(blockedRow).toBeFocused();
+  await expect(blockedRow).toHaveAccessibleName('Click "Submit"');
+  await expect(blockedRow).toHaveAccessibleDescription(
+    /Blocked, cannot be approved: This account is on the read-only tier/,
+  );
+  const ungrounded = step(page, 4);
+  await ungrounded.focus();
+  await expect(ungrounded).toHaveAccessibleDescription(
+    /Not grounded, cannot be approved: ambiguous element/,
+  );
+
+  // Changing the selection is announced through the live summary.
+  await expect(page.getByTestId("approval-summary")).toHaveAttribute(
+    "aria-live",
+    "polite",
+  );
+});
+
+test("the record keeps the person's exclusions apart from the system's, in words and counts", async ({
+  page,
+}) => {
+  await propose(page, "writes: Buy something");
+  await expect(page.getByText("Proposed - nothing has run")).toBeVisible({
+    timeout: 10_000,
+  });
+  // Writes are allowed for this account: 1, 2, 3 approvable; 4 and 5 are not.
+  await step(page, 3)
+    .getByRole("button", { name: /^Leave out:/ })
+    .click();
+  await page.getByRole("button", { name: "Approve and run 2 steps" }).click();
+  await expect(page.getByTestId("run-started")).toBeVisible({
+    timeout: 10_000,
+  });
+
+  await expect(page.getByTestId("plan-scope")).toContainText(
+    "2 of 5 proposed steps approved to run. 3 did not run: 1 left out by you, 2 the system could not approve.",
+  );
+  await expect(page.getByTestId("excluded-by-user")).toContainText(
+    "Left out by you (1)",
+  );
+  await expect(page.getByTestId("excluded-by-user")).toContainText("Left out");
+  await expect(page.getByTestId("excluded-by-system")).toContainText(
+    "The system could not approve (2)",
+  );
+  // The step the person left out is NOT filed under the system's exclusions, or vice versa.
+  await expect(page.getByTestId("excluded-by-system")).not.toContainText(
+    "Left out",
+  );
+  await expect(page.getByTestId("excluded-by-user")).not.toContainText(
+    "Not grounded",
+  );
+  await page.screenshot({
+    path: "test-results/plan-record-split.png",
+    fullPage: true,
+  });
 });

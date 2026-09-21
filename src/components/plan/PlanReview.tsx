@@ -88,6 +88,8 @@ export function PlanReview({
 
       <div
         data-testid="approval-summary"
+        role="status"
+        aria-live="polite"
         className="flex flex-col gap-1 border border-border bg-card p-3 text-sm"
       >
         <p className="font-medium">

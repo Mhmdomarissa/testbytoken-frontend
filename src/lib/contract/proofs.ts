@@ -44,8 +44,17 @@ export const ProofVerdictSchema = extensibleEnum(
 );
 
 export const UncoveredReasonSchema = extensibleEnum(
-  ["not_uniquely_locatable", "ungrounded", "skipped", "blocked"],
-  "Why a candidate element has no executed scenario.",
+  [
+    "not_uniquely_locatable",
+    "ungrounded",
+    "skipped",
+    "blocked",
+    "removed_by_user",
+  ],
+  "Why a candidate has no executed scenario. `removed_by_user` (a plan run): " +
+    "the person who approved the plan left the step out. `ungrounded` and " +
+    "`blocked` (a plan run): the system could not approve it. These are " +
+    "different facts and are never merged into one reason.",
 );
 
 /**
@@ -105,7 +114,12 @@ export const ProofSnapshotSchema = z
             action_class: ActionClassSchema,
             reason: extensibleEnum(
               ["removed_by_user", "ungrounded", "blocked"],
-              "Why a proposed step was not approved to run.",
+              "Why a proposed step was not approved to run. `removed_by_user`: " +
+                "the person left it out. `ungrounded` / `blocked`: the SYSTEM " +
+                "could not approve it. Derived by the server (the approval " +
+                "records only the approved ids): a step that is ungrounded is " +
+                "`ungrounded`; otherwise one that is blocked is `blocked`; " +
+                "otherwise, absent from the approval, `removed_by_user`.",
             ),
           }),
         ),
@@ -138,6 +152,10 @@ export const ProofSnapshotSchema = z
       .openapi({
         description:
           "WHICH candidates were not covered, with why - what the public " +
+          "page shows under 'not covered'. FOR A PLAN RUN: exactly one entry " +
+          "per `plan.excluded_steps` entry (label = the step description, " +
+          "`page_url` = the page it is bound to, else the target's " +
+          "`base_url`), with the SAME reason. " +
           "page shows under 'not covered'. At most 200 entries; " +
           "`uncovered_total` is the true count when there are more. A proof " +
           "that hides the gaps is not a proof.",
