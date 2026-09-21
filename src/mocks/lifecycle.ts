@@ -87,6 +87,7 @@ function isPrivateHost(host: string): boolean {
  * registering a target with a recognisable host - a screen can't be driven
  * through a state the mock can't produce:
  *
+ *   empty.*     -> completes with no modules
  *   refused.*   -> refused        slow.*      -> timeout
  *   broken.*    -> internal       unreachable.* / legacy-admin.example.com -> unreachable
  *   a private, loopback or link-local address -> blocked_by_guardrail
@@ -133,6 +134,11 @@ export function scanFailureFor(targetUrl: string): ScanFailure | null {
 /** The seeded "Legacy admin" target (data.ts): keyed on its address, so fixing the address fixes the scan. */
 const UNREACHABLE_FIXTURE_HOST = "legacy-admin.example.com";
 
+/** `empty.*` hosts complete successfully but find nothing to test - the designed empty-inventory state. */
+export function scanFindsNothing(targetUrl: string): boolean {
+  return new URL(targetUrl).hostname.toLowerCase().startsWith("empty.");
+}
+
 export function computeScanState(base: Scan, elapsedMs: number): Scan {
   const failure = scanFailureFor(base.target_url);
   if (failure && elapsedMs >= SCAN_TIMELINE.completedAt) {
@@ -143,7 +149,9 @@ export function computeScanState(base: Scan, elapsedMs: number): Scan {
       ...base,
       status: "completed",
       failure: null,
-      modules: [modCheckout, modSettings],
+      modules: scanFindsNothing(base.target_url)
+        ? []
+        : [modCheckout, modSettings],
     };
   }
   if (elapsedMs >= SCAN_TIMELINE.crawlingAt) {
