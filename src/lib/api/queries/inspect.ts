@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { InspectResponseSchema } from "@/lib/contract";
 import { apiPost } from "../client";
 import { queryKeys } from "../keys";
@@ -28,5 +28,30 @@ export function useInspect(
       }),
     enabled: scanId !== undefined && moduleId !== undefined,
     staleTime: Infinity,
+  });
+}
+
+/**
+ * The inventories of several modules at once - the inventory screen shows
+ * a whole scan. Same key and query function as `useInspect`, so a module
+ * opened elsewhere is already cached. Results are index-aligned with
+ * `moduleIds`, each with its own loading/error state: one module failing
+ * to load must not blank the others.
+ */
+export function useInspectModules(
+  scanId: string | undefined,
+  moduleIds: string[],
+) {
+  return useQueries({
+    queries: moduleIds.map((moduleId) => ({
+      queryKey: queryKeys.inspect(scanId ?? "", moduleId),
+      queryFn: () =>
+        apiPost("/inspect", InspectResponseSchema, {
+          scan_id: scanId,
+          module_id: moduleId,
+        }),
+      enabled: scanId !== undefined,
+      staleTime: Infinity,
+    })),
   });
 }

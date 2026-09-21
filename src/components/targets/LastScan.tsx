@@ -10,6 +10,15 @@ const SCAN_LABELS = new Map<string, string>([
   ["failed", "Failed"],
 ]);
 
+/** The wording for a scan status on a chip; undefined for a value we don't know (the chip then shows the raw value). */
+export function scanStatusLabel(
+  status: string | UnrecognisedValue,
+): string | undefined {
+  return status instanceof UnrecognisedValue
+    ? undefined
+    : SCAN_LABELS.get(status);
+}
+
 const formatWhen = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short",
@@ -27,10 +36,7 @@ export function LastScan({
   if (scan === null) {
     return <span className="text-muted-foreground">Never scanned</span>;
   }
-  const label =
-    scan.status instanceof UnrecognisedValue
-      ? undefined
-      : SCAN_LABELS.get(scan.status);
+  const label = scanStatusLabel(scan.status);
   return (
     <div className="flex flex-col items-start gap-1">
       <StatusBadge status={toBadgeStatus(scan.status)} label={label} />
