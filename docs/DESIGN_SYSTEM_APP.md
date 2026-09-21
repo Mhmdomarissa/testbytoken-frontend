@@ -257,6 +257,91 @@ to avoid colors that read as conventional red/green/amber regardless of
 method, that's a different, stricter constraint than what's written, and
 worth confirming.
 
+## Status chips — Phase B, B2
+
+The Phase A finding stood into Phase B: foreground lightness cannot carry
+seven states on this background at a usable separation. Text-on-page
+needs 4.5:1 against the page for every status, all seven sharing one
+narrow lightness band; the worst adjacent pair tops out around
+~1.11–1.12:1 — a real improvement over the original bug's ~1.0:1, but
+not by much, and not a ceiling any amount of further token-tweaking can
+raise (see "Isoluminance" above).
+
+**A filled chip changes which contrast pair the color has to win.**
+Instead of status-colored text sitting on the page background, every
+`StatusBadge` now renders a solid fill with the label and icon drawn in
+a single fixed ink (`--color-blue-deep` — an existing anchor, not a new
+color) on top of it. That splits one hard constraint into two easier
+ones:
+
+- The **fill** only needs 3:1 against the page (AA non-text, WCAG
+  1.4.11) — not 4.5:1.
+- The **label/icon** only need 4.5:1 against their _own fill_ — not
+  against the page.
+
+Solving for lightness against a fixed dark ink instead of against the
+page background moves the usable range from ~[0.25, 0.54] to
+~[0.235, 0.91] — measured, not estimated, from the actual constraint
+each approach imposes (see the derivation below). Same method as the
+`-fg` ladder otherwise: equal **contrast-ratio** steps (not equal
+lightness steps — WCAG contrast is `(L+0.05)/(L'+0.05)`, so those are
+not the same thing), same hue per status for continuity with the rest
+of the app, chroma re-solved to fit the new lightness (reduced at the
+lighter end to stay in sRGB gamut — `pass` and `running` most visibly).
+
+| State       | Fill hex  | Ink-on-fill (≥4.5:1) | Fill vs `blue-deep` (≥3:1) | Fill vs `blue-mid` (≥3:1) |
+| ----------- | --------- | -------------------- | -------------------------- | ------------------------- |
+| `fail`      | `#d75f64` | **4.93:1**           | **4.93:1**                 | **4.30:1**                |
+| `timed_out` | `#d87e4c` | **6.05:1**           | **6.05:1**                 | **5.27:1**                |
+| `queued`    | `#b6a28f` | **7.38:1**           | **7.38:1**                 | **6.43:1**                |
+| `skipped`   | `#b4b6c9` | **9.04:1**           | **9.04:1**                 | **7.88:1**                |
+| `warning`   | `#e6c58a` | **10.98:1**          | **10.98:1**                | **9.57:1**                |
+| `running`   | `#afe7fe` | **13.54:1**          | **13.54:1**                | **11.80:1**               |
+| `pass`      | `#d7ffdd` | **16.61:1**          | **16.61:1**                | **14.47:1**               |
+
+All seven clear both requirements with real margin — `fail` sits
+closest to the floor (its ink contrast, 4.93:1, is also its fill-vs-page
+number, since the ink color and the darker page ground are compared the
+same way), the other six carry increasing headroom by construction (each
+is a fixed contrast-ratio step lighter).
+
+Full pairwise fill-to-fill contrast:
+
+|               | fail | timed_out | queued | skipped | warning | running | pass     |
+| ------------- | ---- | --------- | ------ | ------- | ------- | ------- | -------- |
+| **fail**      | —    | 1.23      | 1.50   | 1.83    | 2.23    | 2.75    | **3.37** |
+| **timed_out** |      | —         | 1.22   | 1.49    | 1.81    | 2.24    | 2.74     |
+| **queued**    |      |           | —      | 1.22    | 1.49    | 1.83    | 2.25     |
+| **skipped**   |      |           |        | —       | 1.21    | 1.50    | 1.84     |
+| **warning**   |      |           |        |         | —       | 1.23    | 1.51     |
+| **running**   |      |           |        |         |         | —       | 1.23     |
+
+Worst case is `skipped`/`warning` at **1.21:1** — every adjacent pair
+lands at ~1.21–1.24:1, which is the ladder's common contrast-ratio step
+(equal-ratio spacing makes every adjacent pair equal by construction,
+the same property as the `-fg` ladder). That is a real, measured
+improvement over the old ladder's ~1.11–1.12:1 worst case — not
+dramatic in absolute terms (both are "barely above 1:1" on their own),
+but it roughly **doubles the perceptual margin above 1.0** (0.11 → 0.21)
+that a fully colorblind or greyscale viewer gets from lightness alone,
+before the icon and label — always present, always distinct-silhouette
+and literal text — do the actual, model-independent job of
+distinguishing the seven states. `src/components/status/StatusBadge.test.tsx`
+asserts all of the above against the real, committed `styles/tokens.css`
+(both the wiring — a rendered chip's CSS variable resolves to a real,
+defined value — and the numbers — ink-on-fill ≥4.5:1, fill-vs-page
+≥3:1, and every pairwise fill combination ≥1.18:1).
+
+**Why not push the range further?** The floor (~0.235) has real margin
+above the mathematical minimum for 3:1-vs-page (~0.149) so `fail` isn't
+sitting exactly on the line; the ceiling (~0.91) stops short of 1.0 so
+`pass` still reads as pale green, not white — an earlier Phase A attempt
+at a similarly light `pass` foreground (L≈0.90 in that ladder) was
+rejected on its own merits as washed out, and the same taste judgment
+applies here. Both ends have room to move if a future review wants more
+separation still; this is a deliberate, stated choice, not the absolute
+ceiling of what's achievable.
+
 ## Text hierarchy — measured, not assumed
 
 `rgba(248, 244, 238, α)` composited over both grounds (browsers alpha-blend
