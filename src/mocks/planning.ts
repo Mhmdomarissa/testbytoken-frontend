@@ -19,11 +19,14 @@ type PlanStep = z.infer<typeof PlanStepSchema>;
  *     AMBIGUOUS element (ungrounded), and a step that would type a password
  *     (ungrounded, `credential_required` - the engine refuses; no plan ever
  *     types a credential).
- *   - Write steps are `blocked` for a read-only account (mockAccount).
+ *   - Write steps are `blocked` for a read-only account (mockAccount) - the
+ *     default here. An intent starting with "writes:" is planned as if for
+ *     an account that CAN run write steps, so the unblocked-write path is
+ *     reachable in a browser without a second account.
  */
 export const PLAN_GENERATION_MS = 1_500;
 
-function proposedSteps(): PlanStep[] {
+function proposedSteps(intent: string): PlanStep[] {
   const elements = elementsForModule(modCheckout.id) ?? [];
   const byId = (id: string) => {
     const el = elements.find((e) => e.id === id);
@@ -33,13 +36,14 @@ function proposedSteps(): PlanStep[] {
   const submit = byId("el_submit");
   const unicode = byId("el_unicode");
   const duplicate = byId("el_duplicate");
-  const writeBlocked = mockAccount.writeActions
-    ? null
-    : {
-        reason_code: "read_only_tier" as const,
-        message:
-          "This account is on the read-only tier, which can't run steps that change state in your application.",
-      };
+  const writeBlocked =
+    mockAccount.writeActions || intent.startsWith("writes:")
+      ? null
+      : {
+          reason_code: "read_only_tier" as const,
+          message:
+            "This account is on the read-only tier, which can't run steps that change state in your application.",
+        };
 
   return [
     {
@@ -172,7 +176,7 @@ export function resolvePlan(id: string): Plan | undefined {
       : {
           ...plan,
           status: "proposed",
-          steps: proposedSteps(),
+          steps: proposedSteps(plan.intent),
           updated_at: new Date().toISOString(),
         };
     planStore.set(id, { plan: settled, createdAtMs });
