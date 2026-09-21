@@ -10,8 +10,7 @@ import {
 import { useResource } from "@/hooks/useResource";
 import { WorkspaceSchema } from "@/lib/contract";
 import { enumLabel } from "@/lib/api/tolerant";
-
-const DEMO_WORKSPACE_ID = "wksp_demo";
+import { DEMO_WORKSPACE_ID } from "@/lib/workspace";
 
 /**
  * The engine/workspace status pill A7 calls for. Polls the one workspace
