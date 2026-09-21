@@ -350,7 +350,7 @@ test("a plan is read against the inventory it came from, and the runs list label
   });
   // 5 steps drawn from an inventory of 30 elements, touching 2 of them.
   await expect(page.getByTestId("plan-inventory")).toContainText(
-    "These 5 steps touch 2 of the 30 elements in the inventory the plan was grounded against",
+    "These 5 steps touch 2 of the 30 elements in the inventory this plan was made from",
   );
 
   await step(page, 3)

@@ -19,8 +19,8 @@ export function InventoryContext({
   return (
     <p data-testid="plan-inventory" className="text-sm text-muted-foreground">
       These {steps.length} steps touch {touched} of the {inventoryElements}{" "}
-      elements in the inventory the plan was grounded against. Elements the plan
-      does not touch are not tested by it.
+      elements in the inventory this plan was made from. Elements the plan does
+      not touch are not tested by it.
     </p>
   );
 }
