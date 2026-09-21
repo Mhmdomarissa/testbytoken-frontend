@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toast";
 import { MockingProvider } from "@/mocks/MockingProvider";
+import { QueryProvider } from "@/lib/api/QueryProvider";
 
 // Heading typeface. Weight 300 only - see docs/DESIGN_SYSTEM_APP.md.
 const cormorantGaramond = Cormorant_Garamond({
@@ -37,10 +38,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <MockingProvider>
-          <TooltipProvider>
-            {children}
-            <Toaster />
-          </TooltipProvider>
+          <QueryProvider>
+            <TooltipProvider>
+              {children}
+              <Toaster />
+            </TooltipProvider>
+          </QueryProvider>
         </MockingProvider>
       </body>
     </html>
