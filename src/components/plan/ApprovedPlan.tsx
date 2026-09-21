@@ -1,11 +1,15 @@
 import { PlanStepRow } from "./PlanStepRow";
-import { approvability, type PlanStep } from "./reviewState";
+import { exclusionReason, type PlanStep } from "./reviewState";
 
 /**
  * A plan that has been approved, read-only: what was proposed, what was
- * approved and in what order, and what was left out. The record the proof
- * later has to be able to state - so the exclusions are as visible as the
- * approved steps, not hidden behind them.
+ * approved and in what order, and what did NOT run - split by WHO excluded
+ * it. A step the person left out and a step the system could not approve
+ * are different facts (the proof records them separately), so they are
+ * separate groups here, each counted.
+ *
+ * The first line is the run's own denominator in words: approving 2 of 5
+ * and both passing is "2 of 5 covered", never "2 of 2".
  */
 export function ApprovedPlan({
   steps,
@@ -21,13 +25,30 @@ export function ApprovedPlan({
     const s = byId.get(id);
     return s ? [s] : [];
   });
-  const excluded = steps.filter((s) => !approvedIds.includes(s.id));
+  const byUser = steps.filter(
+    (s) => exclusionReason(s, approvedIds) === "removed_by_user",
+  );
+  const bySystem = steps.filter((s) => {
+    const r = exclusionReason(s, approvedIds);
+    return r === "ungrounded" || r === "blocked";
+  });
 
   return (
     <div className="flex flex-col gap-4" data-testid="approved-plan">
       <p className="text-sm text-muted-foreground">
         Approved {new Date(approvedAt).toLocaleString()}. This approval is
         permanent; the plan can no longer be edited.
+      </p>
+
+      <p data-testid="plan-scope" className="text-sm font-medium">
+        {approved.length} of {steps.length} proposed steps approved to run.
+        {byUser.length + bySystem.length > 0 &&
+          ` ${byUser.length + bySystem.length} did not run: ${byUser.length} left out by you, ${bySystem.length} the system could not approve.`}{" "}
+        <span className="font-normal text-muted-foreground">
+          Any result reports this scope - a pass rate is a pass rate of the{" "}
+          {approved.length} that ran, alongside {approved.length} of{" "}
+          {steps.length} covered.
+        </span>
       </p>
 
       <section className="flex flex-col gap-2">
@@ -45,21 +66,37 @@ export function ApprovedPlan({
         </ol>
       </section>
 
-      {excluded.length > 0 && (
-        <section className="flex flex-col gap-2" data-testid="excluded-steps">
+      {byUser.length > 0 && (
+        <section className="flex flex-col gap-2" data-testid="excluded-by-user">
           <h2 className="font-heading text-lg font-light">
-            Not run ({excluded.length})
+            Left out by you ({byUser.length})
           </h2>
           <ol className="flex flex-col gap-2">
-            {excluded.map((step) => (
+            {byUser.map((step) => (
               <PlanStepRow
                 key={step.id}
                 step={step}
-                position={
-                  approvability(step).ok
-                    ? { kind: "left-out" }
-                    : { kind: "not-approvable" }
-                }
+                position={{ kind: "left-out" }}
+              />
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {bySystem.length > 0 && (
+        <section
+          className="flex flex-col gap-2"
+          data-testid="excluded-by-system"
+        >
+          <h2 className="font-heading text-lg font-light">
+            The system could not approve ({bySystem.length})
+          </h2>
+          <ol className="flex flex-col gap-2">
+            {bySystem.map((step) => (
+              <PlanStepRow
+                key={step.id}
+                step={step}
+                position={{ kind: "not-approvable" }}
               />
             ))}
           </ol>

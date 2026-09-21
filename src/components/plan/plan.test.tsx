@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { UnrecognisedValue } from "@/lib/api/tolerant";
 import {
   approvability,
+  exclusionReason,
   initialReview,
   isWrite,
   move,
@@ -14,6 +15,7 @@ import {
 import { PlanStepRow } from "./PlanStepRow";
 import { PlanReview } from "./PlanReview";
 import { ApprovedPlan } from "./ApprovedPlan";
+import { exclusionReason as serverExclusionReason } from "@/mocks/planning";
 
 afterEach(cleanup);
 
@@ -63,6 +65,40 @@ describe("approvability and effect", () => {
     expect(
       isWrite(step({ action_class: new UnrecognisedValue("teleport") })),
     ).toBe(true);
+  });
+});
+
+describe("exclusionReason (must match the server's derivation for the proof)", () => {
+  it("ungrounded, else blocked, else the person's; approved steps have none", () => {
+    const ok = step();
+    const u = ungrounded();
+    const b = blocked();
+    const both = ungrounded({
+      blocked: { reason_code: "read_only_tier", message: "m" },
+    });
+    const ids = [ok.id];
+    expect(exclusionReason(ok, ids)).toBeNull();
+    expect(exclusionReason(u, ids)).toBe("ungrounded");
+    expect(exclusionReason(b, ids)).toBe("blocked");
+    expect(exclusionReason(both, ids)).toBe("ungrounded"); // ungrounded wins
+    expect(exclusionReason(step(), ids)).toBe("removed_by_user");
+  });
+
+  it("agrees with the reference server on every kind of step, approved or not", () => {
+    const steps = [
+      step(),
+      ungrounded(),
+      blocked(),
+      ungrounded({ blocked: { reason_code: "policy", message: "m" } }),
+    ];
+    for (const approved of [[], [steps[0]!.id], steps.map((s) => s.id)]) {
+      for (const s of steps) {
+        // The mock's PlanStep type is the strict one; the shapes are identical here.
+        expect(exclusionReason(s, approved)).toBe(
+          serverExclusionReason(s as never, approved),
+        );
+      }
+    }
   });
 });
 
@@ -394,9 +430,33 @@ describe("ApprovedPlan", () => {
       />,
     );
     expect(screen.getByText("Approved to run (2)")).toBeTruthy();
-    expect(screen.getByTestId("excluded-steps").textContent).toMatch(
-      /Not run \(1\).*Not grounded/,
+    expect(screen.getByTestId("excluded-by-system").textContent).toMatch(
+      /could not approve \(1\).*Not grounded/,
     );
+    expect(screen.queryByTestId("excluded-by-user")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("keeps the person's exclusions apart from the system's, counted separately, and states the scope", () => {
+    const ran = step();
+    const userLeft = step({ description: "person dropped this" });
+    const sys1 = ungrounded();
+    const sys2 = blocked();
+    render(
+      <ApprovedPlan
+        steps={[ran, userLeft, sys1, sys2]}
+        approvedIds={[ran.id]}
+        approvedAt="2026-09-10T12:00:00Z"
+      />,
+    );
+    expect(screen.getByTestId("plan-scope").textContent).toMatch(
+      /1 of 4 proposed steps approved to run\. 3 did not run: 1 left out by you, 2 the system could not approve\./,
+    );
+    const user = screen.getByTestId("excluded-by-user");
+    const system = screen.getByTestId("excluded-by-system");
+    expect(user.textContent).toMatch(/Left out by you \(1\)/);
+    expect(user.textContent).toContain("person dropped this");
+    expect(system.textContent).toMatch(/could not approve \(2\)/);
+    expect(system.textContent).not.toContain("person dropped this");
   });
 });

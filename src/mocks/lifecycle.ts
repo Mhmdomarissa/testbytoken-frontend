@@ -387,8 +387,12 @@ export function computeRunState(
     finished_at: resolved
       ? new Date(startedAtMs + timeline.resolvesAt).toISOString()
       : null,
+    // A finished plan run has a proof (built and frozen on first read, see
+    // handlers/proofs.ts); its id is derivable so the run can point at it.
     proof_id:
-      resolved && timeline.finalStatus !== "timed_out" ? base.proof_id : null,
+      resolved && timeline.finalStatus !== "timed_out"
+        ? (base.proof_id ?? (base.plan_id ? `proof_${base.id}` : null))
+        : null,
     // B0.5 B9: the report exists once the run has finished (a timed-out run
     // produced none - the engine went silent).
     report_url:
