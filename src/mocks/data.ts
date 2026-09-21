@@ -356,6 +356,8 @@ function liveRunBase(id: string): z.infer<typeof RunDetailSchema> {
 export const runLivePass = liveRunBase("run_live_pass_1");
 export const runLiveFail = liveRunBase("run_live_fail_1");
 export const runLiveStall = liveRunBase("run_live_stall_1");
+/** Same timeline as runLivePass, but its first SSE connection drops mid-run - see handlers/events.ts. */
+export const runLiveDrop = liveRunBase("run_live_drop_1");
 
 const LONG_RUN_STEP_COUNT = 64;
 
@@ -404,6 +406,7 @@ export const runs = [
   runLivePass,
   runLiveFail,
   runLiveStall,
+  runLiveDrop,
 ];
 
 // ---------------------------------------------------------------------

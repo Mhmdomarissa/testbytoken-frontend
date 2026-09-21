@@ -136,3 +136,51 @@ for (const type of Object.keys(CVD_MATRICES)) {
     `${type.padEnd(14)} pass->${passCvd}  fail->${failCvd}  contrast=${contrastRatio(passCvd, failCvd).toFixed(2)}`,
   );
 }
+
+// ---------------------------------------------------------------------
+// Phase B, B2: the same CVD check for the FILLED CHIPS StatusBadge now
+// renders (pass/fail and running/fail are the pairs that carry meaning;
+// the full matrix is in docs/DESIGN_SYSTEM_APP.md's "Status chips").
+// Contrast is computed between the two simulated FILL colors - what a
+// dichromat sees of the chips - not against the page.
+// ---------------------------------------------------------------------
+const chipFill = Object.fromEntries(
+  STATUSES.map((s) => [
+    s,
+    tokenHex(`status-${s.replace(/_/g, "-")}-chip-fill`),
+  ]),
+);
+const MEANINGFUL_PAIRS = [
+  ["pass", "fail"],
+  ["running", "fail"],
+  ["pass", "timed_out"],
+  ["warning", "fail"],
+];
+
+console.log("\n--- chip fills: meaningful pairs, normal vision + CVD ---");
+for (const [a, b] of MEANINGFUL_PAIRS) {
+  const row = [
+    `${a} vs ${b}`.padEnd(22),
+    `normal=${contrastRatio(chipFill[a], chipFill[b]).toFixed(2)}`,
+  ];
+  for (const type of Object.keys(CVD_MATRICES)) {
+    row.push(
+      `${type}=${contrastRatio(simulateCVD(chipFill[a], type), simulateCVD(chipFill[b], type)).toFixed(2)}`,
+    );
+  }
+  console.log(row.join("  "));
+}
+
+console.log("\n--- old foreground scheme, same pairs (for comparison) ---");
+for (const [a, b] of MEANINGFUL_PAIRS) {
+  const row = [
+    `${a} vs ${b}`.padEnd(22),
+    `normal=${contrastRatio(fg[a], fg[b]).toFixed(2)}`,
+  ];
+  for (const type of Object.keys(CVD_MATRICES)) {
+    row.push(
+      `${type}=${contrastRatio(simulateCVD(fg[a], type), simulateCVD(fg[b], type)).toFixed(2)}`,
+    );
+  }
+  console.log(row.join("  "));
+}

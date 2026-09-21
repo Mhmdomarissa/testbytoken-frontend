@@ -4,11 +4,13 @@ import {
   LoaderCircleIcon,
   ClockIcon,
   ClockAlertIcon,
+  CircleHelpIcon,
   CircleSlashIcon,
   TriangleAlertIcon,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UnrecognisedValue, truncateRaw } from "@/lib/api/tolerant";
 
 /**
  * The single place a status (run, step, scan, job) renders anywhere in
@@ -55,12 +57,22 @@ export function StatusBadge({
   label,
   className,
 }: {
-  status: Status;
-  /** Override the default label, e.g. a Run's "passed"/"failed" wording. */
+  status: Status | UnrecognisedValue;
+  /** Override the default label, e.g. a Run's "passed"/"failed" wording. Ignored for an unrecognised status - the raw value is the only honest label there. */
   label?: string;
   className?: string;
 }) {
+  // Phase B §1.1 / docs/PHASE_B0_5.md A1: a status this client doesn't
+  // know renders as visibly unrecognised, carrying the raw value - never
+  // a throw, never a blank, never a fallback that reads as a real state.
+  // The second check is for a caller that bypassed the types entirely
+  // (an `as` cast, JS): a status with no STATUS_META entry gets the same
+  // treatment instead of `undefined.icon`.
+  if (status instanceof UnrecognisedValue)
+    return <UnrecognisedChip raw={status.raw} className={className} />;
   const meta = STATUS_META[status];
+  if (!meta)
+    return <UnrecognisedChip raw={String(status)} className={className} />;
   const Icon = meta.icon;
   // `status` values are snake_case (matching the contract's enum, e.g.
   // `timed_out`); the CSS custom properties they key into use hyphens
@@ -83,6 +95,37 @@ export function StatusBadge({
         aria-hidden="true"
       />
       {label ?? meta.label}
+    </span>
+  );
+}
+
+/**
+ * Deliberately NOT a fill from the status scale, and not a neutral grey:
+ * a dashed outline in the primary text color on the bare page. Every
+ * legitimate state is a solid fill, so "no fill, dashed edge, question
+ * mark" can't be mistaken for one - and it needs no new hue. The raw
+ * value is shown (React-escaped, capped at 40 chars, the full string in
+ * the tooltip attribute) because "unrecognised" alone would hide what
+ * the server actually said.
+ */
+function UnrecognisedChip({
+  raw,
+  className,
+}: {
+  raw: string;
+  className?: string;
+}) {
+  return (
+    <span
+      title={`Unrecognised status: ${raw}`}
+      data-unrecognised-status=""
+      className={cn(
+        "inline-flex max-w-64 items-center gap-1 border border-dashed border-(--text-primary) px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-(--text-primary)",
+        className,
+      )}
+    >
+      <CircleHelpIcon className="size-3 shrink-0" aria-hidden="true" />
+      <span className="truncate">Unrecognised: {truncateRaw(raw)}</span>
     </span>
   );
 }

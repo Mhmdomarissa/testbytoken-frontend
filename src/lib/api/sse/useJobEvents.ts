@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { JobEventSchema } from "@/lib/contract";
 import { API_BASE_URL } from "../config";
+import { parseJobEventFrame } from "./parseFrame";
 import {
   applyJobEvent,
   initialJobEventsState,
-  type JobEvent,
   type JobEventsState,
 } from "./jobEventsReducer";
 
@@ -27,6 +26,16 @@ export interface UseJobEventsResult extends JobEventsState {
   connectionStatus: ConnectionStatus;
   /** `Date.now()` of the last frame received, or null before the first one. Exposed so a consumer can render its own "no update in Ns" affordance - see the file comment on why this hook does not do that itself. */
   lastEventAt: number | null;
+  /**
+   * Frames received but structurally unusable (not JSON, unknown event
+   * type). Never silent: a consumer shows "N updates could not be read"
+   * so a missing step can't pass for a step that never happened.
+   * Unfamiliar status VALUES are not counted here - they parse and
+   * render as unrecognised.
+   */
+  unreadableFrameCount: number;
+  /** How many times the connection dropped and was re-established - a dropped stream is visible data, not something a consumer has to infer from `connectionStatus` flickering. */
+  reconnectCount: number;
 }
 
 /**
@@ -64,6 +73,8 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connecting");
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
+  const [unreadableFrameCount, setUnreadableFrameCount] = useState(0);
+  const [reconnectCount, setReconnectCount] = useState(0);
 
   // Reset during render, not in the effect below, when `jobId` itself
   // changes - the React-recommended way to "adjust state when a prop
@@ -74,6 +85,8 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     setTrackedJobId(jobId);
     setState(initialJobEventsState);
     setLastEventAt(null);
+    setUnreadableFrameCount(0);
+    setReconnectCount(0);
   }
 
   useEffect(() => {
@@ -84,6 +97,12 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     let attempt = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let lastEventId: string | null = null;
+    // Set by a `done` event. The server closes the stream right after it,
+    // which the browser reports as an error indistinguishable from a
+    // dropped connection - without this, a FINISHED job reconnects forever
+    // and the UI shows "reconnecting" on a completed run (found by running
+    // this hook in a real browser: e2e/job-events.spec.ts).
+    let finished = false;
 
     function connect() {
       if (cancelled) return;
@@ -104,36 +123,38 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
 
       source.onmessage = (message: MessageEvent<string>) => {
         if (cancelled) return;
-        let event: JobEvent;
-        try {
-          event = JobEventSchema.parse(JSON.parse(message.data));
-        } catch (err) {
-          // A malformed frame is our contract drifting from what the
-          // server actually sent, not a connection problem - loud in
-          // dev, dropped (not crashed) in production.
+        const frame = parseJobEventFrame(message.data);
+        if (!frame.ok) {
           if (process.env.NODE_ENV !== "production") {
             console.error(
-              "[useJobEvents] Malformed SSE frame, dropped:",
-              message.data,
-              err,
+              `[useJobEvents] Unreadable SSE frame (${frame.reason}):`,
+              frame.raw,
             );
           }
+          setUnreadableFrameCount((n) => n + 1);
           return;
         }
+        const { event } = frame;
         lastEventId = event.id;
         setLastEventAt(Date.now());
         setState((prev) => applyJobEvent(prev, event));
+        if (event.type === "done") {
+          finished = true;
+          source?.close();
+          setConnectionStatus("closed");
+        }
       };
 
       // Fires on a real transport failure (connection refused, dropped,
       // non-2xx on (re)connect) - never on a merely quiet stream, which
       // is exactly the distinction this hook relies on. See file comment.
       source.onerror = () => {
-        if (cancelled) return;
+        if (cancelled || finished) return;
         source?.close();
         const delay = backoffDelay(attempt);
         attempt += 1;
         setConnectionStatus("reconnecting");
+        setReconnectCount((n) => n + 1);
         reconnectTimer = setTimeout(connect, delay);
       };
     }
@@ -153,5 +174,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     ...state,
     connectionStatus: jobId === undefined ? "closed" : connectionStatus,
     lastEventAt,
+    unreadableFrameCount,
+    reconnectCount,
   };
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { z } from "zod";
+import { tolerant, type Tolerated } from "@/lib/api/tolerant";
 
 export type ResourceState<T> =
   | { status: "loading" }
@@ -15,10 +16,11 @@ export type ResourceState<T> =
  * no Next proxy/BFF - fetching backend resources from a Server Component
  * would itself be exactly that.
  */
-export function useResource<T>(
+export function useResource<S extends z.ZodType>(
   url: string,
-  schema: z.ZodType<T>,
-): ResourceState<T> & { retry: () => void } {
+  schema: S,
+): ResourceState<Tolerated<z.output<S>>> & { retry: () => void } {
+  type T = Tolerated<z.output<S>>;
   const [state, setState] = useState<ResourceState<T>>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
 
@@ -39,7 +41,7 @@ export function useResource<T>(
             body?.error?.message ?? `Request failed (${res.status}).`,
           );
         }
-        const data = schema.parse(await res.json());
+        const data = tolerant(schema).parse(await res.json());
         if (!cancelled) setState({ status: "success", data });
       } catch (err) {
         if (!cancelled) {

@@ -116,6 +116,31 @@ describe("applyJobEvents: shuffled (out-of-order) delivery", () => {
     );
   });
 
+  it("never lets a stale progress event regress a newer one (the mutation that used to survive)", () => {
+    // Progress is the one event type whose late arrival is silently
+    // wrong rather than obviously wrong: a bar jumping BACKWARDS from
+    // 80% to 10% looks like a plausible restart. Removing the ordering
+    // guard from the reducer left every earlier test green.
+    const newer: JobEvent = {
+      id: "5",
+      type: "progress",
+      message: "almost there",
+      percent: 80,
+    };
+    const older: JobEvent = {
+      id: "2",
+      type: "progress",
+      message: "starting",
+      percent: 10,
+    };
+    const state = applyJobEvents(initialJobEventsState, [newer, older]);
+    expect(state.progress).toEqual({ message: "almost there", percent: 80 });
+    // ...and in the other order it still ends at the newer one.
+    expect(
+      applyJobEvents(initialJobEventsState, [older, newer]).progress,
+    ).toEqual({ message: "almost there", percent: 80 });
+  });
+
   it("never lets a stale status/done overwrite a newer one", () => {
     const olderStatus: JobEvent = {
       id: "2",
