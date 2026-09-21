@@ -13,7 +13,8 @@ import type { NextRequest } from "next/server";
  * cheap to fail per-request: GET /auth/me, called from the shell layout.
  */
 const SESSION_COOKIE = "session";
-const PUBLIC_PATHS = ["/sign-in", "/style-guide"];
+// "/p" is the public proof page (B9): opened cold by someone with no account.
+const PUBLIC_PATHS = ["/sign-in", "/style-guide", "/p"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

@@ -168,7 +168,7 @@ const results = [];
 for (const manifestFile of manifests) {
   const route = routeNameFor(manifestFile);
   if (route === "/_global-error") continue;
-  // Dev-only test harnesses (404 in production - see src/app/dev/*/page.tsx):
+  // Dev-only test harnesses (404 in production - see src/app/(console)/dev/*/page.tsx):
   // not shipped to a customer, so not budgeted.
   if (route.startsWith("/dev/")) continue;
 

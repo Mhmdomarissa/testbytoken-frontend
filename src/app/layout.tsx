@@ -2,10 +2,6 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { Toaster } from "@/components/ui/toast";
-import { MockingProvider } from "@/mocks/MockingProvider";
-import { QueryProvider } from "@/lib/api/QueryProvider";
 
 // Heading typeface. Weight 300 only - see docs/DESIGN_SYSTEM_APP.md.
 const cormorantGaramond = Cormorant_Garamond({
@@ -26,6 +22,11 @@ export const metadata: Metadata = {
   description: "Testing-as-a-service with an auditable proof for every run.",
 };
 
+/**
+ * Deliberately bare: html, fonts, body. Every provider lives in
+ * (console)/layout.tsx so routes outside it (the public proof page) don't
+ * inherit the console's client runtime.
+ */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -36,16 +37,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         montserrat.variable,
       )}
     >
-      <body className="min-h-full flex flex-col">
-        <MockingProvider>
-          <QueryProvider>
-            <TooltipProvider>
-              {children}
-              <Toaster />
-            </TooltipProvider>
-          </QueryProvider>
-        </MockingProvider>
-      </body>
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
