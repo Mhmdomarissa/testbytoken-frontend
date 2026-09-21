@@ -1,5 +1,11 @@
 import type { z } from "zod";
-import type { PlanSchema, PlanStepSchema } from "@/lib/contract";
+import type {
+  PlanSchema,
+  PlanStepSchema,
+  ProofSchema,
+  ProofSnapshotSchema,
+  RunDetailSchema,
+} from "@/lib/contract";
 import { elementsForModule, modCheckout } from "./data";
 import { mockAccount, planStore } from "./store";
 
@@ -276,4 +282,122 @@ export function discardPlan(id: string): ApproveResult {
   };
   planStore.set(id, { ...planStore.get(id)!, plan: discarded });
   return { ok: true, plan: discarded };
+}
+
+// ---------------------------------------------------------------------
+// What a plan run's numbers are OF (docs/API_CONTRACT.md, "Plan runs")
+// ---------------------------------------------------------------------
+
+type ExclusionReason = "removed_by_user" | "ungrounded" | "blocked";
+
+/**
+ * Who excluded a step, derived from the immutable plan (the approval
+ * records only the approved ids): ungrounded, else blocked - both the
+ * SYSTEM's doing - else absent from the approval, which is the PERSON's.
+ */
+export function exclusionReason(
+  step: PlanStep,
+  approvedIds: string[],
+): ExclusionReason | null {
+  if (approvedIds.includes(step.id)) return null;
+  if (step.binding.type === "ungrounded") return "ungrounded";
+  if (step.blocked !== null) return "blocked";
+  return "removed_by_user";
+}
+
+/**
+ * A plan run's coverage: candidate = everything the plan PROPOSED,
+ * generated = what was approved to run. So 2 of 5 approved and both
+ * passing is pass_rate 1, coverage 2 of 5 - never 2 of 2.
+ */
+export function planCoverage(plan: Plan): {
+  generated: number;
+  candidate: number;
+} {
+  return {
+    generated: plan.approval?.step_ids.length ?? 0,
+    candidate: plan.steps.length,
+  };
+}
+
+function pageUrlFor(step: PlanStep, fallback: string): string {
+  const b = step.binding;
+  return b.type === "ungrounded" ? fallback : b.page_url;
+}
+
+function reasonText(step: PlanStep, why: ExclusionReason): string {
+  if (why === "removed_by_user")
+    return "Left out by the person who approved the plan.";
+  if (why === "blocked") return step.blocked!.message;
+  return step.binding.type === "ungrounded"
+    ? step.binding.reason
+    : "The planner could not ground this step.";
+}
+
+/** The frozen proof of a FINISHED plan run: what ran, what was approved, and every step that did not run with who excluded it. */
+export function proofForPlanRun(
+  run: z.infer<typeof RunDetailSchema>,
+  plan: Plan,
+  target: { name: string; base_url: string },
+): z.infer<typeof ProofSchema> {
+  const approvedIds = plan.approval?.step_ids ?? [];
+  const byId = new Map(plan.steps.map((s) => [s.id, s]));
+  const excluded = plan.steps.flatMap((step) => {
+    const reason = exclusionReason(step, approvedIds);
+    return reason ? [{ step, reason }] : [];
+  });
+  const finished = run.finished_at ?? new Date().toISOString();
+  const snapshot: z.infer<typeof ProofSnapshotSchema> = {
+    verdict: run.status === "passed" ? "passed" : "failed",
+    pass_rate: run.pass_rate,
+    coverage: run.coverage,
+    target: { name: target.name, base_url: target.base_url },
+    started_at: run.started_at,
+    finished_at: finished,
+    duration_ms:
+      new Date(finished).getTime() - new Date(run.started_at).getTime(),
+    token_cost: run.token_cost,
+    steps: run.steps,
+    plan: {
+      id: plan.id,
+      intent: plan.intent,
+      approved_at: plan.approval!.approved_at,
+      approved_steps: approvedIds.flatMap((id) => {
+        const s = byId.get(id);
+        return s
+          ? [
+              {
+                id: s.id,
+                description: s.description,
+                action_class: s.action_class,
+              },
+            ]
+          : [];
+      }),
+      excluded_steps: excluded.map(({ step, reason }) => ({
+        id: step.id,
+        description: step.description,
+        action_class: step.action_class,
+        reason,
+      })),
+    },
+    uncovered_total: excluded.length,
+    uncovered: excluded.map(({ step, reason }) => ({
+      label: step.description,
+      page_url: pageUrlFor(step, target.base_url),
+      reason_code: reason,
+      reason: reasonText(step, reason),
+    })),
+  };
+  return {
+    id: run.proof_id!,
+    run_id: run.id,
+    hash: `sha256:${[...JSON.stringify(snapshot)]
+      .reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
+      .toString(16)
+      .padStart(8, "0")}`,
+    share: null,
+    created_at: finished,
+    snapshot,
+  };
 }

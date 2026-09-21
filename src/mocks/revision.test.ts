@@ -13,6 +13,7 @@ import {
   LoginSessionSchema,
   MeResponseSchema,
   PlanSchema,
+  ProofSchema,
   PublicProofSchema,
   RunDetailSchema,
   ScanSchema,
@@ -426,5 +427,129 @@ describe("B10: proofs are frozen, self-contained, and the public one leaks nothi
     expect(revoked.enabled).toBe(false);
     expect((await fetch(`${base}/p/${revoked.token}`)).status).toBe(404); // disabled
     expect((await fetch(`${base}/p/${enabled.token}`)).status).toBe(404); // rotated away
+  });
+});
+
+describe("plan runs: the numbers are OF the plan, and the exclusions travel with the result", () => {
+  async function runApproved(intent: string, stepIds: string[]) {
+    const plan = await settledPlan(intent);
+    const approved = await post(`/plans/${plan.id}/approve`, {
+      step_ids: stepIds,
+    });
+    expect(approved.status).toBe(200);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const created = RunDetailSchema.parse(
+      await (
+        await post("/runs", {
+          workspace_id: "wksp_demo",
+          target_id: "tgt_checkout",
+          plan_id: plan.id,
+        })
+      ).json(),
+    );
+    return { plan, created };
+  }
+  const finishedRun = async (id: string) => {
+    vi.setSystemTime(Date.now() + 60_000);
+    const run = RunDetailSchema.parse(
+      await (await fetch(`${base}/runs/${id}`)).json(),
+    );
+    return run;
+  };
+
+  it("approving 2 of 5 and both passing reports pass rate 100% with coverage 2 of 5 - never 2 of 2", async () => {
+    const { created } = await runApproved("writes: buy something", [
+      "pstp_1",
+      "pstp_2",
+    ]);
+    // Coverage is fixed by the approval, from the moment the run exists.
+    expect(created.coverage).toEqual({ generated: 2, candidate: 5 });
+    const run = await finishedRun(created.id);
+    expect(run.status).toBe("passed");
+    expect(run.steps.length).toBe(2);
+    expect(run.pass_rate).toBe(1);
+    expect(run.coverage).toEqual({ generated: 2, candidate: 5 });
+    expect(run.proof_id).toBe(`proof_${run.id}`);
+  });
+
+  it("the proof carries the plan, and tells the person's exclusions from the system's", async () => {
+    // writes: -> 3 approvable steps. Approve 1 and 2; the person leaves out 3;
+    // 4 and 5 cannot be approved (ungrounded).
+    const { created } = await runApproved("writes: buy something", [
+      "pstp_1",
+      "pstp_2",
+    ]);
+    const run = await finishedRun(created.id);
+    const res = await fetch(`${base}/proofs/${run.proof_id}`);
+    expect(res.status).toBe(200);
+    const proof = ProofSchema.parse(await res.json());
+    const snap = proof.snapshot;
+
+    expect(snap.plan!.approved_steps.map((s) => s.id)).toEqual([
+      "pstp_1",
+      "pstp_2",
+    ]);
+    const reasons = Object.fromEntries(
+      snap.plan!.excluded_steps.map((s) => [s.id, s.reason]),
+    );
+    expect(reasons).toEqual({
+      pstp_3: "removed_by_user",
+      pstp_4: "ungrounded",
+      pstp_5: "ungrounded",
+    });
+
+    // coverage, the exclusions, and the uncovered list are one story.
+    expect(snap.coverage).toEqual({ generated: 2, candidate: 5 });
+    expect(snap.uncovered_total).toBe(
+      snap.coverage.candidate - snap.coverage.generated,
+    );
+    expect(snap.uncovered.length).toBe(snap.plan!.excluded_steps.length);
+    expect(snap.uncovered.map((u) => u.reason_code).sort()).toEqual(
+      snap.plan!.excluded_steps.map((s) => s.reason).sort(),
+    );
+    expect(snap.pass_rate).toBe(1);
+  });
+
+  it("a step blocked for the account is 'blocked' (the system's), not 'removed_by_user'", async () => {
+    // Read-only account: step 2 is blocked. Approve the two approvable steps (1 and 3).
+    const { created } = await runApproved("buy something", [
+      "pstp_1",
+      "pstp_3",
+    ]);
+    const run = await finishedRun(created.id);
+    const proof = ProofSchema.parse(
+      await (await fetch(`${base}/proofs/${run.proof_id}`)).json(),
+    );
+    const reasons = Object.fromEntries(
+      proof.snapshot.plan!.excluded_steps.map((s) => [s.id, s.reason]),
+    );
+    expect(reasons).toEqual({
+      pstp_2: "blocked",
+      pstp_4: "ungrounded",
+      pstp_5: "ungrounded",
+    });
+    expect(Object.values(reasons)).not.toContain("removed_by_user");
+  });
+
+  it("the proof is frozen: reading it twice, or after time passes, gives the identical snapshot", async () => {
+    const { created } = await runApproved("writes: buy something", [
+      "pstp_1",
+      "pstp_2",
+    ]);
+    const run = await finishedRun(created.id);
+    const first = await (await fetch(`${base}/proofs/${run.proof_id}`)).json();
+    vi.setSystemTime(Date.now() + 3_600_000);
+    const second = await (await fetch(`${base}/proofs/${run.proof_id}`)).json();
+    expect(second).toEqual(first);
+  });
+
+  it("a run that has not finished has no proof yet", async () => {
+    const { created } = await runApproved("writes: buy something", [
+      "pstp_1",
+      "pstp_2",
+    ]);
+    expect(created.proof_id).toBeNull();
+    const res = await fetch(`${base}/proofs/proof_${created.id}`);
+    expect(res.status).toBe(404);
   });
 });
