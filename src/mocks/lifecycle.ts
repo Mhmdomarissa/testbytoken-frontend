@@ -307,8 +307,67 @@ function step(
   };
 }
 
+/**
+ * How long an executed step is reported `running` before it reaches its
+ * terminal status. A real engine says "I started this step" and later "it
+ * passed"; without a running phase a client could never highlight the
+ * CURRENT step from anything the server sent (Phase B B7 wants exactly
+ * that, and CLAUDE.md forbids inventing it).
+ */
+export const RUNNING_PHASE_MS = 900;
+
+/**
+ * Turns a list of finished steps into FRAMES: every executed step (pass,
+ * fail, warning) first appears `running`, starting when the previous step
+ * finished (or RUNNING_PHASE_MS before it finishes, whichever is later),
+ * then in its terminal state. Skipped steps never ran, so they have no
+ * running phase; neither does the engine's own `timeout` marker. Frames are
+ * what the timeline, the poll and the event stream all derive from, so a
+ * step is one id with several states over time - which is exactly what the
+ * client's reducer (keyed on Step.id) exists to handle.
+ */
+export function withRunningPhase(finished: TimedStep[]): TimedStep[] {
+  const frames: TimedStep[] = [];
+  let prevAt = 0;
+  for (const f of finished) {
+    const executed =
+      f.step.status === "pass" ||
+      f.step.status === "fail" ||
+      f.step.status === "warning";
+    const runningAt = Math.max(prevAt, f.at - RUNNING_PHASE_MS);
+    if (executed && f.step.action !== "timeout" && runningAt < f.at) {
+      frames.push({
+        at: runningAt,
+        step: {
+          ...f.step,
+          status: "running",
+          message: "",
+          duration_ms: 0,
+          screenshot_url: null,
+        },
+      });
+    }
+    frames.push(f);
+    prevAt = f.at;
+  }
+  return frames;
+}
+
+/** The latest frame of every step at `elapsedMs`, in step order. */
+export function stepsAt(timeline: RunTimeline, elapsedMs: number): Step[] {
+  const latest = new Map<string, Step>();
+  for (const f of timeline.steps) {
+    if (f.at <= elapsedMs) latest.set(f.step.id, f.step);
+  }
+  return [...latest.values()].sort((a, b) => a.index - b.index);
+}
+
+function timeline(t: RunTimeline): RunTimeline {
+  return { ...t, steps: withRunningPhase(t.steps) };
+}
+
 /** Progresses normally: 5 passing steps, then "passed". */
-export const LIVE_PASS_TIMELINE: RunTimeline = {
+export const LIVE_PASS_TIMELINE: RunTimeline = timeline({
   steps: [
     step(0, 0, { action: "navigate", target: "https://checkout.example.com/" }),
     step(1, 1200),
@@ -318,10 +377,10 @@ export const LIVE_PASS_TIMELINE: RunTimeline = {
   ],
   resolvesAt: 5500,
   finalStatus: "passed",
-};
+});
 
 /** Fails partway: two passing steps, then a real failure, then done. */
-export const LIVE_FAIL_TIMELINE: RunTimeline = {
+export const LIVE_FAIL_TIMELINE: RunTimeline = timeline({
   steps: [
     step(0, 0, { action: "navigate", target: "https://checkout.example.com/" }),
     step(1, 1200, { action: "click", target: "#add-to-cart" }),
@@ -342,7 +401,7 @@ export const LIVE_FAIL_TIMELINE: RunTimeline = {
   ],
   resolvesAt: 3000,
   finalStatus: "failed",
-};
+});
 
 /**
  * Stalls, then times out: two steps arrive normally, then the engine
@@ -352,7 +411,7 @@ export const LIVE_FAIL_TIMELINE: RunTimeline = {
  * which is the point: a happy-path-only mock can't produce that ambiguity
  * for a console to handle.
  */
-export const LIVE_STALL_TIMELINE: RunTimeline = {
+export const LIVE_STALL_TIMELINE: RunTimeline = timeline({
   steps: [
     step(0, 0, { action: "navigate", target: "https://checkout.example.com/" }),
     step(1, 1200, { action: "click", target: "#add-to-cart" }),
@@ -373,7 +432,7 @@ export const LIVE_STALL_TIMELINE: RunTimeline = {
   ],
   resolvesAt: 15_000,
   finalStatus: "timed_out",
-};
+});
 
 /**
  * A run of an APPROVED plan (B0.5 B7): one executed step per approved plan
@@ -398,11 +457,11 @@ export function timelineForPlan(plan: Plan): RunTimeline {
       message: planStep.description,
     });
   });
-  return {
+  return timeline({
     steps,
     resolvesAt: steps.length * 1_200 + 700,
     finalStatus: "passed",
-  };
+  });
 }
 
 export function computeRunState(
@@ -410,9 +469,7 @@ export function computeRunState(
   timeline: RunTimeline,
   elapsedMs: number,
 ): Run {
-  const stepsSoFar = timeline.steps
-    .filter((s) => s.at <= elapsedMs)
-    .map((s) => s.step);
+  const stepsSoFar = stepsAt(timeline, elapsedMs);
   const resolved = elapsedMs >= timeline.resolvesAt;
 
   const passed = stepsSoFar.filter((s) => s.status === "pass").length;
@@ -483,19 +540,26 @@ export function timelineCancelledAt(
   cancelledAtMs: number,
 ): RunTimeline {
   return {
-    steps: timeline.steps.map((s) =>
+    // Frames already delivered keep their positions (event ids are
+    // positional). A `running` frame still to come never happens; every
+    // other frame still to come becomes the step's `skipped` outcome.
+    steps: timeline.steps.flatMap((s) =>
       s.at <= cancelledAtMs
-        ? s
-        : {
-            at: cancelledAtMs,
-            step: {
-              ...s.step,
-              status: "skipped",
-              message: "Skipped: the run was cancelled before this step.",
-              duration_ms: 0,
-              screenshot_url: null,
-            },
-          },
+        ? [s]
+        : s.step.status === "running"
+          ? []
+          : [
+              {
+                at: cancelledAtMs,
+                step: {
+                  ...s.step,
+                  status: "skipped" as const,
+                  message: "Skipped: the run was cancelled before this step.",
+                  duration_ms: 0,
+                  screenshot_url: null,
+                },
+              },
+            ],
     ),
     resolvesAt: cancelledAtMs,
     finalStatus: "cancelled",

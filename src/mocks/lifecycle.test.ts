@@ -12,6 +12,7 @@ import {
   LIVE_FAIL_TIMELINE,
   LIVE_STALL_TIMELINE,
   SCAN_TIMELINE,
+  timelineCancelledAt,
 } from "./lifecycle";
 import type { RunDetailSchema, ScanSchema } from "@/lib/contract";
 import type { z } from "zod";
@@ -129,7 +130,9 @@ describe("run emitting ordered step events over time", () => {
       LIVE_PASS_TIMELINE.resolvesAt,
     );
     expect(run.status).toBe("passed");
-    expect(run.steps).toHaveLength(LIVE_PASS_TIMELINE.steps.length);
+    // Five distinct steps (each one id, several frames over time).
+    expect(run.steps).toHaveLength(5);
+    expect(run.steps.every((s) => s.status === "pass")).toBe(true);
     expect(run.finished_at).not.toBeNull();
   });
 });
@@ -281,5 +284,77 @@ describe("scan outcomes that are not failures", () => {
         done,
       ).modules.length,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe("a step is reported running before it is finished (so a client never has to guess which is current)", () => {
+  const at = (t: number) =>
+    computeRunState(baseRun, LIVE_PASS_TIMELINE, t).steps;
+
+  it("an executed step is `running` between the previous step finishing and its own result", () => {
+    // Step 1 finishes at 1200; it starts as soon as step 0 is done (0) but no
+    // earlier than RUNNING_PHASE_MS before its result.
+    const mid = at(600);
+    expect(mid.map((s) => [s.id, s.status])).toEqual([
+      ["stp_0", "pass"],
+      ["stp_1", "running"],
+    ]);
+    expect(at(1200).map((s) => s.status)).toEqual(["pass", "pass"]);
+  });
+
+  it("a running step carries no outcome: no message, no duration, no screenshot", () => {
+    const running = at(600).find((s) => s.status === "running")!;
+    expect(running.message).toBe("");
+    expect(running.duration_ms).toBe(0);
+    expect(running.screenshot_url).toBeNull();
+  });
+
+  it("at most one step is running at any moment, and never a skipped step", () => {
+    for (const t of [0, 300, 600, 1100, 1300, 2500, 2700, 3100]) {
+      for (const tl of [LIVE_PASS_TIMELINE, LIVE_FAIL_TIMELINE]) {
+        const steps = computeRunState(baseRun, tl, t).steps;
+        expect(
+          steps.filter((s) => s.status === "running").length,
+        ).toBeLessThanOrEqual(1);
+      }
+    }
+    // The fail timeline's skipped step never has a running phase.
+    const frames = LIVE_FAIL_TIMELINE.steps.filter(
+      (f) => f.step.id === "stp_3",
+    );
+    expect(frames.map((f) => f.step.status)).toEqual(["skipped"]);
+  });
+
+  it("the engine's own timeout marker is not a step that 'ran'", () => {
+    const frames = LIVE_STALL_TIMELINE.steps.filter(
+      (f) => f.step.id === "stp_timeout",
+    );
+    expect(frames.map((f) => f.step.status)).toEqual(["fail"]);
+  });
+
+  it("frames are in time order, so event ids (positions) never go backwards in time", () => {
+    for (const tl of [
+      LIVE_PASS_TIMELINE,
+      LIVE_FAIL_TIMELINE,
+      LIVE_STALL_TIMELINE,
+    ]) {
+      const times = tl.steps.map((f) => f.at);
+      expect([...times].sort((a, b) => a - b)).toEqual(times);
+    }
+  });
+
+  it("cancelling mid-step: the step that was running becomes skipped, later steps never start", () => {
+    const cancelled = timelineCancelledAt(LIVE_PASS_TIMELINE, 1_500);
+    const steps = computeRunState(baseRun, cancelled, 60_000).steps;
+    expect(steps.map((s) => s.status)).toEqual([
+      "pass", // stp_0
+      "pass", // stp_1 finished at 1200
+      "skipped", // stp_2 started running at 1500, the moment of cancel: it never finished
+      "skipped",
+      "skipped",
+    ]);
+    // Frames delivered before the cancel are untouched, in the same positions.
+    const before = LIVE_PASS_TIMELINE.steps.filter((f) => f.at <= 1_500);
+    expect(cancelled.steps.slice(0, before.length)).toEqual(before);
   });
 });
