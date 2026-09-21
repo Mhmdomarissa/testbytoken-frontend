@@ -577,7 +577,7 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Fraction of generated scenarios that passed. Always present alongside coverage."
+            "description": "Fraction of the scenarios/steps that RAN which passed. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5."
           },
           "coverage": {
             "$ref": "#/components/schemas/Coverage"
@@ -650,12 +650,12 @@
           "generated": {
             "type": "integer",
             "minimum": 0,
-            "description": "Scenarios actually generated - i.e. elements that were uniquely locatable."
+            "description": "Scenarios actually generated - i.e. elements that were uniquely locatable. FOR A PLAN RUN (`plan_id` non-null): the number of plan steps approved to run."
           },
           "candidate": {
             "type": "integer",
             "minimum": 0,
-            "description": "Total candidate elements the engine attempted to generate scenarios for."
+            "description": "Total candidate elements the engine attempted to generate scenarios for. FOR A PLAN RUN (`plan_id` non-null): the number of steps the plan PROPOSED, so everything left out of the approval - by the person, or because it could not be approved - is inside the denominator and shows as not covered."
           }
         },
         "required": [
@@ -847,7 +847,7 @@
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Fraction of generated scenarios that passed. Always present alongside coverage."
+            "description": "Fraction of the scenarios/steps that RAN which passed. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5."
           },
           "coverage": {
             "$ref": "#/components/schemas/Coverage"
@@ -2002,7 +2002,7 @@
                         "ungrounded",
                         "blocked"
                       ],
-                      "description": "Why a proposed step was not approved to run. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                      "description": "Why a proposed step was not approved to run. `removed_by_user`: the person left it out. `ungrounded` / `blocked`: the SYSTEM could not approve it. Derived by the server (the approval records only the approved ids): a step that is ungrounded is `ungrounded`; otherwise one that is blocked is `blocked`; otherwise, absent from the approval, `removed_by_user`. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
                       "x-extensible-enum": true
                     }
                   },
@@ -2048,9 +2048,10 @@
                     "not_uniquely_locatable",
                     "ungrounded",
                     "skipped",
-                    "blocked"
+                    "blocked",
+                    "removed_by_user"
                   ],
-                  "description": "Why a candidate element has no executed scenario. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                  "description": "Why a candidate has no executed scenario. `removed_by_user` (a plan run): the person who approved the plan left the step out. `ungrounded` and `blocked` (a plan run): the system could not approve it. These are different facts and are never merged into one reason. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
                   "x-extensible-enum": true
                 },
                 "reason": {
@@ -2065,7 +2066,7 @@
                 "reason"
               ]
             },
-            "description": "WHICH candidates were not covered, with why - what the public page shows under 'not covered'. At most 200 entries; `uncovered_total` is the true count when there are more. A proof that hides the gaps is not a proof."
+            "description": "WHICH candidates were not covered, with why - what the public page shows under 'not covered'. FOR A PLAN RUN: exactly one entry per `plan.excluded_steps` entry (label = the step description, `page_url` = the page it is bound to, else the target's `base_url`), with the SAME reason. page shows under 'not covered'. At most 200 entries; `uncovered_total` is the true count when there are more. A proof that hides the gaps is not a proof."
           }
         },
         "required": [
