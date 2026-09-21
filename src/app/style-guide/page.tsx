@@ -48,6 +48,7 @@ const environmentItems = [
 const statusSwatches: Status[] = [
   "pass",
   "fail",
+  "timed_out",
   "running",
   "queued",
   "skipped",

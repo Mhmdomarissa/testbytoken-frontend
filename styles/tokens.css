@@ -43,42 +43,63 @@
    * border is AA non-text (>=3:1) against both. See DESIGN_SYSTEM_APP.md
    * for the OKLCH coordinates and how each was searched.
    *
-   * Foreground lightness is deliberately spread (L 0.648-0.80), not
-   * independently minimized per state - the first derivation minimized
-   * each to its own AA floor and they converged to within 0.03 of each
-   * other, making every pair ~1.0:1 against each other (a WCAG 1.4.1
-   * failure caught in the Phase A review: colorblind and greyscale
-   * viewers could not tell pass from fail). Color is still only a
-   * secondary channel - every place a status renders, it must also carry
-   * a distinct-silhouette icon and a text label (StatusBadge component);
-   * this spread narrows the gap for full-color viewers, it does not
-   * replace the non-color channels. See DESIGN_SYSTEM_APP.md for the
-   * measured pairwise ratios, including under color-vision-deficiency
-   * simulation.
+   * Foreground lightness is deliberately spread across all SEVEN statuses
+   * (not just pass/fail) - the first derivation minimized each
+   * independently to its own AA floor and they converged to within 0.03
+   * of each other, making every pair ~1.0:1 against each other (a WCAG
+   * 1.4.1 failure caught in the Phase A review: colorblind and greyscale
+   * viewers could not tell pass from fail). A follow-up review pass found
+   * that fixing pass/fail alone wasn't enough - several *other* pairs
+   * (warning/running, pass/running, queued/skipped) were still only
+   * ~1.05-1.17:1. Every status is now placed on a lightness ladder
+   * spaced so each step is an EQUAL contrast RATIO, not an equal
+   * lightness difference (WCAG contrast is (L+0.05)/(L'+0.05) - a fixed
+   * lightness gap produces a smaller ratio higher up the scale, so equal
+   * lightness steps do not give equal, or even monotonic, contrast
+   * steps). fail and pass anchor the two ends (fail is at its AA floor
+   * against --color-blue-mid; pass was deliberately kept out of pastel
+   * territory - see DESIGN_SYSTEM_APP.md). With those two ends fixed,
+   * ~1.11-1.12:1 is the mathematical ceiling for the worst-case adjacent
+   * pair across seven statuses - color is still only a secondary
+   * channel: every place a status renders, it must also carry a
+   * distinct-silhouette icon and a text label (StatusBadge component).
+   * See DESIGN_SYSTEM_APP.md for the full ladder, every pairwise ratio,
+   * and color-vision-deficiency simulation (corrected to the Machado,
+   * Oliveira & Fluck 2009 model - see that doc for why the originally
+   * reported numbers were wrong).
    * ------------------------------------------------------------------- */
   --status-warning-fg: var(
     --color-gold
-  ); /* gold itself: already 8.10:1 / 7.06:1 */
+  ); /* gold itself, unchanged: already sits at the right ladder rung */
   --status-warning-bg: #3a2b0d;
   --status-warning-border: #85682d;
 
-  --status-fail-fg: #db6368; /* L=0.648 (at its AA floor - deepest/most saturated of the five) */
+  --status-fail-fg: #db6368; /* ladder position 1/7 (darkest) - at its AA floor */
   --status-fail-bg: #472021;
   --status-fail-border: #b04c50;
 
-  --status-pass-fg: #83d494; /* L=0.80 (lightest of the five - pass and fail are the deliberate extremes) */
+  /* Distinct from `fail`: a failure has a specific reason from a specific
+     step; a timeout is the engine going silent, with none. Own hue
+     (amber, between fail's red and warning's gold - not a new anchor,
+     derived the same way fail/pass/running were), own ladder rung, own
+     icon+label (StatusBadge) - not just `fail` with a different label. */
+  --status-timed-out-fg: #d57a49; /* ladder position 2/7 */
+  --status-timed-out-bg: #432515;
+  --status-timed-out-border: #a25a31;
+
+  --status-pass-fg: #83d494; /* ladder position 7/7 (lightest) - deliberately kept out of pastel territory */
   --status-pass-bg: #1a3520;
   --status-pass-border: #387949;
 
-  --status-running-fg: #49c1ea; /* L=0.76 */
+  --status-running-fg: #4ec5ee; /* ladder position 6/7 */
   --status-running-bg: #0a3341;
   --status-running-border: #007695;
 
-  --status-queued-fg: #a89482; /* L=0.68 */
+  --status-queued-fg: #ab9785; /* ladder position 3/7 */
   --status-queued-bg: #362c22;
   --status-queued-border: #796a5b;
 
-  --status-skipped-fg: #a1a3b6; /* L=0.72 */
+  --status-skipped-fg: #a1a3b5; /* ladder position 4/7 */
   --status-skipped-bg: #2c2d37;
   --status-skipped-border: #6a6b7a;
 

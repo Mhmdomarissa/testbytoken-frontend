@@ -68,19 +68,26 @@ const PUBLIC_ROUTE_PREFIX = "/p/";
 const PUBLIC_ROUTE_BUDGET_BYTES = null;
 
 /**
- * Discovered the hard way: this build is not perfectly byte-reproducible
- * across environments. A baseline written locally (macOS, a given Node
- * patch) failed every single route on CI (Ubuntu, a Node minor-version
- * float) by a small, consistent amount (+0.4 to +2.2 KB, ~0.1-0.5%) - not
- * a real regression, cross-build noise (exact cause not root-caused
- * further: plausibly directory-iteration order affecting chunk
- * concatenation, or a differing Node patch before CI's node-version was
- * pinned to .nvmrc's exact version alongside this). A real regression
- * from an added dependency or component is easily an order of magnitude
- * bigger than this tolerance; this exists to absorb noise, not to hide
- * genuine growth.
+ * Measured, not guessed (pre-Phase-B review, item 4). This was 8 KB, a
+ * hedge added when CI (Ubuntu, a floating Node minor version) first
+ * failed every route by +0.4-2.2 KB against a baseline written locally
+ * (macOS, a specific Node patch). A follow-up PR pinned CI to that exact
+ * same .nvmrc version, which raised the question: was Node-version drift
+ * the actual cause, making this tolerance redundant? Tested directly by
+ * setting it to 0 and pushing - CI run 35565089141 still failed every
+ * route, by +0.4 to +1.7 KB, always CI-higher than local, never lower.
+ * That rules out Node-version float as the cause (it's now pinned
+ * identically on both sides) and confirms this is genuine macOS/Ubuntu
+ * build non-determinism (not root-caused further - plausibly the native
+ * zlib linked into each platform's Node binary producing slightly
+ * different gzip output for identical input, or filesystem
+ * directory-iteration order affecting Turbopack's chunk concatenation).
+ * 4 KB is ~2.3x the largest single-route drift actually observed
+ * (1.7 KB on /runs) - enough margin to absorb this specific noise
+ * without hiding a real regression, which for an added dependency or
+ * component is easily an order of magnitude bigger than 4 KB.
  */
-const TOLERANCE_BYTES = 8 * 1024;
+const TOLERANCE_BYTES = 4 * 1024;
 
 const WRITE_MODE = process.argv.includes("--write");
 

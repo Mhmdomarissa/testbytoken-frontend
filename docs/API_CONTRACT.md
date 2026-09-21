@@ -154,6 +154,23 @@ way to explain it to a customer without this endpoint.
 | `GET /runs/{id}`         | essential    | Full step detail.                                                                 |
 | `POST /runs/{id}/cancel` | nice-to-have | Letting a run finish instead of cancelling wastes some tokens but blocks nothing. |
 
+**Run status includes `timed_out`, distinct from `failed`.** A run's
+overall `status` is `queued` / `running` / `passed` / `failed` /
+`cancelled` / `timed_out` — a different, run-level vocabulary from the
+six-value step status above (a run's per-step statuses don't include
+`timed_out`; only the run as a whole times out). `timed_out` means the
+engine stopped responding and produced no further step events before the
+deadline: a diagnostic absence, not a specific assertion failure, so it
+carries no `message` the way a `failed` step does and `proof_id` stays
+permanently null (no run report was produced). Surfaced by building the
+mock's stateful lifecycle simulation (Phase A review §5) — the original
+five-value enum had no way to represent an engine going silent, only an
+engine that actively failed a check. Given the full design-token
+treatment in `docs/DESIGN_SYSTEM_APP.md`'s "Isoluminance" section: its
+own AA-verified color, its own icon (`ClockAlertIcon`, not `fail`'s
+`OctagonXIcon`), and its own row in `src/lib/color/contrast.test.ts`'s
+pairwise coverage — not `fail` with a different label.
+
 ### events
 
 `GET /jobs/{id}/events` — essential. Watching a real browser execute
