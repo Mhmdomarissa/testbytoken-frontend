@@ -178,8 +178,8 @@ test("approval sends exactly the chosen steps in the chosen order, then starts a
   await expect(page.getByTestId("approved-plan")).toContainText(
     "Approved to run (3)",
   );
-  await page.getByRole("link", { name: "View runs" }).click();
-  await expect(page).toHaveURL(/\/runs$/);
+  await page.getByRole("link", { name: "Watch this run" }).click();
+  await expect(page).toHaveURL(/\/runs\/run_/);
 });
 
 test("an approved plan is a permanent record: what ran and what did not, with why", async ({
@@ -362,7 +362,7 @@ test("a plan is read against the inventory it came from, and the runs list label
   });
   await expect(page.getByTestId("plan-inventory")).toBeVisible();
 
-  await page.getByRole("link", { name: "View runs" }).click();
+  await page.getByRole("link", { name: "Runs", exact: true }).click();
   await expect(page).toHaveURL(/\/runs$/);
   // The plan run says "plan steps"; the suite runs say "elements". Never a bare "x/y".
   const plan = page.locator(
