@@ -3,13 +3,9 @@ import { z } from "zod";
 import { WorkspaceSchema } from "@/lib/contract";
 import { apiDelete, apiGet, apiPost } from "../client";
 import { queryKeys } from "../keys";
+import { isUnrecognised } from "../tolerant";
 
-type Workspace = z.infer<typeof WorkspaceSchema>;
-
-const NON_TERMINAL_STATUSES = new Set<Workspace["status"]>([
-  "booting",
-  "resetting",
-]);
+const NON_TERMINAL_STATUSES = new Set<string>(["booting", "resetting"]);
 
 /**
  * A workspace boots an engine + browser and can be "booting"/"resetting"
@@ -26,7 +22,11 @@ export function useWorkspace(id: string | undefined) {
     staleTime: 0,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && NON_TERMINAL_STATUSES.has(status) ? 2_000 : false;
+      // Unrecognised keeps polling: a state we do not understand is not "settled".
+      return status &&
+        (isUnrecognised(status) || NON_TERMINAL_STATUSES.has(status))
+        ? 2_000
+        : false;
     },
   });
 }

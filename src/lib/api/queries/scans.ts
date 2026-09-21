@@ -3,10 +3,16 @@ import type { z } from "zod";
 import { CreateScanRequestSchema, ScanSchema } from "@/lib/contract";
 import { apiGet, apiPost } from "../client";
 import { queryKeys } from "../keys";
+import { isUnrecognised, type Tolerated } from "../tolerant";
 
-type Scan = z.infer<typeof ScanSchema>;
+type Scan = Tolerated<z.infer<typeof ScanSchema>>;
 
-const TERMINAL_SCAN_STATUSES = new Set<Scan["status"]>(["completed", "failed"]);
+const TERMINAL_SCAN_STATUSES = new Set<string>(["completed", "failed"]);
+
+/** Unrecognised is NOT terminal: we can't call a scan finished on a state we don't understand (Phase B \u00a71.1) - it keeps polling and keeps refetching. */
+function isTerminal(status: Scan["status"]): boolean {
+  return !isUnrecognised(status) && TERMINAL_SCAN_STATUSES.has(status);
+}
 
 /**
  * A scan is actively changing while `queued`/`crawling`/`parked` - the
@@ -27,15 +33,11 @@ export function useScan(id: string | undefined) {
     queryFn: () => apiGet(`/scans/${id}`, ScanSchema),
     enabled: id !== undefined,
     staleTime: (query) =>
-      query.state.data && TERMINAL_SCAN_STATUSES.has(query.state.data.status)
-        ? Infinity
-        : 0,
+      query.state.data && isTerminal(query.state.data.status) ? Infinity : 0,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       if (!status) return 1_500;
-      return TERMINAL_SCAN_STATUSES.has(status) || status === "parked"
-        ? false
-        : 1_500;
+      return isTerminal(status) || status === "parked" ? false : 1_500;
     },
   });
 }

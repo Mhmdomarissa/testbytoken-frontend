@@ -1,8 +1,13 @@
 import type { z } from "zod";
 import type { JobEventSchema, StepSchema } from "@/lib/contract";
+import type { Tolerated, UnrecognisedValue } from "../tolerant";
 
-export type JobEvent = z.infer<typeof JobEventSchema>;
-export type Step = z.infer<typeof StepSchema>;
+// Tolerated<...>: a status this client doesn't know is an
+// UnrecognisedValue in the state, not a dropped event (docs/PHASE_B0_5.md
+// A1) - the reducer's logic never looks at a status value, so it needs no
+// special-casing, only honest types.
+export type JobEvent = Tolerated<z.infer<typeof JobEventSchema>>;
+export type Step = Tolerated<z.infer<typeof StepSchema>>;
 
 /**
  * The state a job's (scan or run) live event stream accumulates into.
@@ -22,10 +27,14 @@ export interface JobEventsState {
    *  out-of-order arrival doesn't need to know how many steps precede it. */
   steps: Record<number, Step>;
   /** Latest applied job-level status (from a "status" or "done" event), or null before either arrives. */
-  status: string | null;
+  status: string | UnrecognisedValue | null;
   progress: { message: string | null; percent: number | null } | null;
   /** Every "log" event applied so far, in the order they were applied (not necessarily arrival order under reordering - see applyJobEvent). */
-  logs: { id: string; level: "info" | "warning" | "error"; message: string }[];
+  logs: {
+    id: string;
+    level: "info" | "warning" | "error" | UnrecognisedValue;
+    message: string;
+  }[];
   /** Highest event id ever observed, including from duplicates/late arrivals that didn't otherwise change state - what a reconnect's `?since=` should resume from. */
   lastEventId: string | null;
 

@@ -24,7 +24,8 @@
     "bundle-budget": "node scripts/check-bundle-budget.mjs",
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "check:status-contrast": "node scripts/check-status-contrast.mjs",
-    "contract-drift": "node scripts/check-contract-drift.mjs"
+    "contract-drift": "node scripts/check-contract-drift.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
@@ -42,6 +43,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

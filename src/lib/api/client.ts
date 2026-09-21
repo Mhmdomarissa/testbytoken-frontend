@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import { apiErrorFromResponse, normalizeError } from "./errors";
 import { API_BASE_URL } from "./config";
+import { tolerant, type Tolerated } from "./tolerant";
 
 /**
  * The one place an HTTP request to the backend gets made. Every query and
@@ -16,12 +17,17 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
-async function request<T>(
+async function request<S extends z.ZodType>(
   path: string,
-  schema: z.ZodType<T>,
+  schema: S,
   init: RequestInit,
   options?: RequestOptions,
-): Promise<T> {
+): Promise<Tolerated<z.output<S>>> {
+  // Every response is parsed through the TOLERANT twin of its contract
+  // schema (tolerant.ts): an enum value this client doesn't know becomes
+  // an UnrecognisedValue instead of failing the whole response. Applied
+  // here, once, so no call site can forget to.
+  const responseSchema = tolerant(schema);
   const controller = new AbortController();
   const timeout = setTimeout(
     () => controller.abort(),
@@ -50,11 +56,11 @@ async function request<T>(
 
     // 204 No Content (e.g. DELETE /targets/{id}) - nothing to parse.
     if (res.status === 204) {
-      return schema.parse(undefined);
+      return responseSchema.parse(undefined);
     }
 
     const body: unknown = await res.json();
-    return schema.parse(body);
+    return responseSchema.parse(body);
   } catch (err) {
     throw normalizeError(err);
   } finally {
@@ -62,20 +68,20 @@ async function request<T>(
   }
 }
 
-export function apiGet<T>(
+export function apiGet<S extends z.ZodType>(
   path: string,
-  schema: z.ZodType<T>,
+  schema: S,
   options?: RequestOptions,
-): Promise<T> {
+): Promise<Tolerated<z.output<S>>> {
   return request(path, schema, { method: "GET" }, options);
 }
 
-export function apiPost<T>(
+export function apiPost<S extends z.ZodType>(
   path: string,
-  schema: z.ZodType<T>,
+  schema: S,
   body?: unknown,
   options?: RequestOptions,
-): Promise<T> {
+): Promise<Tolerated<z.output<S>>> {
   return request(
     path,
     schema,
@@ -87,12 +93,12 @@ export function apiPost<T>(
   );
 }
 
-export function apiPatch<T>(
+export function apiPatch<S extends z.ZodType>(
   path: string,
-  schema: z.ZodType<T>,
+  schema: S,
   body: unknown,
   options?: RequestOptions,
-): Promise<T> {
+): Promise<Tolerated<z.output<S>>> {
   return request(
     path,
     schema,
@@ -101,10 +107,10 @@ export function apiPatch<T>(
   );
 }
 
-export function apiDelete<T>(
+export function apiDelete<S extends z.ZodType>(
   path: string,
-  schema: z.ZodType<T>,
+  schema: S,
   options?: RequestOptions,
-): Promise<T> {
+): Promise<Tolerated<z.output<S>>> {
   return request(path, schema, { method: "DELETE" }, options);
 }

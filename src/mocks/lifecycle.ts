@@ -273,6 +273,11 @@ export const LIVE_RUN_TIMELINES = new Map<string, RunTimeline>([
   ["run_live_pass_1", LIVE_PASS_TIMELINE],
   ["run_live_fail_1", LIVE_FAIL_TIMELINE],
   ["run_live_stall_1", LIVE_STALL_TIMELINE],
+  // Same progression as a clean pass; the difference is the TRANSPORT (its
+  // first SSE connection is dropped mid-run - handlers/events.ts), which is
+  // where reconnect-and-resume gets exercised. Phase B lists "stream
+  // disconnect with recovery" as a fourth lifecycle scenario.
+  ["run_live_drop_1", LIVE_PASS_TIMELINE],
 ]);
 
 /** POST /runs calls this to give a freshly-created run a live timeline. */

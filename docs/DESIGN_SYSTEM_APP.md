@@ -299,11 +299,11 @@ lighter end to stay in sRGB gamut — `pass` and `running` most visibly).
 | `running`   | `#afe7fe` | **13.54:1**          | **13.54:1**                | **11.80:1**               |
 | `pass`      | `#d7ffdd` | **16.61:1**          | **16.61:1**                | **14.47:1**               |
 
-All seven clear both requirements with real margin — `fail` sits
-closest to the floor (its ink contrast, 4.93:1, is also its fill-vs-page
-number, since the ink color and the darker page ground are compared the
-same way), the other six carry increasing headroom by construction (each
-is a fixed contrast-ratio step lighter).
+All seven clear both requirements with real margin, and `fail` sits
+closest to the floor. Note that the "ink-on-fill" and "fill vs `blue-deep`"
+columns are the same number by construction — the ink _is_ `blue-deep` —
+so they are one check reported twice, not two independent ones; the
+independent check is the `blue-mid` column.
 
 Full pairwise fill-to-fill contrast:
 
@@ -331,6 +331,35 @@ asserts all of the above against the real, committed `styles/tokens.css`
 (both the wiring — a rendered chip's CSS variable resolves to a real,
 defined value — and the numbers — ink-on-fill ≥4.5:1, fill-vs-page
 ≥3:1, and every pairwise fill combination ≥1.18:1).
+
+### Chips under color-vision deficiency
+
+Same Machado, Oliveira & Fluck (2009) matrices as the foreground analysis
+above (`npm run check:status-contrast` reproduces every number). Contrast
+is between the two _simulated fills_ — what a dichromat sees of two chips
+side by side. The pairs that carry meaning, and the pairs adjacent in the
+ladder that don't (nobody confuses `skipped` and `warning` at a glance,
+and the icon and label carry it either way):
+
+| Pair                  | Normal | Protanopia | Deuteranopia | Tritanopia |
+| --------------------- | ------ | ---------- | ------------ | ---------- |
+| `pass` vs `fail`      | 3.37   | 4.27       | **2.93**     | 3.35       |
+| `running` vs `fail`   | 2.75   | 3.58       | 2.34         | 2.76       |
+| `pass` vs `timed_out` | 2.74   | 3.29       | 2.46         | 2.76       |
+| `warning` vs `fail`   | 2.23   | 2.61       | 2.04         | 2.21       |
+
+`pass` vs `fail` under deuteranopia across the three schemes this
+project has had: **1.17:1** (the original per-state-minimum foreground
+tokens — isoluminant, the WCAG 1.4.1 bug), **1.69:1** (the Phase A
+re-derived foreground ladder), **2.93:1** (chips). An independent
+recomputation put the chip figure at 2.97; the ~0.04 difference is
+consistent with matrix/rounding precision and changes no conclusion.
+
+Adjacent-pair contrast in the ladder stays at ~1.21–1.24 however far the
+range widens (a 3.4× wider span over six steps buys ~22% per step — the
+sixth-root effect), and that is fine: adjacent pairs are the wrong thing
+to optimise. The distinctions that matter — pass/fail, running/fail —
+went from 1.00:1 to 3.37:1 and 2.75:1 in normal vision.
 
 **Why not push the range further?** The floor (~0.235) has real margin
 above the mathematical minimum for 3:1-vs-page (~0.149) so `fail` isn't

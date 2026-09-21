@@ -4,13 +4,14 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ListChecksIcon } from "lucide-react";
-import { RunSummarySchema, RunStatusSchema, paginated } from "@/lib/contract";
-import type { z } from "zod";
+import { RunSummarySchema, paginated } from "@/lib/contract";
 import { useResource } from "@/hooks/useResource";
 import { ListSkeleton } from "@/components/state/ListSkeleton";
 import { EmptyState } from "@/components/state/EmptyState";
 import { ErrorState } from "@/components/state/ErrorState";
-import { StatusBadge, type Status } from "@/components/status/StatusBadge";
+import { StatusBadge } from "@/components/status/StatusBadge";
+import { toBadgeStatus } from "@/components/status/badgeStatus";
+import { PassRateCoverage } from "@/components/status/PassRateCoverage";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -22,22 +23,6 @@ import {
 } from "@/components/ui/table";
 
 const RunListResponseSchema = paginated(RunSummarySchema);
-
-// Run status vocabulary differs slightly from the six-value step/design
-// status scale (a run additionally has "queued"/"running"/"passed"/
-// "failed"/"cancelled") - this maps each onto the closest status token.
-const STATUS_TOKEN: Record<z.infer<typeof RunStatusSchema>, Status> = {
-  queued: "queued",
-  running: "running",
-  passed: "pass",
-  failed: "fail",
-  cancelled: "skipped",
-  // Own status, own icon+color (Phase A review, pre-Phase-B item 3) - a
-  // timeout used to reuse `failed`'s color and icon, distinguished only
-  // by label text, which was exactly the single-channel pattern this
-  // whole exercise exists to eliminate.
-  timed_out: "timed_out",
-};
 
 export default function RunsPage() {
   return (
@@ -103,8 +88,7 @@ function RunsList() {
             <TableRow>
               <TableHead>Run</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Pass rate</TableHead>
-              <TableHead>Coverage</TableHead>
+              <TableHead>Pass rate &middot; coverage</TableHead>
               <TableHead className="text-right">Cost</TableHead>
             </TableRow>
           </TableHeader>
@@ -113,16 +97,13 @@ function RunsList() {
               <TableRow key={run.id}>
                 <TableCell className="font-mono text-xs">{run.id}</TableCell>
                 <TableCell>
-                  <StatusBadge
-                    status={STATUS_TOKEN[run.status]}
-                    label={run.status}
+                  <StatusBadge status={toBadgeStatus(run.status)} />
+                </TableCell>
+                <TableCell>
+                  <PassRateCoverage
+                    passRate={run.pass_rate}
+                    coverage={run.coverage}
                   />
-                </TableCell>
-                <TableCell className="tabular-nums">
-                  {Math.round(run.pass_rate * 100)}%
-                </TableCell>
-                <TableCell className="tabular-nums">
-                  {run.coverage.generated}/{run.coverage.candidate}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
                   {run.token_cost.toFixed(1)}

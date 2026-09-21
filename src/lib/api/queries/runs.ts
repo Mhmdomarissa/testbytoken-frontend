@@ -8,8 +8,9 @@ import {
 } from "@/lib/contract";
 import { apiGet, apiPost } from "../client";
 import { queryKeys } from "../keys";
+import { isUnrecognised, type Tolerated } from "../tolerant";
 
-type RunDetail = z.infer<typeof RunDetailSchema>;
+type RunDetail = Tolerated<z.infer<typeof RunDetailSchema>>;
 type RunListParams = {
   target_id?: string;
   suite_id?: string;
@@ -20,10 +21,18 @@ type RunListParams = {
 
 const RunListResponseSchema = paginated(RunSummarySchema);
 
-const NON_TERMINAL_RUN_STATUSES = new Set<RunDetail["status"]>([
-  "queued",
-  "running",
-]);
+const NON_TERMINAL_RUN_STATUSES = new Set<string>(["queued", "running"]);
+
+/**
+ * A status this client doesn't recognise is treated as NOT finished: we
+ * can't claim a run is done when we don't know what its state means, and
+ * "keep polling" is the only answer that can't freeze the UI on a stale
+ * reading (Phase B \u00a71.1 - never present a state the server didn't send
+ * as if it were settled).
+ */
+function isStillMoving(status: RunDetail["status"]): boolean {
+  return isUnrecognised(status) || NON_TERMINAL_RUN_STATUSES.has(status);
+}
 
 function toSearchParams(params: RunListParams): string {
   const usp = new URLSearchParams();
@@ -71,12 +80,12 @@ export function useRun(id: string | undefined) {
     queryFn: () => apiGet(`/runs/${id}`, RunDetailSchema),
     enabled: id !== undefined,
     staleTime: (query) =>
-      query.state.data && NON_TERMINAL_RUN_STATUSES.has(query.state.data.status)
-        ? 0
-        : Infinity,
+      query.state.data && !isStillMoving(query.state.data.status)
+        ? Infinity
+        : 0,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && NON_TERMINAL_RUN_STATUSES.has(status) ? 3_000 : false;
+      return status && isStillMoving(status) ? 3_000 : false;
     },
   });
 }
