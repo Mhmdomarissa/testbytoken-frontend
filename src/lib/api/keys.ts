@@ -26,6 +26,9 @@ export const queryKeys = {
       ["runs", "list", params] as const,
     detail: (id: string) => ["runs", id] as const,
   },
+  loginSessions: {
+    detail: (id: string) => ["login-sessions", id] as const,
+  },
   plans: {
     detail: (id: string) => ["plans", id] as const,
   },
