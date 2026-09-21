@@ -165,7 +165,10 @@ UI-only fakes).
 architecture rule is that the browser talks to the backend directly, with
 no Next proxy/BFF — fetching backend resources from a Server Component
 would itself be exactly that, so every data-driven page here is a client
-component (`src/hooks/useResource.ts`).
+component. The four proof-of-primitive pages above still use Phase A's
+minimal `src/hooks/useResource.ts` (no caching, one fetch per mount) -
+Phase B's real screens use the data layer below instead; `useResource`
+is not being extended further and goes away once nothing uses it.
 
 **Known mock-only limitation:** Service Workers cannot set cookies via a
 `Set-Cookie` response header (a browser/spec restriction, not an MSW bug).
@@ -175,6 +178,60 @@ sign-in/sign-out pages additionally set/clear the cookie via
 `document.cookie` as a mock-only workaround
 (`src/mocks/session-cookie-workaround.ts`). This entire file should be
 deleted once a real backend exists.
+
+## Data layer (`src/lib/api/`)
+
+Phase B, B1: one directory owns all backend communication. No component
+fetches, no inline URL strings — every resource goes through a query or
+mutation hook here, and every response is Zod-parsed at the boundary
+(`client.ts`). No `as` casts.
+
+- **`client.ts`** — `apiGet`/`apiPost`/`apiPatch`/`apiDelete`, each taking
+  a Zod schema and returning parsed, typed data. `credentials: "include"`
+  on every request (cookie auth, sibling-subdomain deployment, per
+  `docs/API_CONTRACT.md`) and a 15s timeout by default.
+- **`errors.ts`** — every failure (`network`, `http`, `parse`, `timeout`)
+  normalises to one `ApiError` shape, so a component handles "something
+  went wrong" once while still able to branch on `kind` (a 404 is not a
+  dropped connection). A schema-parse failure — our contract drifting
+  from what the server actually sent — is loud (`console.error`) in
+  development and quiet in production.
+- **`QueryProvider.tsx`** — [TanStack Query](https://tanstack.com/query)
+  for cache keys, per-resource stale times, and invalidation, rather than
+  hand-rolling a cache layer for what's already a well-tested one. Only
+  `network`/`timeout` errors and 5xx retry (twice, exponential backoff);
+  a 4xx or a schema-parse failure retrying gets the same wrong answer
+  back. One `QueryClient` per component-tree instance, not a module
+  singleton — the safe pattern for the App Router.
+- **`keys.ts`** — every query key in one place, so a mutation for one
+  resource can invalidate another's cache without reaching into its
+  internals.
+- **`queries/*.ts`** — one file per resource (`workspaces`, `targets`,
+  `scans`, `inspect`, `suites`, `runs`, `proofs`). Stale times are chosen
+  per resource, not defaulted: a finished `proof` is immutable
+  (`staleTime: Infinity`); a `run` or `scan` in progress has none
+  (`staleTime: 0`, plus a conditional `refetchInterval` that stops once
+  the status is terminal); `targets`/`suites` change rarely (60s). Each
+  hook's comment says why. (`usage` and suite-authoring endpoints beyond
+  what the spine needs are Phase C and intentionally not here yet.)
+- **`sse/jobEventsReducer.ts`** — the pure `(state, event) => state`
+  reducer `GET /jobs/{id}/events` folds into. Keyed by `Step.index`, with
+  a per-key "last-applied event id" so a shuffled/duplicated/late
+  arrival can never overwrite newer state — verified by
+  `jobEventsReducer.test.ts` against exactly those hostile sequences
+  (shuffled, duplicated, gapped-then-backfilled), not just the happy
+  path.
+- **`sse/useJobEvents.ts`** — the `EventSource` client: reconnects with
+  exponential backoff + full jitter (capped at 30s), resumes via an
+  explicit `?since=<last-seen-id>` on every (re)connection (not
+  `EventSource`'s native `Last-Event-ID` header, which some proxies
+  strip), and deliberately does **not** treat a quiet-but-open stream as
+  a failure — Phase A's `LIVE_STALL_TIMELINE` goes quiet for a real 15s
+  before resolving, and forcing a reconnect on an idle timer would
+  misreport a healthy, slow run as a dropped connection. `lastEventAt` is
+  exposed instead, for a consumer to render its own staleness affordance.
+  Not unit-tested itself (jsdom has no `EventSource`) — verified by
+  driving it in a real browser once B7 wires it into a screen.
 
 ## What is not here yet
 
