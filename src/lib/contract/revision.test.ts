@@ -197,7 +197,7 @@ describe("B10: a proof is a self-contained frozen snapshot", () => {
   const snapshot = {
     verdict: "passed",
     pass_rate: 1,
-    coverage: { generated: 21, candidate: 24 },
+    coverage: { basis: "inventory", generated: 21, candidate: 24 },
     target: { name: "Checkout", base_url: "https://a.example.com" },
     started_at: "2026-09-21T12:00:00Z",
     finished_at: "2026-09-21T12:01:00Z",

@@ -98,8 +98,21 @@ export const StepSchema = z
   })
   .openapi("Step");
 
+export const CoverageBasisSchema = extensibleEnum(
+  ["inventory", "plan"],
+  "What `generated` and `candidate` COUNT. `inventory` (a suite run): " +
+    "`candidate` = elements the engine found, `generated` = those it could " +
+    "uniquely locate and so generate a scenario for. `plan` (a run from a " +
+    "plan): `candidate` = steps the plan proposed, `generated` = steps " +
+    "approved to run. The two are different denominators and are NOT " +
+    "comparable: 2 of 5 plan steps says nothing about how much of the " +
+    "application was tested - see the proof's `plan.grounded_against` for " +
+    "that. A client MUST label a coverage figure with its basis.",
+);
+
 export const CoverageSchema = z
   .object({
+    basis: CoverageBasisSchema,
     generated: z.number().int().min(0).openapi({
       description:
         "Scenarios actually generated - i.e. elements that were uniquely locatable. FOR A PLAN RUN (`plan_id` non-null): the number of plan steps approved to run.",

@@ -37,7 +37,7 @@ const baseRun: z.infer<typeof RunDetailSchema> = {
   report_url: null,
   status: "running",
   pass_rate: 1,
-  coverage: { generated: 21, candidate: 24 },
+  coverage: { basis: "inventory", generated: 21, candidate: 24 },
   token_cost: 1.1,
   proof_id: "proof_should_be_cleared_until_resolved",
   started_at: new Date().toISOString(),
@@ -105,7 +105,11 @@ describe("run emitting ordered step events over time", () => {
     expect(run.status).toBe("running");
     expect(run.finished_at).toBeNull();
     // NON-NEGOTIABLE shape still holds mid-run: coverage present alongside pass_rate.
-    expect(run.coverage).toEqual({ generated: 21, candidate: 24 });
+    expect(run.coverage).toEqual({
+      basis: "inventory",
+      generated: 21,
+      candidate: 24,
+    });
   });
 
   it("clears proof_id until resolved, then restores it", () => {

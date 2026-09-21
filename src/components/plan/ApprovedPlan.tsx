@@ -1,3 +1,4 @@
+import { InventoryContext } from "./InventoryContext";
 import { PlanStepRow } from "./PlanStepRow";
 import { exclusionReason, type PlanStep } from "./reviewState";
 
@@ -15,8 +16,10 @@ export function ApprovedPlan({
   steps,
   approvedIds,
   approvedAt,
+  inventoryElements,
 }: {
   steps: PlanStep[];
+  inventoryElements: number | null;
   approvedIds: string[];
   approvedAt: string;
 }) {
@@ -50,6 +53,8 @@ export function ApprovedPlan({
           {steps.length} covered.
         </span>
       </p>
+
+      <InventoryContext steps={steps} inventoryElements={inventoryElements} />
 
       <section className="flex flex-col gap-2">
         <h2 className="font-heading text-lg font-light">
