@@ -14,6 +14,8 @@ describe("Run: pass_rate and coverage are both required, everywhere", () => {
     workspace_id: "wksp_1",
     target_id: "tgt_1",
     suite_id: "suite_1",
+    plan_id: null,
+    login_session_id: null,
     status: "passed",
     pass_rate: 0.8,
     coverage: { generated: 8, candidate: 10 },
@@ -40,11 +42,16 @@ describe("Run: pass_rate and coverage are both required, everywhere", () => {
   it("RunDetail (with steps) still requires both", () => {
     const { coverage: _coverage, ...withoutCoverage } = base;
     expect(
-      RunDetailSchema.safeParse({ ...withoutCoverage, steps: [] }).success,
+      RunDetailSchema.safeParse({
+        ...withoutCoverage,
+        report_url: null,
+        steps: [],
+      }).success,
     ).toBe(false);
-    expect(RunDetailSchema.safeParse({ ...base, steps: [] }).success).toBe(
-      true,
-    );
+    expect(
+      RunDetailSchema.safeParse({ ...base, report_url: null, steps: [] })
+        .success,
+    ).toBe(true);
   });
 });
 
@@ -53,6 +60,7 @@ describe("Element: uniquely_locatable is required on every inventory entry", () 
     id: "el_1",
     page_url: "https://example.com",
     label: "Submit",
+    role: "button",
     locator: "#submit",
     locator_strategy: "css",
     uniquely_locatable: true,

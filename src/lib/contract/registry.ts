@@ -8,6 +8,8 @@ import { registerRunPaths } from "./runs";
 import { registerEventPaths } from "./events";
 import { registerSuitePaths } from "./suites";
 import { registerTargetPaths } from "./targets";
+import { registerPlanPaths } from "./plans";
+import { registerLoginSessionPaths } from "./login-sessions";
 import { registerProofPaths } from "./proofs";
 import { registerUsagePaths } from "./usage";
 
@@ -32,5 +34,7 @@ registerRunPaths(registry);
 registerEventPaths(registry);
 registerSuitePaths(registry);
 registerTargetPaths(registry);
+registerPlanPaths(registry);
+registerLoginSessionPaths(registry);
 registerProofPaths(registry);
 registerUsagePaths(registry);

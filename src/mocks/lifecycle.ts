@@ -1,16 +1,19 @@
 import type { z } from "zod";
 import type {
+  PlanSchema,
   ScanSchema,
   RunDetailSchema,
   StepSchema,
   JobEventSchema,
 } from "@/lib/contract";
-import { modCheckout, modSettings } from "./data";
+import { modCheckout, modSettings, reportUrl } from "./data";
 
 type Scan = z.infer<typeof ScanSchema>;
+type Plan = z.infer<typeof PlanSchema>;
 type Run = z.infer<typeof RunDetailSchema>;
 type Step = z.infer<typeof StepSchema>;
-type JobEvent = z.infer<typeof JobEventSchema>;
+// Only sequenced events (with an id) ever live in a job's event LOG; heartbeats are transport, not history.
+type JobEvent = Exclude<z.infer<typeof JobEventSchema>, { type: "heartbeat" }>;
 
 /**
  * Phase A review, §5: "a mock layer that returns static payloads cannot
@@ -59,18 +62,40 @@ export const SCAN_TIMELINE: ScanTimeline = {
   completedAt: 4000,
 };
 
+/**
+ * A target named tgt_unreachable never resolves: its scan crawls, then FAILS
+ * with a structured reason (B0.5 B4) - the designed scan-failure state.
+ */
+const UNREACHABLE_TARGET_ID = "tgt_unreachable";
+
 export function computeScanState(base: Scan, elapsedMs: number): Scan {
+  if (
+    base.target_id === UNREACHABLE_TARGET_ID &&
+    elapsedMs >= SCAN_TIMELINE.completedAt
+  ) {
+    return {
+      ...base,
+      status: "failed",
+      modules: [],
+      failure: {
+        kind: "unreachable",
+        message:
+          "We couldn't reach legacy-admin.example.com - the name did not resolve. Check the address, or that the site is up.",
+      },
+    };
+  }
   if (elapsedMs >= SCAN_TIMELINE.completedAt) {
     return {
       ...base,
       status: "completed",
+      failure: null,
       modules: [modCheckout, modSettings],
     };
   }
   if (elapsedMs >= SCAN_TIMELINE.crawlingAt) {
-    return { ...base, status: "crawling", modules: [] };
+    return { ...base, status: "crawling", failure: null, modules: [] };
   }
-  return { ...base, status: "queued", modules: [] };
+  return { ...base, status: "queued", failure: null, modules: [] };
 }
 
 /** Ids of scans driven by SCAN_TIMELINE rather than returned static. */
@@ -84,21 +109,29 @@ export function resolveScan(base: Scan): Scan {
   return computeScanState(base, elapsedMsFor(base.id));
 }
 
+function scanTerminalStatus(scanTargetId?: string): "completed" | "failed" {
+  return scanTargetId === UNREACHABLE_TARGET_ID ? "failed" : "completed";
+}
+
 function scanStatusEvent(id: string, status: Scan["status"]): JobEvent {
   return { id, type: "status", status };
 }
 
 /** Ordered JobEvents for a scan's progress so far, for SSE backlog. */
-export function scanEventLog(elapsedMs: number): JobEvent[] {
+export function scanEventLog(
+  elapsedMs: number,
+  scanTargetId?: string,
+): JobEvent[] {
   const events: JobEvent[] = [scanStatusEvent("0", "queued")];
   if (elapsedMs >= SCAN_TIMELINE.crawlingAt)
     events.push(scanStatusEvent("1", "crawling"));
   if (elapsedMs >= SCAN_TIMELINE.completedAt) {
-    events.push(scanStatusEvent(String(events.length), "completed"));
+    const terminal = scanTerminalStatus(scanTargetId);
+    events.push(scanStatusEvent(String(events.length), terminal));
     events.push({
       id: String(events.length + 1),
       type: "done",
-      status: "completed",
+      status: terminal,
     });
   }
   return events;
@@ -107,9 +140,10 @@ export function scanEventLog(elapsedMs: number): JobEvent[] {
 /** Every future scan transition still to come, for scheduling live SSE. */
 export function pendingScanEvents(
   elapsedMs: number,
+  scanTargetId?: string,
 ): { delayMs: number; event: JobEvent }[] {
   const pending: { delayMs: number; event: JobEvent }[] = [];
-  let nextId = scanEventLog(elapsedMs).length;
+  let nextId = scanEventLog(elapsedMs, scanTargetId).length;
 
   if (elapsedMs < SCAN_TIMELINE.crawlingAt) {
     pending.push({
@@ -121,12 +155,16 @@ export function pendingScanEvents(
   if (elapsedMs < SCAN_TIMELINE.completedAt) {
     pending.push({
       delayMs: SCAN_TIMELINE.completedAt - elapsedMs,
-      event: scanStatusEvent(String(nextId), "completed"),
+      event: scanStatusEvent(String(nextId), scanTerminalStatus(scanTargetId)),
     });
     nextId += 1;
     pending.push({
       delayMs: SCAN_TIMELINE.completedAt - elapsedMs,
-      event: { id: String(nextId), type: "done", status: "completed" },
+      event: {
+        id: String(nextId),
+        type: "done",
+        status: scanTerminalStatus(scanTargetId),
+      },
     });
   }
   return pending;
@@ -153,6 +191,8 @@ function step(
   return {
     at,
     step: {
+      id: `stp_${index}`,
+      plan_step_id: null,
       index,
       action: "click",
       target: `#step-${index}`,
@@ -220,6 +260,36 @@ export const LIVE_STALL_TIMELINE: RunTimeline = {
   finalStatus: "timed_out",
 };
 
+/**
+ * A run of an APPROVED plan (B0.5 B7): one executed step per approved plan
+ * step, in the approved order, each pointing back at its plan step
+ * (`plan_step_id`) - so a proof can say what was approved and what ran.
+ */
+export function timelineForPlan(plan: Plan): RunTimeline {
+  const approvedIds = plan.approval?.step_ids ?? [];
+  const steps = approvedIds.map((planStepId, i) => {
+    const planStep = plan.steps.find((s) => s.id === planStepId)!;
+    const target =
+      planStep.binding.type === "element"
+        ? planStep.binding.locator
+        : planStep.binding.type === "page"
+          ? planStep.binding.page_url
+          : "";
+    return step(i, i * 1_200, {
+      id: `stp_${planStepId}`,
+      plan_step_id: planStepId,
+      action: planStep.action,
+      target,
+      message: planStep.description,
+    });
+  });
+  return {
+    steps,
+    resolvesAt: steps.length * 1_200 + 700,
+    finalStatus: "passed",
+  };
+}
+
 export function computeRunState(
   base: Run,
   timeline: RunTimeline,
@@ -232,6 +302,8 @@ export function computeRunState(
 
   if (resolved && timeline.finalStatus === "timed_out") {
     stepsSoFar.push({
+      id: "stp_timeout",
+      plan_step_id: null,
       index: stepsSoFar.length,
       action: "timeout",
       target: "engine",
@@ -259,6 +331,12 @@ export function computeRunState(
       : null,
     proof_id:
       resolved && timeline.finalStatus !== "timed_out" ? base.proof_id : null,
+    // B0.5 B9: the report exists once the run has finished (a timed-out run
+    // produced none - the engine went silent).
+    report_url:
+      resolved && timeline.finalStatus !== "timed_out"
+        ? reportUrl(base.id)
+        : null,
   };
 }
 

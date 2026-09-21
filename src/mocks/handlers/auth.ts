@@ -4,6 +4,7 @@ import {
   MagicLinkResponseSchema,
   VerifyResponseSchema,
 } from "@/lib/contract";
+import { mockAccount } from "../store";
 import { json, errorResponse } from "../respond";
 
 const SESSION_COOKIE = "session=demo_user";
@@ -36,7 +37,10 @@ export const authHandlers = [
     if (!cookie.includes(SESSION_COOKIE)) {
       return errorResponse(401, "unauthenticated", "No session.");
     }
-    return json(MeResponseSchema, demoUser);
+    return json(MeResponseSchema, {
+      ...demoUser,
+      capabilities: { write_actions: mockAccount.writeActions },
+    });
   }),
 
   http.post("*/auth/logout", async () => {

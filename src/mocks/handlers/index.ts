@@ -6,6 +6,8 @@ import { runHandlers } from "./runs";
 import { eventHandlers } from "./events";
 import { suiteHandlers } from "./suites";
 import { targetHandlers } from "./targets";
+import { planHandlers } from "./plans";
+import { loginSessionHandlers } from "./loginSessions";
 import { proofHandlers } from "./proofs";
 import { usageHandlers } from "./usage";
 
@@ -18,6 +20,8 @@ export const handlers = [
   ...eventHandlers,
   ...suiteHandlers,
   ...targetHandlers,
+  ...planHandlers,
+  ...loginSessionHandlers,
   ...proofHandlers,
   ...usageHandlers,
 ];

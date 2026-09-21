@@ -116,6 +116,19 @@
             "type": "string",
             "format": "email"
           },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "write_actions": {
+                "type": "boolean",
+                "description": "Whether this account may run steps that change state in a target application (`action_class: write`). False on the read-only tier. The UI reads this to show write steps blocked up front; the SERVER is still authoritative and marks each affected plan step `blocked`."
+              }
+            },
+            "required": [
+              "write_actions"
+            ],
+            "description": "REQUIRED (B0.5 B7). What this account's tier permits. An object, not a tier name, so a capability can be added without the client having to know what tier implies it."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -126,6 +139,7 @@
         "required": [
           "id",
           "email",
+          "capabilities",
           "created_at"
         ]
       },
@@ -147,7 +161,8 @@
               "error",
               "terminated"
             ],
-            "description": "Lifecycle state of the engine process backing this workspace."
+            "description": "Lifecycle state of the engine process backing this workspace. Describes the ENGINE PROCESS only - a customer's sign-in state is a LoginSession, not a workspace state. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
           },
           "error": {
             "type": [
@@ -211,7 +226,8 @@
               "completed",
               "failed"
             ],
-            "description": "`parked` means the crawl is waiting on a manual sign-in."
+            "description": "Scan-shaped subset of the JobStatus vocabulary. `parked` means the crawl is waiting on a manual sign-in. Extensible: clients MUST tolerate unknown members.",
+            "x-extensible-enum": true
           },
           "parked_reason": {
             "type": [
@@ -219,6 +235,18 @@
               "null"
             ],
             "description": "Set when status is `parked`, e.g. `login_required`."
+          },
+          "failure": {
+            "$ref": "#/components/schemas/ScanFailure"
+          },
+          "login_session_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "The captured login session this scan is crawling under (B0.5 B8), or null.",
+            "example": "run_8f2a1c9d"
           },
           "modules": {
             "type": "array",
@@ -246,10 +274,41 @@
           "target_url",
           "status",
           "parked_reason",
+          "failure",
+          "login_session_id",
           "modules",
           "created_at",
           "updated_at"
         ]
+      },
+      "ScanFailure": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "unreachable",
+              "refused",
+              "timeout",
+              "blocked_by_guardrail",
+              "internal"
+            ],
+            "description": "Why a scan failed. `unreachable`: DNS/connection failure - the URL may be wrong or the site down. `refused`: the site answered and denied us (403/WAF/robots) - the customer must allow our engine. `timeout`: the site was too slow to crawl. `blocked_by_guardrail`: WE refused the target (e.g. a private/internal address) - not retryable, change the target. `internal`: our fault - retry, then contact support. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable, safe to show a customer as-is. MUST NOT contain page content, cookies, tokens, or anything typed into the browser."
+          }
+        },
+        "required": [
+          "kind",
+          "message"
+        ],
+        "description": "REQUIRED (B0.5 B4). MUST be non-null exactly when `status` is `failed`, and null otherwise."
       },
       "Module": {
         "type": "object",
@@ -324,12 +383,29 @@
             "minLength": 1,
             "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
             "example": "run_8f2a1c9d"
+          },
+          "login_session_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Crawl under an already-captured login session (B0.5 B8). Omit for an unauthenticated crawl; a crawl that then needs sign-in parks with `login_required`.",
+            "example": "run_8f2a1c9d"
           }
         },
         "required": [
           "workspace_id",
           "target_id"
         ]
+      },
+      "ContinueScanRequest": {
+        "type": "object",
+        "properties": {
+          "login_session_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Attach a completed login session to a scan parked with `login_required`. Required in that case (B0.5 B8).",
+            "example": "run_8f2a1c9d"
+          }
+        }
       },
       "InspectResponse": {
         "type": "object",
@@ -369,6 +445,14 @@
             "type": "string",
             "description": "Best-effort human label - visible text, aria-label, or similar."
           },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "REQUIRED (B0.5 B6). What the element IS: its computed ARIA role (`button`, `link`, `textbox`, `heading`, `checkbox`...), null when it has no meaningful role (a generic container). Distinct from `locator_strategy`, which is how we FIND it, not what it is - the inventory screen exists to show whether the system understands the app, and the lookup strategy does not answer that. An open string, not an enum: ARIA's vocabulary is large and owned by a standard.",
+            "example": "button"
+          },
           "locator": {
             "type": "string"
           },
@@ -381,7 +465,8 @@
               "text",
               "test_id"
             ],
-            "description": "How `locator` should be interpreted by the runner."
+            "description": "How `locator` should be interpreted by the runner. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
           },
           "uniquely_locatable": {
             "type": "boolean",
@@ -399,6 +484,7 @@
           "id",
           "page_url",
           "label",
+          "role",
           "locator",
           "locator_strategy",
           "uniquely_locatable",
@@ -448,9 +534,30 @@
             "example": "run_8f2a1c9d"
           },
           "suite_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "minLength": 1,
-            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "description": "The suite this run executed, or null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set.",
+            "example": "run_8f2a1c9d"
+          },
+          "plan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "REQUIRED (B0.5 B7). The approved plan this run executes, or null for a suite run. A run references the plan it came from; that plan is immutable.",
+            "example": "run_8f2a1c9d"
+          },
+          "login_session_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "The captured login session the run used (B0.5 B8), or null. An opaque reference - the session itself is never returned by any endpoint.",
             "example": "run_8f2a1c9d"
           },
           "status": {
@@ -463,7 +570,8 @@
               "cancelled",
               "timed_out"
             ],
-            "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure."
+            "description": "Overall run status - the run-shaped subset of the JobStatus vocabulary. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Extensible: new members MAY be added; clients MUST tolerate unknown members.",
+            "x-extensible-enum": true
           },
           "pass_rate": {
             "type": "number",
@@ -503,6 +611,14 @@
             "description": "ISO 8601 UTC timestamp.",
             "example": "2026-09-16T14:32:00Z"
           },
+          "report_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "REQUIRED (B0.5 B9). Resolved URL of the engine's generated HTML report (`GET /runs/{id}/report`), or null until the run finishes. Session-scoped, like every other authenticated URL here - never a token in the URL. UNTRUSTED CONTENT: see the endpoint."
+          },
           "steps": {
             "type": "array",
             "items": {
@@ -515,6 +631,8 @@
           "workspace_id",
           "target_id",
           "suite_id",
+          "plan_id",
+          "login_session_id",
           "status",
           "pass_rate",
           "coverage",
@@ -522,6 +640,7 @@
           "proof_id",
           "started_at",
           "finished_at",
+          "report_url",
           "steps"
         ]
       },
@@ -547,9 +666,25 @@
       "Step": {
         "type": "object",
         "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "REQUIRED (B0.5 B1). Stable identity of this step, unique within its run: minted when the step is created and never derived from its position. Clients key step state on this, not on `index` - a run whose steps are re-indexed (a plan edit, an inserted retry) must not merge two distinct steps into one. The same `id` appears on every event and response that mentions the step.",
+            "example": "stp_3f9a1c"
+          },
           "index": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Display order only. Not an identity - see `id`."
+          },
+          "plan_step_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "The approved plan step this executed step came from; null for a run that did not come from a plan. Lets a proof say what was approved and what actually ran.",
+            "example": "run_8f2a1c9d"
           },
           "action": {
             "type": "string",
@@ -575,7 +710,8 @@
               "warning",
               "queued"
             ],
-            "description": "Per-step status. Matches the design system's status token names 1:1."
+            "description": "Per-step status. Matches the design system's status token names 1:1. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
           },
           "message": {
             "type": "string",
@@ -595,7 +731,9 @@
           }
         },
         "required": [
+          "id",
           "index",
+          "plan_step_id",
           "action",
           "target",
           "assertion",
@@ -614,22 +752,33 @@
             "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
             "example": "run_8f2a1c9d"
           },
-          "suite_id": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
-            "example": "run_8f2a1c9d"
-          },
           "target_id": {
             "type": "string",
             "minLength": 1,
             "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
             "example": "run_8f2a1c9d"
+          },
+          "suite_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run an existing suite. Exactly one of `suite_id` / `plan_id` MUST be given; anything else is a 422 `invalid_request`.",
+            "example": "run_8f2a1c9d"
+          },
+          "plan_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Run an APPROVED plan (B0.5 B7) - what executes is the plan's approved step list, in that order. A plan that is not `approved` is a 409 `plan_not_approved`.",
+            "example": "run_8f2a1c9d"
+          },
+          "login_session_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A `completed`, unexpired login session to run under (B0.5 B8). Opaque reference; no credential ever crosses this API.",
+            "example": "run_8f2a1c9d"
           }
         },
         "required": [
           "workspace_id",
-          "suite_id",
           "target_id"
         ]
       },
@@ -655,9 +804,30 @@
             "example": "run_8f2a1c9d"
           },
           "suite_id": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "minLength": 1,
-            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "description": "The suite this run executed, or null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set.",
+            "example": "run_8f2a1c9d"
+          },
+          "plan_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "REQUIRED (B0.5 B7). The approved plan this run executes, or null for a suite run. A run references the plan it came from; that plan is immutable.",
+            "example": "run_8f2a1c9d"
+          },
+          "login_session_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "description": "The captured login session the run used (B0.5 B8), or null. An opaque reference - the session itself is never returned by any endpoint.",
             "example": "run_8f2a1c9d"
           },
           "status": {
@@ -670,7 +840,8 @@
               "cancelled",
               "timed_out"
             ],
-            "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure."
+            "description": "Overall run status - the run-shaped subset of the JobStatus vocabulary. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Extensible: new members MAY be added; clients MUST tolerate unknown members.",
+            "x-extensible-enum": true
           },
           "pass_rate": {
             "type": "number",
@@ -716,6 +887,8 @@
           "workspace_id",
           "target_id",
           "suite_id",
+          "plan_id",
+          "login_session_id",
           "status",
           "pass_rate",
           "coverage",
@@ -732,7 +905,9 @@
             "properties": {
               "id": {
                 "type": "string",
-                "description": "Monotonically increasing within the job; pass the last-seen value as `?since=` to resume."
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "example": "42"
               },
               "type": {
                 "type": "string",
@@ -742,7 +917,19 @@
               },
               "status": {
                 "type": "string",
-                "description": "New job-level status, e.g. a ScanStatus or RunStatus value."
+                "enum": [
+                  "queued",
+                  "crawling",
+                  "parked",
+                  "running",
+                  "completed",
+                  "passed",
+                  "failed",
+                  "cancelled",
+                  "timed_out"
+                ],
+                "description": "New job-level status (B0.5 B5: the same JobStatus vocabulary as the Scan and Run resources, no longer a bare string).",
+                "x-extensible-enum": true
               }
             },
             "required": [
@@ -755,7 +942,10 @@
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "example": "42"
               },
               "type": {
                 "type": "string",
@@ -789,7 +979,10 @@
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "example": "42"
               },
               "type": {
                 "type": "string",
@@ -811,7 +1004,10 @@
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "example": "42"
               },
               "type": {
                 "type": "string",
@@ -825,7 +1021,9 @@
                   "info",
                   "warning",
                   "error"
-                ]
+                ],
+                "description": "Log severity. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                "x-extensible-enum": true
               },
               "message": {
                 "type": "string"
@@ -842,7 +1040,10 @@
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "pattern": "^(0|[1-9][0-9]*)$",
+                "description": "Position in the job's event sequence: a non-negative integer in canonical decimal form (no sign, no leading zeros, at most 9007199254740991), STRICTLY increasing within a job. Compare numerically. Gaps are permitted; reordering and reuse are not. Pass the last-seen value as `?since=` to resume - events with a greater id are delivered.",
+                "example": "42"
               },
               "type": {
                 "type": "string",
@@ -851,13 +1052,53 @@
                 ]
               },
               "status": {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "crawling",
+                  "parked",
+                  "running",
+                  "completed",
+                  "passed",
+                  "failed",
+                  "cancelled",
+                  "timed_out"
+                ],
+                "description": "Terminal job status. The server closes the stream after this frame; a client MUST NOT reconnect to a job it has received `done` for.",
+                "x-extensible-enum": true
               }
             },
             "required": [
               "id",
               "type",
               "status"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "heartbeat"
+                ]
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 UTC timestamp.",
+                "example": "2026-09-16T14:32:00Z"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Always 15000 in this version of the contract."
+              }
+            },
+            "required": [
+              "type",
+              "at",
+              "interval_ms"
             ]
           }
         ]
@@ -975,7 +1216,11 @@
               "staging",
               "production"
             ],
-            "description": "Named environment a target belongs to."
+            "description": "Named environment a target belongs to. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
+          "last_scan": {
+            "$ref": "#/components/schemas/ScanSummary"
           },
           "created_at": {
             "type": "string",
@@ -995,9 +1240,59 @@
           "name",
           "base_url",
           "environment",
+          "last_scan",
           "created_at",
           "updated_at"
         ]
+      },
+      "ScanSummary": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "crawling",
+              "parked",
+              "completed",
+              "failed"
+            ],
+            "description": "Scan-shaped subset of the JobStatus vocabulary. `parked` means the crawl is waiting on a manual sign-in. Extensible: clients MUST tolerate unknown members.",
+            "x-extensible-enum": true
+          },
+          "failure": {
+            "$ref": "#/components/schemas/ScanFailure"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "failure",
+          "created_at",
+          "updated_at"
+        ],
+        "description": "REQUIRED (B0.5 B4). The most recent scan of this target, or null if it has never been scanned. A summary on the Target rather than a scan-list endpoint so the targets list is one round trip, not N+1."
       },
       "CreateTargetRequest": {
         "type": "object",
@@ -1018,7 +1313,8 @@
               "staging",
               "production"
             ],
-            "description": "Named environment a target belongs to."
+            "description": "Named environment a target belongs to. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
           }
         },
         "required": [
@@ -1046,11 +1342,12 @@
               "staging",
               "production"
             ],
-            "description": "Named environment a target belongs to."
+            "description": "Named environment a target belongs to. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
           }
         }
       },
-      "Proof": {
+      "Plan": {
         "type": "object",
         "properties": {
           "id": {
@@ -1059,16 +1356,558 @@
             "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
             "example": "run_8f2a1c9d"
           },
-          "run_id": {
+          "workspace_id": {
             "type": "string",
             "minLength": 1,
             "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
             "example": "run_8f2a1c9d"
           },
-          "hash": {
+          "target_id": {
             "type": "string",
-            "description": "Tamper-evident hash over the canonical step sequence, e.g. sha256 hex digest.",
-            "example": "sha256:9f2c..."
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "scan_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The scan whose inventory the plan was grounded against.",
+            "example": "run_8f2a1c9d"
+          },
+          "intent": {
+            "type": "string",
+            "description": "What the person asked for, verbatim."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "generating",
+              "proposed",
+              "approved",
+              "discarded",
+              "failed"
+            ],
+            "description": "`generating`: the planner is still working (steps empty). `proposed`: ready for review, executes nothing. `approved`: a human approved a list of its steps; a run may now execute it. `discarded`: abandoned unapproved. `failed`: the planner could not produce a plan. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanStep"
+            },
+            "description": "The proposed steps, in proposed order. Empty while `generating`. IMMUTABLE once the plan leaves `generating`."
+          },
+          "failure": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "message"
+            ],
+            "description": "Non-null exactly when `status` is `failed`."
+          },
+          "approval": {
+            "$ref": "#/components/schemas/PlanApproval"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "target_id",
+          "scan_id",
+          "intent",
+          "status",
+          "steps",
+          "failure",
+          "approval",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "PlanStep": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable, unique within the plan. Carried onto the executed run's `Step.plan_step_id`.",
+            "example": "run_8f2a1c9d"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Proposed order."
+          },
+          "description": {
+            "type": "string",
+            "description": "Plain-English statement of the step, e.g. \"Click the Add to cart button\"."
+          },
+          "action": {
+            "type": "string",
+            "description": "Engine action name, same open vocabulary as `Step.action`."
+          },
+          "input": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Literal text a fill-style action would enter, or null. NEVER a credential: a step that needs one is `ungrounded` with `credential_required`."
+          },
+          "action_class": {
+            "type": "string",
+            "enum": [
+              "read",
+              "write"
+            ],
+            "description": "Whether a step only observes (`read`) or changes state in the target application (`write`: submits a form, deletes, purchases). SAFETY: a client MUST treat an unknown class as `write`. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
+          "binding": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "element"
+                    ]
+                  },
+                  "element_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+                    "example": "run_8f2a1c9d"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "The element's label, frozen at generation. Untrusted text."
+                  },
+                  "role": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "page_url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "locator": {
+                    "type": "string"
+                  },
+                  "uniquely_locatable": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ],
+                    "description": "Always true: a step is bound only to an element the engine can target reliably. An element that is not uniquely locatable yields an `ungrounded` binding, never a shaky `element` one."
+                  }
+                },
+                "required": [
+                  "type",
+                  "element_id",
+                  "label",
+                  "role",
+                  "page_url",
+                  "locator",
+                  "uniquely_locatable"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "page"
+                    ]
+                  },
+                  "page_url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "type",
+                  "page_url"
+                ],
+                "description": "For steps that act on a page rather than an element (`navigate`). Found while building the reference mock: every plan starts with a navigation, which is neither an element step nor ungrounded."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "ungrounded"
+                    ]
+                  },
+                  "reason_code": {
+                    "type": "string",
+                    "enum": [
+                      "no_locator",
+                      "ambiguous_element",
+                      "not_in_inventory",
+                      "login_required",
+                      "credential_required",
+                      "unsupported_action"
+                    ],
+                    "description": "Why the planner could not bind a step to a real element. `credential_required`: the step would have typed a credential - the engine refuses; sign-in goes through a login session, never a plan. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                    "x-extensible-enum": true
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "Human-readable, safe to show as-is; may quote page text - untrusted."
+                  }
+                },
+                "required": [
+                  "type",
+                  "reason_code",
+                  "reason"
+                ]
+              }
+            ],
+            "description": "What the step is bound to: a real inventory element, a page, or nothing (ungrounded). UNGROUNDED STEPS ARE PART OF THE PLAN, not omitted from it: the UI must show them, in place, with the reason (Phase B section 1.3). An ungrounded step cannot be approved."
+          },
+          "blocked": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "reason_code": {
+                "type": "string",
+                "enum": [
+                  "read_only_tier",
+                  "policy"
+                ],
+                "description": "Why an otherwise-groundable step may not run. `read_only_tier`: the account's capabilities do not include write actions (GET /auth/me). Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                "x-extensible-enum": true
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason_code",
+              "message"
+            ],
+            "description": "Non-null when the step may not run for this account (e.g. a write step on a read-only tier). Set by the SERVER - the client does not infer it. A blocked step is shown, in place, with the reason, and cannot be approved."
+          }
+        },
+        "required": [
+          "id",
+          "index",
+          "description",
+          "action",
+          "input",
+          "action_class",
+          "binding",
+          "blocked"
+        ]
+      },
+      "PlanApproval": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "approved_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "step_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "description": "The ordered ids of the plan steps that were approved to run. Steps of the plan absent from this list were left out (removed by the person, or not approvable). Immutable once set."
+          }
+        },
+        "required": [
+          "approved_at",
+          "step_ids"
+        ],
+        "description": "Non-null exactly when `status` is `approved`. Immutable."
+      },
+      "CreatePlanRequest": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "scan_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "workspace_id",
+          "target_id",
+          "scan_id",
+          "intent"
+        ]
+      },
+      "ApprovePlanRequest": {
+        "type": "object",
+        "properties": {
+          "step_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "minItems": 1,
+            "description": "The ordered ids to run: a non-empty subset of the plan's steps, in the order the person chose. No duplicates, no unknown ids, and nothing ungrounded or blocked - any of those is a 422 `invalid_step_selection`. Steps cannot be added or edited: this list is a selection and an ordering, nothing more."
+          }
+        },
+        "required": [
+          "step_ids"
+        ]
+      },
+      "LoginSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "provisioning",
+              "ready",
+              "in_progress",
+              "completed",
+              "expired",
+              "failed",
+              "cancelled"
+            ],
+            "description": "`provisioning`: the live browser is starting. `ready`: it is up and waiting for the customer to open `view_url`. `in_progress`: the customer has connected and is signing in. `completed`: the customer finished and the engine captured the session - runs and scans may reference it. `expired`: `expires_at` passed before completion (or, once completed, the captured session is no longer usable). `failed`: see `failure`. `cancelled`: abandoned. (\"Not started\" is not a server state - it is the absence of a LoginSession.) Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
+          "view_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Where the customer reaches the live browser. Non-null only while `ready` / `in_progress`. MUST be on a separate origin from the app (a remote-browser stream is an untrusted-content origin) and MUST NOT be a long-lived bearer link: it MAY carry a single-use ticket, valid for at most 60 seconds, exchanged on first load for an httpOnly cookie scoped to that origin, after which it is useless. This is the one deliberate exception to 'never a token in a URL' (docs/API_CONTRACT.md), and is what makes the live view usable cross-origin at all. Re-fetch the session to get a fresh one; never store it."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this session stops being usable: before completion, the deadline to finish signing in; after completion, when the captured session lapses for runs. One field, stage-dependent meaning, so a client only ever asks one question of it - is it past yet.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "failure": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "browser_unavailable",
+                  "no_session_detected",
+                  "internal"
+                ],
+                "description": "`browser_unavailable`: the live browser could not be started or died. `no_session_detected`: the customer said they were done but no signed-in session was found. `internal`: our fault. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                "x-extensible-enum": true
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "description": "Non-null exactly when `status` is `failed`."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "target_id",
+          "status",
+          "view_url",
+          "expires_at",
+          "failure",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "CreateLoginSessionRequest": {
+        "type": "object",
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          }
+        },
+        "required": [
+          "workspace_id",
+          "target_id"
+        ]
+      },
+      "Proof": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PublicProof"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+                "example": "run_8f2a1c9d"
+              },
+              "share": {
+                "$ref": "#/components/schemas/Share"
+              }
+            },
+            "required": [
+              "run_id",
+              "share"
+            ]
+          }
+        ]
+      },
+      "ProofSnapshot": {
+        "type": "object",
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "cancelled",
+              "timed_out"
+            ],
+            "description": "The terminal outcome of the run this proof attests to, frozen at creation. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
+          "pass_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Frozen. Never shown without `coverage` (Phase B section 1.2)."
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "base_url": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "name",
+              "base_url"
+            ],
+            "description": "A frozen COPY of the target's name and URL - not a reference. Renaming or deleting the target later does not alter the proof."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 0
           },
           "token_cost": {
             "type": "number",
@@ -1078,26 +1917,170 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Step"
-            }
+            },
+            "description": "Every step with its status and reason (`message`). `screenshot_url` is authorized per endpoint - see the Proof/PublicProof endpoints."
           },
-          "share": {
-            "$ref": "#/components/schemas/Share"
+          "plan": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+                "example": "run_8f2a1c9d"
+              },
+              "intent": {
+                "type": "string"
+              },
+              "approved_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 UTC timestamp.",
+                "example": "2026-09-16T14:32:00Z"
+              },
+              "approved_steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+                      "example": "run_8f2a1c9d"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "action_class": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ],
+                      "description": "Whether a step only observes (`read`) or changes state in the target application (`write`: submits a form, deletes, purchases). SAFETY: a client MUST treat an unknown class as `write`. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                      "x-extensible-enum": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "description",
+                    "action_class"
+                  ]
+                }
+              },
+              "excluded_steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+                      "example": "run_8f2a1c9d"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "action_class": {
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ],
+                      "description": "Whether a step only observes (`read`) or changes state in the target application (`write`: submits a form, deletes, purchases). SAFETY: a client MUST treat an unknown class as `write`. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                      "x-extensible-enum": true
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "removed_by_user",
+                        "ungrounded",
+                        "blocked"
+                      ],
+                      "description": "Why a proposed step was not approved to run. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                      "x-extensible-enum": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "description",
+                    "action_class",
+                    "reason"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "intent",
+              "approved_at",
+              "approved_steps",
+              "excluded_steps"
+            ],
+            "description": "What was PROPOSED and what was APPROVED, frozen from the plan. Null for a run that came from a suite rather than a plan. A proof that cannot say what was approved is not a proof."
           },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "description": "ISO 8601 UTC timestamp.",
-            "example": "2026-09-16T14:32:00Z"
+          "uncovered_total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "MUST equal `coverage.candidate - coverage.generated`. The gap, as a number."
+          },
+          "uncovered": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "description": "Untrusted text."
+                },
+                "page_url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "reason_code": {
+                  "type": "string",
+                  "enum": [
+                    "not_uniquely_locatable",
+                    "ungrounded",
+                    "skipped",
+                    "blocked"
+                  ],
+                  "description": "Why a candidate element has no executed scenario. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+                  "x-extensible-enum": true
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Untrusted text."
+                }
+              },
+              "required": [
+                "label",
+                "page_url",
+                "reason_code",
+                "reason"
+              ]
+            },
+            "description": "WHICH candidates were not covered, with why - what the public page shows under 'not covered'. At most 200 entries; `uncovered_total` is the true count when there are more. A proof that hides the gaps is not a proof."
           }
         },
         "required": [
-          "id",
-          "run_id",
-          "hash",
+          "verdict",
+          "pass_rate",
+          "coverage",
+          "target",
+          "started_at",
+          "finished_at",
+          "duration_ms",
           "token_cost",
           "steps",
-          "share",
-          "created_at"
+          "plan",
+          "uncovered_total",
+          "uncovered"
         ]
       },
       "Share": {
@@ -1132,6 +2115,37 @@
           "url",
           "enabled",
           "expires_at"
+        ]
+      },
+      "PublicProof": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "hash": {
+            "type": "string",
+            "description": "Tamper-evident hash over the canonical JSON of `snapshot`, e.g. sha256 hex digest.",
+            "example": "sha256:9f2c..."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ProofSnapshot"
+          }
+        },
+        "required": [
+          "id",
+          "hash",
+          "created_at",
+          "snapshot"
         ]
       },
       "CreateShareRequest": {
@@ -1579,6 +2593,16 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContinueScanRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Crawl resumed.",
@@ -1749,10 +2773,11 @@
                 "cancelled",
                 "timed_out"
               ],
-              "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure."
+              "description": "Overall run status - the run-shaped subset of the JobStatus vocabulary. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Extensible: new members MAY be added; clients MUST tolerate unknown members.",
+              "x-extensible-enum": true
             },
             "required": false,
-            "description": "Overall run status. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Added while building the mock's stateful lifecycle simulation (Phase A review, §5) - the review asked for \"at least one [run] that stalls and times out\", and the original five-value enum had no way to represent that outcome distinctly from an ordinary failure.",
+            "description": "Overall run status - the run-shaped subset of the JobStatus vocabulary. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Extensible: new members MAY be added; clients MUST tolerate unknown members.",
             "name": "status",
             "in": "query"
           }
@@ -1888,13 +2913,63 @@
         }
       }
     },
+    "/runs/{id}/report": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "summary": "The engine's generated HTML report for a finished run",
+        "description": "REQUIRED (B0.5 B9). **UNTRUSTED CONTENT.** The report is HTML produced from a run against a site we do not control, and it quotes that site's text. It MUST NOT be rendered inline in the app's DOM. The frontend embeds it only in an `<iframe sandbox>` WITHOUT `allow-same-origin`, and the server MUST make that the only safe way to consume it, not merely the recommended one: respond with `Content-Security-Policy: sandbox` (no `allow-same-origin`, no `allow-scripts`), `X-Content-Type-Options: nosniff` and `Content-Disposition: inline`, so even a direct navigation to this URL is sandboxed. Authorization class: session-scoped (same cookie as the rest of the API; never a token in the URL). 404 until the run has finished. There is deliberately no public/proof-scoped variant: the shareable artefact is the Proof snapshot, not this report.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report, as `text/html`. Untrusted - sandbox only.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found, or the run has not finished.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/jobs/{id}/events": {
       "get": {
         "tags": [
           "events"
         ],
         "summary": "Subscribe to a job's events (SSE)",
-        "description": "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`. Reconnect with `?since=<last-seen id>` to resume without re-delivering earlier events. Authenticated by cookie (EventSource sends it automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be served from a sibling subdomain of the app (e.g. app.<domain> / api.<domain>), cookie scoped to the parent domain, so this is same-site and EventSource needs no special handling. Never a token in the query string - see docs/API_CONTRACT.md.",
+        "description": "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`, except `heartbeat`, which has no `id:` line (it is not part of the job's event sequence and never advances `Last-Event-ID` / `?since=`). HEARTBEAT (B0.5 B3, required): the server MUST send a `heartbeat` frame every 15 seconds for as long as the stream is open, whether or not the job is doing anything. A client that has received no frame of any kind for 2.5x the interval (37.5s) can therefore conclude the connection is dead, not merely that the job is quiet - the two are distinguishable facts. EVENT ORDERING (B0.5 B2, required): frame ids are the numeric `EventId` sequence; deliver in increasing order, never reuse. Reconnect with `?since=<last-seen id>` to resume without re-delivering earlier events. Authenticated by cookie (EventSource sends it automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be served from a sibling subdomain of the app (e.g. app.<domain> / api.<domain>), cookie scoped to the parent domain, so this is same-site and EventSource needs no special handling. Never a token in the query string - see docs/API_CONTRACT.md.",
         "security": [
           {
             "cookieAuth": []
@@ -2253,6 +3328,404 @@
         }
       }
     },
+    "/plans": {
+      "post": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Ask for a proposed plan from a plain-English intent",
+        "description": "Always asynchronous, uniformly: returns 201 with `status: generating` and empty steps; poll `GET /plans/{id}` until it leaves `generating`. (One shape, not 'sometimes synchronous' - a client should not have to handle both.) Executes NOTHING.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Plan created, generating.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Target or scan not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plans/{id}": {
+      "get": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Get a plan (poll while generating)",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plans/{id}/approve": {
+      "post": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Approve a proposed plan, with the person's edits",
+        "description": "The single write that turns a proposal into something a run may execute. Records `approval` on the plan and moves it to `approved`; after that the plan is permanently read-only.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovePlanRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The approved plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`plan_not_proposed`: still generating, or already approved / discarded / failed. Approval is not repeatable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`invalid_step_selection` - see the request schema.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/plans/{id}/discard": {
+      "post": {
+        "tags": [
+          "plans"
+        ],
+        "summary": "Abandon a proposed plan",
+        "description": "Nice-to-have. The person cancelled review. Unapproved, undiscarded proposals MAY be garbage-collected after at least 24 hours.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The discarded plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plan"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`plan_not_proposed` - an approved plan cannot be discarded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login-sessions": {
+      "post": {
+        "tags": [
+          "login-sessions"
+        ],
+        "summary": "Start an interactive login for a target",
+        "description": "Boots a live browser at the target for the customer to sign in themselves. Takes no credentials. Returns 201 `provisioning`; poll `GET /login-sessions/{id}` until `ready`.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLoginSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Login session created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginSession"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login-sessions/{id}": {
+      "get": {
+        "tags": [
+          "login-sessions"
+        ],
+        "summary": "Get a login session (poll for readiness / completion / expiry)",
+        "description": "Also the way to obtain a fresh `view_url`. Readiness, completion and expiry are all reported here, by polling - not on the job event stream (a login session is not a long-running job with steps).",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The login session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginSession"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login-sessions/{id}/complete": {
+      "post": {
+        "tags": [
+          "login-sessions"
+        ],
+        "summary": "The customer says they have finished signing in",
+        "description": "Takes no body and no credentials - it is only the customer's statement 'I'm done'. The engine checks that a signed-in session exists and captures it: on success the session becomes `completed`; if none is found, `failed` with kind `no_session_detected`.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The session, now `completed` or `failed`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginSession"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`login_session_not_active`: not `ready`/`in_progress` (already completed, expired, failed or cancelled).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/login-sessions/{id}/cancel": {
+      "post": {
+        "tags": [
+          "login-sessions"
+        ],
+        "summary": "Abandon a login session and tear down its browser",
+        "description": "Nice-to-have: an unfinished session also lapses at `expires_at`.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+              "example": "run_8f2a1c9d"
+            },
+            "required": true,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginSession"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/proofs/{id}": {
       "get": {
         "tags": [
@@ -2322,11 +3795,11 @@
         ],
         "responses": {
           "200": {
-            "description": "The proof.",
+            "description": "The proof, as `PublicProof`: the frozen snapshot and NOTHING else - no run id, no workspace/user ids, no share token, no ids that resolve to authenticated data. Self-contained by construction.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Proof"
+                  "$ref": "#/components/schemas/PublicProof"
                 }
               }
             }

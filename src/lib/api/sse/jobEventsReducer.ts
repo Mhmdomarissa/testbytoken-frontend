@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import type { JobEventSchema, StepSchema } from "@/lib/contract";
+import { eventIdValue } from "@/lib/contract";
 import type { Tolerated, UnrecognisedValue } from "../tolerant";
 
 // Tolerated<...>: a status this client doesn't know is an
@@ -25,7 +26,7 @@ export type Step = Tolerated<z.infer<typeof StepSchema>>;
 export interface JobEventsState {
   /** Every step seen so far, keyed by its index - not an array, so an
    *  out-of-order arrival doesn't need to know how many steps precede it. */
-  steps: Record<number, Step>;
+  steps: Record<string, Step>;
   /** Latest applied job-level status (from a "status" or "done" event), or null before either arrives. */
   status: string | UnrecognisedValue | null;
   progress: { message: string | null; percent: number | null } | null;
@@ -42,7 +43,7 @@ export interface JobEventsState {
   /** Every event id ever applied, for exact-duplicate detection regardless of type. */
   appliedIds: ReadonlySet<string>;
   /** Last-applied event id per step index, so a late/out-of-order step update can be told apart from a newer one. */
-  stepEventIds: Readonly<Record<number, string>>;
+  stepEventIds: Readonly<Record<string, string>>;
   statusEventId: string | null;
   progressEventId: string | null;
 }
@@ -60,26 +61,31 @@ export const initialJobEventsState: JobEventsState = {
 };
 
 /**
- * Event ids are documented (docs/API_CONTRACT.md) as "monotonically
- * increasing within the job" but not specified as numeric - this mock and
- * a plausible real backend both use stringified integers ("0", "1", ...).
- * Falls back to treating a non-numeric id as always-newer (fail open:
- * apply it) rather than silently dropping data we can't order - see the
- * B1 report's contract-ambiguity note.
+ * Event ids are a numeric monotonic sequence in canonical decimal form
+ * (B0.5 B2; docs/API_CONTRACT.md "Event ordering"), so comparison is
+ * numeric and total. An id that is not canonical is not an id: it never
+ * reaches here from the wire (EventIdSchema rejects the frame, and the
+ * hook counts it as unreadable), and if a caller hands one in anyway the
+ * event is IGNORED - never treated as newest, which is the fail-open the
+ * old comparison had.
  */
-function idValue(id: string): number {
-  const n = Number(id);
-  return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
-}
-
 function isNewer(candidateId: string, currentId: string | null): boolean {
-  return currentId === null || idValue(candidateId) > idValue(currentId);
+  const candidate = eventIdValue(candidateId);
+  if (candidate === null) return false;
+  if (currentId === null) return true;
+  const current = eventIdValue(currentId);
+  return current === null || candidate > current;
 }
 
 export function applyJobEvent(
   state: JobEventsState,
   event: JobEvent,
 ): JobEventsState {
+  // Heartbeats are liveness, not history: no id, not part of the event
+  // sequence, no effect on job state. (The hook records their arrival.)
+  if (event.type === "heartbeat") return state;
+  if (eventIdValue(event.id) === null) return state;
+
   const lastEventId = isNewer(event.id, state.lastEventId)
     ? event.id
     : state.lastEventId;
@@ -98,16 +104,16 @@ export function applyJobEvent(
 
   switch (event.type) {
     case "step": {
-      const index = event.step.index;
-      if (!isNewer(event.id, state.stepEventIds[index] ?? null)) {
+      const stepId = event.step.id;
+      if (!isNewer(event.id, state.stepEventIds[stepId] ?? null)) {
         // Shuffled/out-of-order: an older update for a step we've already
         // moved past. Never let it overwrite the newer state we have.
         return base;
       }
       return {
         ...base,
-        steps: { ...state.steps, [index]: event.step },
-        stepEventIds: { ...state.stepEventIds, [index]: event.id },
+        steps: { ...state.steps, [stepId]: event.step },
+        stepEventIds: { ...state.stepEventIds, [stepId]: event.id },
       };
     }
 

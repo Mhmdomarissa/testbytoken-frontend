@@ -21,6 +21,8 @@ import {
 
 function step(index: number, overrides: Partial<Step> = {}): Step {
   return {
+    id: `stp_${index}`,
+    plan_step_id: null,
     index,
     action: "click",
     target: `#step-${index}`,
@@ -74,13 +76,15 @@ function expectConvergedState(state: ReturnType<typeof applyJobEvents>) {
   expect(state.logs[0]?.message).toBe("cookie banner dismissed");
   expect(state.lastEventId).toBe("7");
   expect(Object.keys(state.steps)).toHaveLength(3);
-  expect(state.steps[0]?.status).toBe("pass");
+  expect(state.steps.stp_0?.status).toBe("pass");
   // The REVISION (ev6, higher id) must win over the original (ev3) for
   // the same step index - this is "newer wins", not "last write wins" by
   // arrival order, which the shuffled tests below specifically stress.
-  expect(state.steps[1]?.message).toBe("retried and passed on second attempt");
-  expect(state.steps[2]?.status).toBe("fail");
-  expect(state.steps[2]?.message).toBe("assertion failed");
+  expect(state.steps.stp_1?.message).toBe(
+    "retried and passed on second attempt",
+  );
+  expect(state.steps.stp_2?.status).toBe("fail");
+  expect(state.steps.stp_2?.message).toBe("assertion failed");
 }
 
 describe("applyJobEvents: clean, in-order delivery", () => {
@@ -111,7 +115,7 @@ describe("applyJobEvents: shuffled (out-of-order) delivery", () => {
     // reducer were naively "last write wins by arrival", this order would
     // wrongly leave step 1 at ev3's content.
     const state = applyJobEvents(initialJobEventsState, [ev6, ev3]);
-    expect(state.steps[1]?.message).toBe(
+    expect(state.steps.stp_1?.message).toBe(
       "retried and passed on second attempt",
     );
   });
@@ -191,7 +195,7 @@ describe("applyJobEvents: duplicated delivery", () => {
     // ev3 (step 1, original) redelivered AFTER ev6 (step 1, revision)
     // already won - a duplicate of the loser must still lose.
     const state = applyJobEvents(initialJobEventsState, [ev3, ev6, ev3]);
-    expect(state.steps[1]?.message).toBe(
+    expect(state.steps.stp_1?.message).toBe(
       "retried and passed on second attempt",
     );
   });
@@ -209,7 +213,7 @@ describe("applyJobEvents: gapped delivery (missing events, then backfilled)", ()
       ev7,
     ]);
     expect(Object.keys(partial.steps)).toHaveLength(2); // 0 and 1 only
-    expect(partial.steps[2]).toBeUndefined();
+    expect(partial.steps.stp_2).toBeUndefined();
     // lastEventId reflects the highest id actually SEEN, not the highest
     // that logically exists - this is exactly what a reconnect's
     // `?since=` must resume from, and it must not claim to have seen id
@@ -239,5 +243,91 @@ describe("applyJobEvent: single-event behaviour", () => {
     const state = applyJobEvent(initialJobEventsState, ev7);
     const again = applyJobEvent(state, ev7);
     expect(again).toBe(state);
+  });
+});
+
+describe("B0.5 B1: state is keyed on step id, not position", () => {
+  it("two distinct steps that share an index are two steps, not one merged step", () => {
+    // A re-indexed run (a plan edit, an inserted retry) can put two
+    // different steps at the same `index`. Keyed on index they would
+    // silently merge - one of them vanishing from the UI.
+    const a: JobEvent = {
+      id: "1",
+      type: "step",
+      step: { ...step(0), id: "stp_a", message: "step A" },
+    };
+    const b: JobEvent = {
+      id: "2",
+      type: "step",
+      step: { ...step(0), id: "stp_b", message: "step B" },
+    };
+    const state = applyJobEvents(initialJobEventsState, [a, b]);
+    expect(Object.keys(state.steps).sort()).toEqual(["stp_a", "stp_b"]);
+    expect(state.steps.stp_a?.message).toBe("step A");
+    expect(state.steps.stp_b?.message).toBe("step B");
+  });
+
+  it("the same step id at a different index is one step, updated - identity survives re-indexing", () => {
+    const first: JobEvent = {
+      id: "1",
+      type: "step",
+      step: { ...step(2), id: "stp_x" },
+    };
+    const reindexed: JobEvent = {
+      id: "5",
+      type: "step",
+      step: { ...step(0), id: "stp_x", message: "moved" },
+    };
+    const state = applyJobEvents(initialJobEventsState, [reindexed, first]);
+    expect(Object.keys(state.steps)).toEqual(["stp_x"]);
+    expect(state.steps.stp_x?.index).toBe(0);
+    expect(state.steps.stp_x?.message).toBe("moved");
+  });
+});
+
+describe("B0.5 B2: event id ordering is numeric and total, and never fails open", () => {
+  it("compares numerically, not lexicographically - id 10 is newer than id 9", () => {
+    const nine: JobEvent = { id: "9", type: "status", status: "queued" };
+    const ten: JobEvent = { id: "10", type: "status", status: "running" };
+    expect(applyJobEvents(initialJobEventsState, [ten, nine]).status).toBe(
+      "running",
+    );
+    expect(applyJobEvents(initialJobEventsState, [nine, ten]).lastEventId).toBe(
+      "10",
+    );
+  });
+
+  it.each([
+    "",
+    "abc",
+    "01",
+    "-1",
+    "1.5",
+    "1e3",
+    "9007199254740993",
+    "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  ])(
+    "an id that is not canonical (%j) is ignored - never treated as newest",
+    (badId) => {
+      const good: JobEvent = { id: "3", type: "status", status: "running" };
+      const bad: JobEvent = { id: badId, type: "status", status: "failed" };
+      const state = applyJobEvents(initialJobEventsState, [good, bad]);
+      expect(state.status).toBe("running");
+      expect(state.lastEventId).toBe("3");
+    },
+  );
+});
+
+describe("B0.5 B3: heartbeats are liveness, not history", () => {
+  it("a heartbeat changes nothing - and cannot advance the resume point", () => {
+    const beat: JobEvent = {
+      type: "heartbeat",
+      at: "2026-09-21T12:00:00Z",
+      interval_ms: 15_000,
+    };
+    const before = applyJobEvents(initialJobEventsState, [ev0, ev1]);
+    const after = applyJobEvent(before, beat);
+    expect(after).toBe(before); // same reference: literally nothing happened
+    expect(after.lastEventId).toBe("1");
   });
 });

@@ -7,5 +7,7 @@ export * from "./runs";
 export * from "./events";
 export * from "./suites";
 export * from "./targets";
+export * from "./plans";
+export * from "./login-sessions";
 export * from "./proofs";
 export * from "./usage";

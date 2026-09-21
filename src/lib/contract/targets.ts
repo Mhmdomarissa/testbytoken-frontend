@@ -7,6 +7,7 @@ import {
   IdSchema,
   TimestampSchema,
 } from "./common";
+import { ScanSummarySchema } from "./scans";
 
 /**
  * A target is the customer's application under test. `environment` is a
@@ -21,6 +22,12 @@ export const TargetSchema = z
     name: z.string(),
     base_url: z.url(),
     environment: EnvironmentSchema,
+    last_scan: ScanSummarySchema.nullable().openapi({
+      description:
+        "REQUIRED (B0.5 B4). The most recent scan of this target, or null if " +
+        "it has never been scanned. A summary on the Target rather than a " +
+        "scan-list endpoint so the targets list is one round trip, not N+1.",
+    }),
     created_at: TimestampSchema,
     updated_at: TimestampSchema,
   })

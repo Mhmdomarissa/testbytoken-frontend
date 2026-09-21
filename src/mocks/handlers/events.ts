@@ -1,6 +1,10 @@
 import { http, HttpResponse } from "msw";
 import type { z } from "zod";
-import { JobEventSchema, RunDetailSchema } from "@/lib/contract";
+import {
+  HEARTBEAT_INTERVAL_MS,
+  JobEventSchema,
+  RunDetailSchema,
+} from "@/lib/contract";
 import { runStore, scanStore } from "../store";
 import {
   LIVE_RUN_TIMELINES,
@@ -12,10 +16,24 @@ import {
   pendingScanEvents,
 } from "../lifecycle";
 
-type JobEvent = z.infer<typeof JobEventSchema>;
+type WireEvent = z.infer<typeof JobEventSchema>;
+type JobEvent = Exclude<WireEvent, { type: "heartbeat" }>;
 
-function sseFrame(event: JobEvent): string {
+export function sseFrame(event: WireEvent): string {
+  // A heartbeat has no `id:` line: it is not part of the job's event
+  // sequence and must never advance Last-Event-ID / ?since= (B0.5 B3).
+  if (event.type === "heartbeat") {
+    return `data: ${JSON.stringify(event)}\n\n`;
+  }
   return `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`;
+}
+
+export function heartbeatFrame(): string {
+  return sseFrame({
+    type: "heartbeat",
+    at: new Date().toISOString(),
+    interval_ms: HEARTBEAT_INTERVAL_MS,
+  });
 }
 
 /** Static replay log for a run with no lifecycle (already finished). */
@@ -87,8 +105,10 @@ export const eventHandlers = [
       pending = [];
     } else {
       const elapsed = elapsedMsFor(jobId);
-      backlog = scanEventLog(elapsed);
-      pending = LIVE_SCAN_IDS.has(jobId) ? pendingScanEvents(elapsed) : [];
+      backlog = scanEventLog(elapsed, scan?.target_id);
+      pending = LIVE_SCAN_IDS.has(jobId)
+        ? pendingScanEvents(elapsed, scan?.target_id)
+        : [];
     }
 
     backlog = backlog.filter((e) => Number(e.id) > since);
@@ -98,10 +118,15 @@ export const eventHandlers = [
     // spec), so a `const` declared after the constructor call would still
     // be in its temporal dead zone when `start()` tries to use it.
     const timers: ReturnType<typeof setTimeout>[] = [];
+    let heartbeat: ReturnType<typeof setInterval> | undefined;
+    const stopHeartbeat = () => {
+      if (heartbeat !== undefined) clearInterval(heartbeat);
+    };
 
     const stream = new ReadableStream({
       cancel() {
         for (const t of timers) clearTimeout(t);
+        stopHeartbeat();
       },
       start(controller) {
         for (const event of backlog) {
@@ -124,13 +149,22 @@ export const eventHandlers = [
           !alreadyDropped.has(jobId);
         if (dropThisConnection) alreadyDropped.add(jobId);
 
+        // Contract (B0.5 B3): a heartbeat every 15s for as long as the
+        // stream is open, whether or not the job is doing anything.
+        heartbeat = setInterval(() => {
+          controller.enqueue(encoder.encode(heartbeatFrame()));
+        }, HEARTBEAT_INTERVAL_MS);
+
         for (const { delayMs, event } of pending) {
           // A dropped connection never delivers what would have arrived
           // after the drop - the client has to get it via ?since=.
           if (dropThisConnection && delayMs >= DROP_AFTER_MS) continue;
           const t = setTimeout(() => {
             controller.enqueue(encoder.encode(sseFrame(event)));
-            if (event.type === "done") controller.close();
+            if (event.type === "done") {
+              stopHeartbeat();
+              controller.close();
+            }
           }, delayMs);
           timers.push(t);
         }
@@ -138,6 +172,7 @@ export const eventHandlers = [
         if (dropThisConnection) {
           timers.push(
             setTimeout(() => {
+              stopHeartbeat();
               controller.error(new Error("simulated connection drop"));
             }, DROP_AFTER_MS),
           );
@@ -145,6 +180,7 @@ export const eventHandlers = [
 
         request.signal.addEventListener("abort", () => {
           for (const t of timers) clearTimeout(t);
+          stopHeartbeat();
         });
       },
     });

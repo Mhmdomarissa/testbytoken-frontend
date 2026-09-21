@@ -4,6 +4,7 @@ import type {
   ModuleSchema,
   PageSchema,
   ProofSchema,
+  ProofSnapshotSchema,
   RunDetailSchema,
   ScanSchema,
   StepSchema,
@@ -52,6 +53,9 @@ export const targetCheckout: z.infer<typeof TargetSchema> = {
   name: "Checkout",
   base_url: "https://checkout.example.com",
   environment: "production",
+  // Overlaid with the real most-recent scan by handlers/targets.ts (a
+  // fixture can't know about scans started after it was written).
+  last_scan: null,
   created_at: now,
   updated_at: now,
 };
@@ -61,11 +65,26 @@ export const targetEmpty: z.infer<typeof TargetSchema> = {
   name: "Freshly added target",
   base_url: "https://new.example.com",
   environment: "staging",
+  last_scan: null, // genuinely never scanned - the "empty account" case
   created_at: now,
   updated_at: now,
 };
 
-export const targets = [targetCheckout, targetEmpty];
+/**
+ * A target whose scan FAILED, so scan failure is a designed state a screen
+ * can be built against (B0.5 B4) rather than a status with no reason.
+ */
+export const targetUnreachable: z.infer<typeof TargetSchema> = {
+  id: "tgt_unreachable",
+  name: "Legacy admin",
+  base_url: "https://legacy-admin.example.com",
+  environment: "test",
+  last_scan: null,
+  created_at: now,
+  updated_at: now,
+};
+
+export const targets = [targetCheckout, targetEmpty, targetUnreachable];
 
 // ---------------------------------------------------------------------
 // Scan - modules/pages, including the XSS title, a zero-locatable module,
@@ -112,6 +131,8 @@ export const scanCheckout: z.infer<typeof ScanSchema> = {
   target_url: targetCheckout.base_url,
   status: "completed",
   parked_reason: null,
+  failure: null,
+  login_session_id: null,
   modules: [modCheckout, modSettings],
   created_at: now,
   updated_at: now,
@@ -126,12 +147,34 @@ export const scanParked: z.infer<typeof ScanSchema> = {
   target_url: targetCheckout.base_url,
   status: "parked",
   parked_reason: "login_required",
+  failure: null,
+  login_session_id: null,
   modules: [modCheckout],
   created_at: now,
   updated_at: now,
 };
 
-export const scans = [scanCheckout, scanParked];
+// A failed scan: the structured KIND is what decides what the user does
+// next (unreachable -> check the URL; refused -> allow our engine; ...).
+export const scanFailed: z.infer<typeof ScanSchema> = {
+  id: "scan_failed_1",
+  workspace_id: workspace.id,
+  target_id: targetUnreachable.id,
+  target_url: targetUnreachable.base_url,
+  status: "failed",
+  parked_reason: null,
+  failure: {
+    kind: "unreachable",
+    message:
+      "We couldn't reach legacy-admin.example.com - the name did not resolve. Check the address, or that the site is up.",
+  },
+  login_session_id: null,
+  modules: [],
+  created_at: now,
+  updated_at: now,
+};
+
+export const scans = [scanCheckout, scanParked, scanFailed];
 
 // ---------------------------------------------------------------------
 // Inspect - element inventories per module, including the zero-locatable
@@ -150,6 +193,7 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       id: "el_submit",
       page_url: pageHome.url,
       label: "Submit",
+      role: "button",
       locator: "#submit",
       locator_strategy: "css",
       uniquely_locatable: true,
@@ -159,6 +203,7 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       id: "el_long_label",
       page_url: pageHome.url,
       label: longLabel,
+      role: "button",
       locator: "button[data-testid='continue-to-payment']",
       locator_strategy: "test_id",
       uniquely_locatable: true,
@@ -168,6 +213,7 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       id: "el_unicode",
       page_url: pageHome.url,
       label: "支払いを続ける 💳 — Продолжить оплату — متابعة الدفع",
+      role: "link",
       locator: "//button[contains(., '支払い')]",
       locator_strategy: "xpath",
       uniquely_locatable: true,
@@ -177,6 +223,7 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       id: "el_duplicate",
       page_url: pageHome.url,
       label: "Remove",
+      role: "button",
       locator: ".line-item button.remove",
       locator_strategy: "css",
       uniquely_locatable: false,
@@ -189,6 +236,7 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       id: "el_settings_1",
       page_url: pageSettings.url,
       label: "Save",
+      role: "button",
       locator: "button.save",
       locator_strategy: "css",
       uniquely_locatable: false,
@@ -198,6 +246,7 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       id: "el_settings_2",
       page_url: pageSettings.url,
       label: "Cancel",
+      role: "button",
       locator: "button.cancel",
       locator_strategy: "css",
       uniquely_locatable: false,
@@ -251,11 +300,18 @@ export const suiteCheckoutVersions: z.infer<typeof SuiteVersionSchema>[] = [
 // that's still "running" so the SSE path has something to stream.
 // ---------------------------------------------------------------------
 
+/** Session-scoped, resolved report URL (docs/API_CONTRACT.md) - served by handlers/runs.ts. */
+export function reportUrl(runId: string): string {
+  return `https://api.testbytoken.example/runs/${runId}/report`;
+}
+
 function step(
   index: number,
   overrides: Partial<z.infer<typeof StepSchema>> = {},
 ): z.infer<typeof StepSchema> {
   return {
+    id: `stp_${index}`,
+    plan_step_id: null,
     index,
     action: "click",
     target: "#submit",
@@ -273,6 +329,9 @@ export const runPassed: z.infer<typeof RunDetailSchema> = {
   workspace_id: workspace.id,
   target_id: targetCheckout.id,
   suite_id: suiteCheckout.id,
+  plan_id: null,
+  login_session_id: null,
+  report_url: reportUrl("run_pass_1"),
   status: "passed",
   pass_rate: 1,
   coverage: { generated: 21, candidate: 24 },
@@ -297,6 +356,9 @@ export const runFailed: z.infer<typeof RunDetailSchema> = {
   workspace_id: workspace.id,
   target_id: targetCheckout.id,
   suite_id: suiteCheckout.id,
+  plan_id: null,
+  login_session_id: null,
+  report_url: reportUrl("run_fail_1"),
   status: "failed",
   pass_rate: 0.75,
   coverage: { generated: 21, candidate: 24 },
@@ -342,6 +404,9 @@ function liveRunBase(id: string): z.infer<typeof RunDetailSchema> {
     workspace_id: workspace.id,
     target_id: targetCheckout.id,
     suite_id: suiteCheckout.id,
+    plan_id: null,
+    login_session_id: null,
+    report_url: null,
     status: "running",
     pass_rate: 1,
     coverage: { generated: 21, candidate: 24 },
@@ -366,6 +431,9 @@ export const runLong: z.infer<typeof RunDetailSchema> = {
   workspace_id: workspace.id,
   target_id: targetCheckout.id,
   suite_id: suiteCheckout.id,
+  plan_id: null,
+  login_session_id: null,
+  report_url: reportUrl("run_long_1"),
   status: "passed",
   pass_rate: 0.96875, // 62/64
   coverage: { generated: 21, candidate: 24 },
@@ -413,6 +481,58 @@ export const runs = [
 // Proofs
 // ---------------------------------------------------------------------
 
+/**
+ * The 3 candidates behind "21 of 24 covered" - which ones, and why. Lengths
+ * MUST agree (uncovered_total = candidate - generated); a test enforces it.
+ */
+const uncoveredFixture: z.infer<typeof ProofSnapshotSchema>["uncovered"] = [
+  {
+    label: "Remove",
+    page_url: pageHome.url,
+    reason_code: "not_uniquely_locatable",
+    reason: 'More than one element matched ".line-item button.remove".',
+  },
+  {
+    label: "Save",
+    page_url: pageSettings.url,
+    reason_code: "not_uniquely_locatable",
+    reason: 'More than one element matched "button.save".',
+  },
+  {
+    label: "Cancel",
+    page_url: pageSettings.url,
+    reason_code: "not_uniquely_locatable",
+    reason: 'More than one element matched "button.cancel".',
+  },
+];
+
+/**
+ * A proof is a FROZEN SNAPSHOT (B0.5 B10): everything the public page needs
+ * is copied in here at creation, so nothing it renders reads through to a
+ * live run, and re-running or renaming anything later cannot change it.
+ */
+function snapshotFor(
+  run: z.infer<typeof RunDetailSchema>,
+): z.infer<typeof ProofSnapshotSchema> {
+  const verdict = run.status === "passed" ? "passed" : "failed";
+  return {
+    verdict,
+    pass_rate: run.pass_rate,
+    coverage: run.coverage,
+    target: { name: targetCheckout.name, base_url: targetCheckout.base_url },
+    started_at: run.started_at,
+    finished_at: run.finished_at ?? now,
+    duration_ms:
+      new Date(run.finished_at ?? now).getTime() -
+      new Date(run.started_at).getTime(),
+    token_cost: run.token_cost,
+    steps: run.steps,
+    plan: null, // suite runs have no plan; a plan run's proof carries it
+    uncovered_total: run.coverage.candidate - run.coverage.generated,
+    uncovered: uncoveredFixture,
+  };
+}
+
 function proofFor(
   run: z.infer<typeof RunDetailSchema>,
   hash: string,
@@ -421,10 +541,9 @@ function proofFor(
     id: run.proof_id!,
     run_id: run.id,
     hash,
-    token_cost: run.token_cost,
-    steps: run.steps,
     share: null,
     created_at: run.finished_at ?? now,
+    snapshot: snapshotFor(run),
   };
 }
 

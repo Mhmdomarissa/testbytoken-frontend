@@ -35,11 +35,28 @@ silently implement around.
   Resources that don't grow the same way (`suites`, `targets`) are plain
   unpaginated arrays — cheaper for the backend, revisit if that stops
   being true.
-- **Status vocabulary.** A run's per-step `status` uses the exact same six
-  values as the design system's status tokens (`pass`, `fail`, `running`,
+- **Status vocabulary.** A step's `status` uses the exact same six values
+  as the design system's status tokens (`pass`, `fail`, `running`,
   `skipped`, `warning`, `queued` — see `styles/tokens.css` and
-  `docs/DESIGN_SYSTEM_APP.md`). One vocabulary, engine to pixel, so there's
-  never a translation table to keep in sync.
+  `docs/DESIGN_SYSTEM_APP.md`). A _job's_ status (scan or run, on the
+  resource and on the event stream alike) is one vocabulary, `JobStatus`;
+  scan and run statuses are subsets of it. One vocabulary, engine to pixel,
+  so there's never a translation table to keep in sync.
+- **Every enum is extensible.** Any enum in this contract may gain members
+  at any time, without a version bump; **clients MUST tolerate unknown
+  members** — render them as unrecognised, never drop the record and never
+  fail the response. Every enum in `openapi.json` is marked
+  `x-extensible-enum: true` and says so in its description, so this is
+  visible from any single one. (Two consequences worth stating: a client
+  MUST treat an unknown `action_class` as `write`; and an implementer can
+  add a status or a failure kind without coordinating a release.)
+- **Event ordering.** See "Event ordering" in the revision below: event ids
+  are a numeric sequence, compared numerically.
+- **Immutability.** Three things are written once and never changed:
+  a **plan's steps** (the proposal), a plan's **approval**, and a
+  **proof's snapshot**. There is deliberately no endpoint that edits any of
+  them. Anything an audit will later ask "what exactly was this?" of is
+  append-only.
 
 ## Two decisions — settled
 
@@ -109,10 +126,330 @@ it's stated on each path's own description
 registrations) rather than once at the schema level — an implementer
 reading only one endpoint's docs cannot get it wrong by omission.
 
+## Revision B0.5 — required changes
+
+The Phase A contract was written from the engine's shape, before any
+screen existed. Building the console found five screens with nothing to
+build against and several places the contract was ambiguous. This revision
+fixes them once. **Every item below is required** — none is a suggestion —
+and each says why, in terms of what breaks without it.
+
+Compared with the Phase A contract, most changes _add_ a required field
+or resource; a few **change an existing shape** (marked ⚠). No backend
+exists yet, so nothing is being broken, but an implementer working from
+the earlier draft should read the ⚠ items.
+
+| #   | Change                                                                                                         | Kind        |
+| --- | -------------------------------------------------------------------------------------------------------------- | ----------- |
+| B1  | `Step.id` — stable step identity                                                                               | added field |
+| B2  | Event ids are a canonical numeric sequence                                                                     | ⚠ tightened |
+| B3  | `heartbeat` event every 15s                                                                                    | added event |
+| B4  | `Target.last_scan`, `Scan.failure`                                                                             | added       |
+| B5  | One `JobStatus` enum; every enum extensible                                                                    | ⚠ changed   |
+| B6  | `Element.role`                                                                                                 | added field |
+| B7  | Plans: `POST /plans`, `GET /plans/{id}`, `…/approve`, `…/discard`; `Run.plan_id`; `capabilities` on `/auth/me` | new         |
+| B8  | Login sessions: 4 endpoints; `login_session_id` on scans and runs                                              | new         |
+| B9  | `GET /runs/{id}/report`, `RunDetail.report_url`                                                                | new         |
+| B10 | ⚠ `Proof` restructured around a frozen `snapshot`; `GET /p/{token}` returns a separate `PublicProof`           | ⚠ changed   |
+
+### B1 — Step identity
+
+**Required.** Every `Step` carries `id`: unique within its run, minted when
+the step is created, **never derived from its position**. `index` stays, for
+display order only. The same `id` appears on every event and response that
+mentions the step.
+
+_Why._ The client keeps live step state in a map keyed on step identity so
+duplicate and late events are harmless. Keyed on `index`, a run whose steps
+are re-indexed (a plan edit, an inserted retry) merges two distinct steps
+into one and one silently disappears from the screen.
+
+_Cost._ Trivial: an id assigned at step creation. `Step.plan_step_id` (null
+for a suite run) links an executed step to the approved plan step it came
+from — see B7.
+
+### B2 — Event ordering
+
+**Required.** Event ids are a **numeric monotonic sequence**: a non-negative
+integer in canonical decimal form (`0` or `[1-9][0-9]*`, no sign, no leading
+zeros, at most 9007199254740991), **strictly increasing within a job**,
+compared numerically. Gaps are permitted; reordering and reuse are not.
+`?since=N` delivers events with id **greater than** N. The schema
+(`EventId`) is a regex, so a value a client could mis-order fails
+validation rather than being guessed at.
+
+_Why._ Ordering is how a client discards a late or duplicated event. The
+Phase A text ("monotonically increasing") didn't say numeric, and the
+client had to assume; an unparseable id was treated as newest — failing
+open, in the worst direction. A ULID would also have worked, but a plain
+per-job counter is what an append-only event log already has, compares with
+no library, and is dense enough to be human-readable in a log.
+`eventIdValue()` in `src/lib/contract/common.ts` is the reference
+comparison; an id that isn't canonical is _not an id_, never "newest".
+
+_Cost._ A per-job counter. If your event log is a table with a
+sequence/auto-increment, this is free.
+
+### B3 — Heartbeat
+
+**Required.** While a stream is open the server sends a `heartbeat` frame
+**every 15 seconds** (`{"type":"heartbeat","at":…,"interval_ms":15000}`),
+whether or not the job is doing anything. A heartbeat frame has **no `id:`
+line** — it is not part of the job's event sequence and never advances
+`Last-Event-ID` / `?since=` (so it doesn't consume sequence numbers or
+appear in replays). A client that has received no frame of _any_ kind for
+2.5× the interval (37.5s) may conclude the connection is dead and
+reconnect.
+
+_Why._ Without it, "the job has been quiet for 30 seconds" and "the
+connection died" look identical, and a client has to pick a wrong answer:
+reconnect on silence (and misreport a healthy, slow run as a connection
+problem) or never notice a dead connection (and freeze on stale data, which
+the UI must not do). With it they are distinguishable facts.
+
+_Cost._ A timer per open stream. Also useful against proxies that reap
+idle connections.
+
+### B4 — Scan state and failure detail
+
+**Required.**
+
+- `Target.last_scan`: `{ id, status, failure, created_at, updated_at } | null`
+  — the most recent scan, or `null` if never scanned. A summary on the
+  target, not a `GET /scans` list, so the targets list is one round trip,
+  not N+1.
+- `Scan.failure`: `{ kind, message } | null`, **non-null exactly when
+  `status` is `failed`**. `kind` ∈ `unreachable`, `refused`, `timeout`,
+  `blocked_by_guardrail`, `internal`. `message` is human-readable and safe
+  to show as-is, and **must not contain page content, cookies, tokens or
+  anything typed into the browser**.
+
+_Why._ "Scan failed" and nothing else isn't a product: the _kind_ decides
+what the customer does next — fix the URL (`unreachable`), allow our engine
+(`refused`), retry (`timeout`, `internal`), or pick a different target
+(`blocked_by_guardrail`, which is _us_ refusing, e.g. an internal address).
+
+_Cost._ `last_scan` is a join on `target_id` ordered by creation. The
+failure kind is whatever the crawler already knows when it gives up.
+
+### B5 — One status enum, and extensibility
+
+**Required.** ⚠ `JobEvent.status` and `done.status` were bare strings while
+`Scan.status` and `Run.status` were closed enums — one concept, two
+representations. All of them now draw on one `JobStatus` enum (`queued`,
+`crawling`, `parked`, `running`, `completed`, `passed`, `failed`,
+`cancelled`, `timed_out`); the scan and run statuses are subsets. And
+**every enum in the contract is extensible** (see Conventions): unknown
+members must be tolerated by clients.
+
+_Why._ The client can only be tolerant of new values if the contract says
+they may appear; otherwise tolerance is defensive guesswork, and a strict
+client that rejects an unfamiliar value silently _deletes_ data (a step
+vanishes from the screen). Making it a stated promise means an implementer
+can add a status without a coordinated release.
+
+### B6 — Element role
+
+**Required.** `Element.role`: the element's computed ARIA role (`button`,
+`link`, `textbox`, `heading`…), `null` for a generic container. An open
+string, not an enum — ARIA's vocabulary is large and owned by a standard.
+
+_Why._ `locator_strategy` (which can be `"role"`) is _how we find_ the
+element, not _what it is_. The inventory screen exists to show whether the
+system understands the application; the lookup strategy doesn't answer that,
+the role does.
+
+_Cost._ The engine computes accessible roles for locating already.
+
+### B7 — Compose and plan
+
+**Required.** The product's differentiator: the gate where a person sees
+what a machine proposed before it executes.
+
+- `POST /plans` `{ workspace_id, target_id, scan_id, intent }` → **201**
+  `Plan`, `status: generating`, empty `steps`. **Always asynchronous** —
+  one shape, not "sometimes synchronous". Poll `GET /plans/{id}` until it
+  leaves `generating`. Executes nothing.
+- A `Plan` is an ordered list of `PlanStep`s. Each has `id`, `index`,
+  `description` (plain English), `action`, `input` (literal text a fill
+  would enter, or null — **never a credential**), `action_class`
+  (`read` | `write`), a `binding`, and `blocked`.
+- `binding` is one of: `element` (a real inventory element: id, label,
+  role, page_url, locator — frozen at generation, always uniquely
+  locatable), `page` (for steps that act on a page, e.g. `navigate`), or
+  **`ungrounded`** with a `reason_code` and human-readable `reason`.
+  **Ungrounded steps are part of the plan, not omitted from it** — the UI
+  must show them. An ungrounded step cannot be approved.
+- `blocked`: set **by the server**, non-null when the step may not run for
+  this account (e.g. a `write` step on the read-only tier), with a reason.
+  The client does not infer it. A blocked step cannot be approved.
+- `GET /auth/me` gains `capabilities: { write_actions: boolean }` so the UI
+  can show write steps blocked up front. The server stays authoritative.
+- `POST /plans/{id}/approve` `{ step_ids: [...] }` — **the person's edits,
+  submitted once**: a non-empty, ordered subset of the plan's step ids. No
+  duplicates, no unknown ids, nothing ungrounded or blocked (**422**
+  `invalid_step_selection`). Steps cannot be added or edited. Records
+  `approval: { approved_at, step_ids }` and moves the plan to `approved`.
+  Already-approved / discarded / failed / still-generating → **409**
+  `plan_not_proposed`.
+- `POST /plans/{id}/discard` (nice-to-have): abandon a proposal. Unapproved
+  proposals may be garbage-collected after ≥24h.
+- `POST /runs` takes `plan_id` **or** `suite_id` — **exactly one** (422
+  `invalid_request` otherwise). ⚠ `Run.suite_id` is therefore nullable, and
+  `Run.plan_id` is added. A plan that isn't `approved` → **409**
+  `plan_not_approved`. The run executes the plan's approved steps in the
+  approved order, and each executed `Step.plan_step_id` points back at its
+  plan step.
+
+**Inspectable before, immutable after.** A plan's `steps` never change once
+it leaves `generating` — not during review, not after approval. Edits live
+in the client until the single approval write. So a Proof can say exactly
+what was proposed, what was approved, and what was left out. A proof that
+can't say what was approved isn't a proof.
+
+_Cost._ Plan _generation_ is the expensive part, and it already exists in
+the engine (it is what turns intent into steps). Everything the contract adds
+around it is cheap on purpose: no `PATCH`, no per-edit round trips, no
+revision counter, no merge logic — reads, and one write of one immutable
+record.
+
+### B8 — Interactive login
+
+**Required.** A `LoginSession` resource models the customer signing in to
+_their own application_ in a live browser we hand them (MFA and SSO
+included). The workspace states describe the engine process, not the
+customer's sign-in, which is why they could not carry it.
+
+- `POST /login-sessions` `{ workspace_id, target_id }` → **201**
+  `LoginSession`, `provisioning`.
+- `status`: `provisioning` → `ready` (browser up, waiting for the customer)
+  → `in_progress` (customer connected) → `completed` | `expired` | `failed`
+  | `cancelled`. ("Not started" is the absence of a session.)
+- `view_url`: where the customer reaches the live browser. Non-null only
+  while `ready`/`in_progress`. **Must be on a separate origin** from the
+  app and **must not be a long-lived bearer link**: it may carry a
+  **single-use ticket, valid ≤60 seconds**, exchanged on first load for an
+  httpOnly cookie scoped to that origin. This is the one deliberate
+  exception to "never a token in a URL" (above); a live remote browser
+  cannot be embedded cross-origin any other way. Re-fetch the session for a
+  fresh one; never store it.
+- `expires_at`: one field, stage-dependent — before completion, the
+  deadline to finish signing in; after, when the captured session lapses.
+- `GET /login-sessions/{id}`: poll for readiness, completion and expiry
+  (not the job event stream — this isn't a long job with steps).
+- `POST /login-sessions/{id}/complete`: no body, no credentials — only the
+  customer's statement "I'm done". The engine checks a signed-in session
+  exists and captures it; if none is found, `failed` with
+  `no_session_detected` (it does not take the customer's word for it).
+  **409** `login_session_not_active` if it isn't `ready`/`in_progress`.
+- `POST /login-sessions/{id}/cancel` (nice-to-have).
+- `login_session_id` (optional) on `POST /scans` and `POST /runs`, and on
+  `POST /scans/{id}/continue` — a scan parked for `login_required` can only
+  continue with a **completed** session attached (422 without one; 409 if
+  it isn't completed). Recorded on `Scan.login_session_id` and
+  `Run.login_session_id`.
+
+> **No credential ever traverses this API.** This is a statement of the
+> contract, not a style preference. No request accepts a username,
+> password, token, cookie or storage state; an implementer **must not add a
+> convenience field** for any of them — not "just for testing", not
+> optional. The captured session lives only inside the engine and is
+> referenced everywhere by the opaque session `id`; it is **never returned
+> by any endpoint, in any field**. `failure.message`, logs and error bodies
+> must not contain page content, typed input, or captured session data.
+> `src/lib/contract/revision.test.ts` fails if any request body grows a
+> property that looks like one.
+
+_Cost._ **This is the most expensive item in the revision.** Streaming an
+interactive remote browser (screencast + input) to the customer, on its own
+origin, with ticket exchange, is real infrastructure. The engine already
+drives a browser that a customer can sign in to (it is what a parked scan
+waits on); this contract asks for that to be a first-class, reusable
+resource rather than something private to one scan.
+
+### B9 — The engine's HTML report
+
+**Required.** `GET /runs/{id}/report` returns the engine's generated
+report as `text/html`; `RunDetail.report_url` is its resolved,
+**session-scoped** URL (never a token in the URL), null until the run
+finishes. 404 until then.
+
+**The report is untrusted content.** It is produced from a site we do not
+control and quotes that site's text. It must never be rendered inline in the
+app's DOM; the frontend embeds it only in an `<iframe sandbox>` without
+`allow-same-origin`. The server must make that the _only_ safe way to
+consume it, not merely the recommended one: respond with
+**`Content-Security-Policy: sandbox`** (no tokens — no `allow-same-origin`,
+no `allow-scripts`), `X-Content-Type-Options: nosniff` and
+`Content-Disposition: inline`, so even someone navigating straight to the
+URL gets a sandboxed document. If the contract didn't say it was untrusted,
+someone would eventually render it inline.
+
+_Cost._ A file the engine already produces, plus three response headers.
+
+### B10 — A proof is a frozen, self-contained snapshot
+
+**Required.** ⚠ `Proof` no longer holds `steps` and `token_cost` at the top
+level and reads through to nothing. It is:
+
+```
+PublicProof { id, hash, created_at, snapshot }
+Proof       = PublicProof + { run_id, share }     // the owner's view
+snapshot    { verdict, pass_rate, coverage{generated,candidate},
+              target{name,base_url}, started_at, finished_at, duration_ms,
+              token_cost, steps[], plan|null,
+              uncovered_total, uncovered[] }
+```
+
+- The snapshot is **copied at creation and never changes**. `hash` is over
+  the canonical JSON of the snapshot. There is no endpoint that mutates it;
+  only `share` (outside the hash) changes.
+- It carries **both halves of coverage**, `target` as a frozen _copy_
+  (renaming or deleting the target later doesn't alter the proof), every
+  step with status and reason, the **plan** that was approved (`intent`,
+  approved steps, and the steps _excluded_ with why — or `null` for a suite
+  run), and **what was not covered**: `uncovered_total` (must equal
+  `coverage.candidate − coverage.generated`) and `uncovered[]` (at most 200
+  entries, each with label, page, reason code and reason).
+- `GET /p/{token}` returns **`PublicProof`**: the snapshot and nothing else
+  — no run id, no workspace or user ids, no share token, no id that
+  resolves to authenticated data. `GET /proofs/{id}` (authenticated)
+  returns `Proof`.
+- **Revocation is whole.** `POST /proofs/{id}/share` with `enabled: false`
+  kills the public page and every proof-scoped screenshot URL at once; a
+  revoked proof renders nothing. (The proof itself, in the owner's
+  authenticated view, is permanent — revoking _sharing_ does not delete
+  the record.)
+
+_Why._ As first specified, the public page couldn't show the pass rate
+_and_ coverage §1.2 requires, or what wasn't covered, because that data
+lived on the run, which needs auth. The fix is not a link to the run:
+
+1. A proof that reads through to live data isn't a proof — re-run the test
+   and it silently changes. The value is that it attests to one moment.
+2. The public page has no credentials; giving it a path to authenticated
+   data to work around that is how a data leak gets built.
+
+_Cost._ At proof creation, copy fields the backend already holds into one
+document and hash it. The `uncovered` list is the set of candidates without
+a generated scenario — the same set `coverage` counts.
+
+### Where this revision costs the most
+
+In descending order, so an implementer can plan:
+
+1. **B8's live browser view** — genuinely new infrastructure, as above.
+2. **B7's planner** — but that is the engine's existing capability; the
+   _API_ around it is deliberately thin.
+3. **B10's snapshot at proof creation** — a copy and a hash; needs care that
+   it is truly frozen.
+4. Everything else is a field, a counter, a timer, or three headers.
+
 ## Endpoints
 
-Every operation from `docs/PHASE_A.md`'s list is implemented — 30
-operations across 12 resource groups, all present in `openapi.json`. Marked
+Every operation from `docs/PHASE_A.md`'s list is implemented, plus the
+B0.5 additions above — 39 operations across 12 resource groups, all present
+in `openapi.json`. Marked
 **essential** (blocks a usable v1) or **nice-to-have** (v1 works without
 it, or a manual workaround exists) — pushback on any of these is exactly
 what this table is for.
@@ -170,6 +507,26 @@ treatment in `docs/DESIGN_SYSTEM_APP.md`'s "Isoluminance" section: its
 own AA-verified color, its own icon (`ClockAlertIcon`, not `fail`'s
 `OctagonXIcon`), and its own row in `src/lib/color/contrast.test.ts`'s
 pairwise coverage — not `fail` with a different label.
+
+| `GET /runs/{id}/report` | essential | The engine's HTML report (untrusted; sandbox-only — B9). |
+
+### plans
+
+| Endpoint                   |              | Why                                                                    |
+| -------------------------- | ------------ | ---------------------------------------------------------------------- |
+| `POST /plans`              | essential    | Intent in, proposed plan out. The differentiator.                      |
+| `GET /plans/{id}`          | essential    | Poll while `generating`; read the proposal.                            |
+| `POST /plans/{id}/approve` | essential    | The gate: one write turns a proposal into something a run may execute. |
+| `POST /plans/{id}/discard` | nice-to-have | Abandoning a proposal; proposals can also just be garbage-collected.   |
+
+### login-sessions
+
+| Endpoint                             |              | Why                                                    |
+| ------------------------------------ | ------------ | ------------------------------------------------------ |
+| `POST /login-sessions`               | essential    | Authenticated testing is impossible without it.        |
+| `GET /login-sessions/{id}`           | essential    | Readiness, completion, expiry, and a fresh `view_url`. |
+| `POST /login-sessions/{id}/complete` | essential    | The customer's "I'm done".                             |
+| `POST /login-sessions/{id}/cancel`   | nice-to-have | Sessions lapse at `expires_at` anyway.                 |
 
 ### events
 

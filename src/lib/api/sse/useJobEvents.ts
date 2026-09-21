@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE_URL } from "../config";
+import { HEARTBEAT_INTERVAL_MS } from "@/lib/contract";
 import { parseJobEventFrame } from "./parseFrame";
 import {
   applyJobEvent,
@@ -22,10 +23,36 @@ function backoffDelay(attempt: number): number {
   );
 }
 
+/** A connection that has produced no frame of ANY kind for this many heartbeat intervals is dead, not quiet. */
+export const DEAD_AFTER_HEARTBEAT_INTERVALS = 2.5;
+
+/**
+ * B0.5 B3: with a heartbeat every 15s (docs/API_CONTRACT.md), "nothing has
+ * happened for 30s" and "the connection died" are different, checkable
+ * facts. A quiet JOB still produces heartbeats; a dead CONNECTION produces
+ * nothing. Pure, so it is unit-tested without a browser.
+ */
+export function isConnectionDead(
+  lastFrameAt: number,
+  now: number,
+  intervalMs: number = HEARTBEAT_INTERVAL_MS,
+): boolean {
+  return now - lastFrameAt > DEAD_AFTER_HEARTBEAT_INTERVALS * intervalMs;
+}
+
 export interface UseJobEventsResult extends JobEventsState {
   connectionStatus: ConnectionStatus;
   /** `Date.now()` of the last frame received, or null before the first one. Exposed so a consumer can render its own "no update in Ns" affordance - see the file comment on why this hook does not do that itself. */
   lastEventAt: number | null;
+  /**
+   * `Date.now()` of the last frame of ANY kind, heartbeats included, or
+   * null before the first. The difference from `lastEventAt` is the whole
+   * point of the heartbeat: a job that has been quiet for a minute but is
+   * still heartbeating is ALIVE and quiet (show "no news for 60s"); a
+   * stream whose `lastFrameAt` is old is dead (this hook reconnects it, and
+   * says so via `connectionStatus`).
+   */
+  lastFrameAt: number | null;
   /**
    * Frames received but structurally unusable (not JSON, unknown event
    * type). Never silent: a consumer shows "N updates could not be read"
@@ -73,6 +100,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connecting");
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
+  const [lastFrameAt, setLastFrameAt] = useState<number | null>(null);
   const [unreadableFrameCount, setUnreadableFrameCount] = useState(0);
   const [reconnectCount, setReconnectCount] = useState(0);
 
@@ -85,6 +113,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     setTrackedJobId(jobId);
     setState(initialJobEventsState);
     setLastEventAt(null);
+    setLastFrameAt(null);
     setUnreadableFrameCount(0);
     setReconnectCount(0);
   }
@@ -103,6 +132,9 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     // and the UI shows "reconnecting" on a completed run (found by running
     // this hook in a real browser: e2e/job-events.spec.ts).
     let finished = false;
+    // Last frame of any kind, tracked locally too: the watchdog runs on a
+    // timer, outside React's render cycle.
+    let lastFrameLocal = Date.now();
 
     function connect() {
       if (cancelled) return;
@@ -118,6 +150,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
       source.onopen = () => {
         if (cancelled) return;
         attempt = 0;
+        lastFrameLocal = Date.now(); // a connection that opens and then says nothing is caught too
         setConnectionStatus("open");
       };
 
@@ -135,8 +168,14 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
           return;
         }
         const { event } = frame;
+        lastFrameLocal = Date.now();
+        setLastFrameAt(lastFrameLocal);
+        // A heartbeat proves the connection is alive and nothing else: it
+        // has no id, is not part of the event sequence, and must not move
+        // `lastEventId` (which `?since=` resumes from).
+        if (event.type === "heartbeat") return;
         lastEventId = event.id;
-        setLastEventAt(Date.now());
+        setLastEventAt(lastFrameLocal);
         setState((prev) => applyJobEvent(prev, event));
         if (event.type === "done") {
           finished = true;
@@ -148,23 +187,39 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
       // Fires on a real transport failure (connection refused, dropped,
       // non-2xx on (re)connect) - never on a merely quiet stream, which
       // is exactly the distinction this hook relies on. See file comment.
-      source.onerror = () => {
-        if (cancelled || finished) return;
-        source?.close();
-        const delay = backoffDelay(attempt);
-        attempt += 1;
-        setConnectionStatus("reconnecting");
-        setReconnectCount((n) => n + 1);
-        reconnectTimer = setTimeout(connect, delay);
-      };
+      source.onerror = handleDrop;
+    }
+
+    function handleDrop() {
+      if (cancelled || finished) return;
+      source?.close();
+      const delay = backoffDelay(attempt);
+      attempt += 1;
+      setConnectionStatus("reconnecting");
+      setReconnectCount((n) => n + 1);
+      reconnectTimer = setTimeout(connect, delay);
     }
 
     connect();
+
+    // Dead-connection watchdog (B0.5 B3). Only ever fires on missing
+    // HEARTBEATS, never on a merely quiet job - the server guarantees a
+    // frame every 15s for as long as the stream is open.
+    const watchdog = setInterval(() => {
+      if (cancelled || finished || reconnectTimer !== undefined) return;
+      if (
+        source?.readyState === EventSource.OPEN &&
+        isConnectionDead(lastFrameLocal, Date.now())
+      ) {
+        handleDrop();
+      }
+    }, 5_000);
 
     return () => {
       cancelled = true;
       source?.close();
       if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
+      clearInterval(watchdog);
     };
   }, [jobId]);
 
@@ -174,6 +229,7 @@ export function useJobEvents(jobId: string | undefined): UseJobEventsResult {
     ...state,
     connectionStatus: jobId === undefined ? "closed" : connectionStatus,
     lastEventAt,
+    lastFrameAt,
     unreadableFrameCount,
     reconnectCount,
   };
