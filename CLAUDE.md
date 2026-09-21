@@ -55,6 +55,69 @@ input until proven otherwise.
   `as` casts at the API boundary.
 - The auth token lives in an **httpOnly cookie**, never `localStorage`.
 
+## Honesty (Phase B, `docs/PHASE_B.md` §1)
+
+The product's whole claim is that nothing is hidden. The engine once
+reported skipped steps as passes; that was fixed in the engine and can be
+reintroduced in the UI by anyone who reaches for an optimistic update or a
+convenient default.
+
+**The UI never invents a status.** It displays exactly what the backend
+reported, and nothing else.
+
+- No optimistic status updates. A step is not "passing" because it
+  started; a run is not "passed" because the last event was a pass. Render
+  `running` until something says otherwise.
+- No inferred aggregates. If the backend sends a run-level verdict,
+  display it. Never compute one client-side from the steps received so
+  far - you may not have all of them.
+- **Unknown status values render as unknown, visibly** (an "unrecognised"
+  chip carrying the raw value), never as a blank cell, never as a default
+  that reads like a legitimate state, and never a throw. Every response is
+  parsed through the tolerant twin of its contract schema
+  (`src/lib/api/tolerant.ts`, applied once in `client.ts`): a strict
+  schema that rejects an unfamiliar enum member hides data - one unknown
+  step status used to fail the parse, drop the SSE frame, and make the
+  step vanish. Failing closed is not the safe option here. Loud in
+  development (console error), graceful in production. Anything not in
+  `toBadgeStatus`'s table is unrecognised, not defaulted.
+- **Connection loss is a state, not an absence.** If the event stream
+  drops, the UI says so. It does not freeze on the last known state and
+  let the user believe that is current.
+
+One line: if you are about to render a status the server did not send you,
+you are writing the bug this product exists to fix.
+
+**Pass rate never ships alone.** Wherever a pass rate appears - tables,
+cards, the run header, the proof page, tooltips, any OG image - coverage
+appears beside it. Enforced structurally: use `PassRateCoverage`, which
+requires both values. There is deliberately no pass-rate-only component;
+do not write `Math.round(run.pass_rate * 100)` in a component.
+
+**Ungrounded and skipped work is shown, never hidden.** If the engine
+could not ground a flow (no locator, ambiguous element, login never
+cleared) that is a first-class result with a reason (`ResultReason`).
+Skipped and ungrounded items are not filtered from lists, not collapsed by
+default, and not excluded from counts without the exclusion stated on
+screen.
+
+**Everything from a tested site is hostile.** Page titles, element
+labels, headings, error text, URLs.
+
+- Long strings truncate and never break layout.
+- Text that looks like markup renders as text.
+- URLs from scraped content are never made clickable without an explicit
+  host-allowlist check, and never `target="_blank"` without
+  `rel="noopener noreferrer"`.
+- The engine's generated HTML report renders only in a sandboxed iframe
+  without `allow-same-origin`, or from a different origin. No third
+  option.
+
+**No password field. Ever.** The customer never types their application's
+password into our UI. Authenticated testing hands the customer an
+interactive browser session where they sign in themselves (MFA and SSO
+included). A credential form means the product has been misread.
+
 ## Process
 
 - Small, reviewable commits, one concern each, and explain _why_ in the
@@ -64,6 +127,15 @@ input until proven otherwise.
   report rather than improvising a smaller version of it.
 
 ## Stop and ask, don't guess, when:
+
+- Anything would put a credential anywhere near our UI, API, or logs.
+- Anything would render untrusted HTML outside a sandboxed iframe.
+- You are pressured to show a pass rate without coverage.
+- A screen seems to need an optimistic status update to feel responsive:
+  the answer is a better loading state, not guessing at results.
+- A change to the contract is not additive - say the UI needs a field that
+  does not exist rather than inventing an endpoint and building against a
+  fiction.
 
 - A change would weaken any rule above.
 - You find yourself wanting to proxy API calls through a Next route

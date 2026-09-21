@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/state/EmptyState";
 import { ErrorState } from "@/components/state/ErrorState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { enumLabel } from "@/lib/api/tolerant";
 import {
   Table,
   TableBody,
@@ -90,7 +91,9 @@ function TargetsList() {
                   {target.base_url}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">{target.environment}</Badge>
+                  <Badge variant="outline">
+                    {enumLabel(target.environment)}
+                  </Badge>
                 </TableCell>
               </TableRow>
             ))}

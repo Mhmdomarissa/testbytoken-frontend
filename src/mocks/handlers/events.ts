@@ -38,6 +38,17 @@ function staticRunEventLog(run: z.infer<typeof RunDetailSchema>): JobEvent[] {
 const encoder = new TextEncoder();
 
 /**
+ * Jobs whose FIRST connection is deliberately killed mid-stream (a real
+ * network error, not a clean close), so a client's reconnect-with-resume
+ * can be exercised against something real. Later connections behave
+ * normally. Module state: resets on a full page reload, which is what a
+ * fresh browser test wants.
+ */
+const DROP_FIRST_CONNECTION_JOB_IDS = new Set(["run_live_drop_1"]);
+const DROP_AFTER_MS = 2_000;
+const alreadyDropped = new Set<string>();
+
+/**
  * One handler for every job kind (scan or run) - both are "jobs" per the
  * contract (docs/API_CONTRACT.md), and both now have the same shape of
  * answer: a backlog of what's already happened, resumable via `?since=`,
@@ -108,12 +119,28 @@ export const eventHandlers = [
           return;
         }
 
+        const dropThisConnection =
+          DROP_FIRST_CONNECTION_JOB_IDS.has(jobId) &&
+          !alreadyDropped.has(jobId);
+        if (dropThisConnection) alreadyDropped.add(jobId);
+
         for (const { delayMs, event } of pending) {
+          // A dropped connection never delivers what would have arrived
+          // after the drop - the client has to get it via ?since=.
+          if (dropThisConnection && delayMs >= DROP_AFTER_MS) continue;
           const t = setTimeout(() => {
             controller.enqueue(encoder.encode(sseFrame(event)));
             if (event.type === "done") controller.close();
           }, delayMs);
           timers.push(t);
+        }
+
+        if (dropThisConnection) {
+          timers.push(
+            setTimeout(() => {
+              controller.error(new Error("simulated connection drop"));
+            }, DROP_AFTER_MS),
+          );
         }
 
         request.signal.addEventListener("abort", () => {

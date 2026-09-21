@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useResource } from "@/hooks/useResource";
 import { WorkspaceSchema } from "@/lib/contract";
+import { enumLabel } from "@/lib/api/tolerant";
 
 const DEMO_WORKSPACE_ID = "wksp_demo";
 
@@ -49,7 +50,7 @@ export function WorkspaceStatusPill() {
   }
 
   const { status } = workspace.data;
-  const label = status === "ready" ? "Engine ready" : status;
+  const label = status === "ready" ? "Engine ready" : enumLabel(status);
 
   return (
     <Tooltip>
