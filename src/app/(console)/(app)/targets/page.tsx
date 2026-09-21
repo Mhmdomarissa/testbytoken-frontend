@@ -166,6 +166,16 @@ function TargetRows({
                   Inventory
                 </Link>
               )}
+            {target.last_scan !== null &&
+              !isUnrecognised(target.last_scan.status) &&
+              target.last_scan.status === "completed" && (
+                <Link
+                  href={`/targets/${target.id}/compose`}
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                >
+                  Compose test
+                </Link>
+              )}
             <Button
               size="sm"
               variant={target.last_scan === null ? "default" : "outline"}

@@ -149,6 +149,16 @@ describe("B7: the plan gate", () => {
     expect(credential?.input).toBeNull();
   });
 
+  it("a 'writes:' intent is planned for a write-capable account, without touching the account", async () => {
+    const plan = await settledPlan("writes: buy something");
+    expect(plan.steps.find((s) => s.id === "pstp_2")?.blocked).toBeNull();
+    expect(mockAccount.writeActions).toBe(false);
+    const ordinary = await settledPlan("buy something");
+    expect(
+      ordinary.steps.find((s) => s.id === "pstp_2")?.blocked,
+    ).not.toBeNull();
+  });
+
   it("write steps are blocked, by the SERVER, on a read-only account - and free on a write account", async () => {
     const readOnly = await settledPlan();
     expect(

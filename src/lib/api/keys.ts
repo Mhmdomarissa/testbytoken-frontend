@@ -26,6 +26,9 @@ export const queryKeys = {
       ["runs", "list", params] as const,
     detail: (id: string) => ["runs", id] as const,
   },
+  plans: {
+    detail: (id: string) => ["plans", id] as const,
+  },
   proofs: {
     detail: (id: string) => ["proofs", id] as const,
     public: (token: string) => ["proofs", "public", token] as const,
