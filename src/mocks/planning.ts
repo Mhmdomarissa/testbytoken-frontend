@@ -1,13 +1,14 @@
 import type { z } from "zod";
 import type {
   PlanSchema,
+  CoverageSchema,
   PlanStepSchema,
   ProofSchema,
   ProofSnapshotSchema,
   RunDetailSchema,
 } from "@/lib/contract";
 import { elementsForModule, modCheckout } from "./data";
-import { mockAccount, planStore } from "./store";
+import { mockAccount, planStore, scanStore } from "./store";
 
 type Plan = z.infer<typeof PlanSchema>;
 type PlanStep = z.infer<typeof PlanStepSchema>;
@@ -310,11 +311,9 @@ export function exclusionReason(
  * generated = what was approved to run. So 2 of 5 approved and both
  * passing is pass_rate 1, coverage 2 of 5 - never 2 of 2.
  */
-export function planCoverage(plan: Plan): {
-  generated: number;
-  candidate: number;
-} {
+export function planCoverage(plan: Plan): z.infer<typeof CoverageSchema> {
   return {
+    basis: "plan",
     generated: plan.approval?.step_ids.length ?? 0,
     candidate: plan.steps.length,
   };
@@ -332,6 +331,29 @@ function reasonText(step: PlanStep, why: ExclusionReason): string {
   return step.binding.type === "ungrounded"
     ? step.binding.reason
     : "The planner could not ground this step.";
+}
+
+/**
+ * How big the inventory was that the plan was grounded against, and how
+ * much of it the proposal touches: 5 steps read very differently against an
+ * inventory of 24 elements than against 5.
+ */
+export function groundedAgainst(plan: Plan) {
+  const modules = scanStore.get(plan.scan_id)?.modules ?? [];
+  const touched = new Set(
+    plan.steps.flatMap((s) =>
+      s.binding.type === "element" ? [s.binding.element_id] : [],
+    ),
+  );
+  return {
+    scan_id: plan.scan_id,
+    elements: modules.reduce((n, m) => n + m.element_count, 0),
+    uniquely_locatable: modules.reduce(
+      (n, m) => n + m.elements_uniquely_locatable_count,
+      0,
+    ),
+    elements_proposed: touched.size,
+  };
 }
 
 /** The frozen proof of a FINISHED plan run: what ran, what was approved, and every step that did not run with who excluded it. */
@@ -362,6 +384,7 @@ export function proofForPlanRun(
       id: plan.id,
       intent: plan.intent,
       approved_at: plan.approval!.approved_at,
+      grounded_against: groundedAgainst(plan),
       approved_steps: approvedIds.flatMap((id) => {
         const s = byId.get(id);
         return s

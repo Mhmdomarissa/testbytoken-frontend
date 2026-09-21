@@ -12,6 +12,7 @@ import {
   usePlan,
 } from "@/lib/api/queries/plans";
 import { useCreateRun } from "@/lib/api/queries/runs";
+import { useScan } from "@/lib/api/queries/scans";
 import { ApiError } from "@/lib/api/errors";
 import { isUnrecognised } from "@/lib/api/tolerant";
 import { DEMO_WORKSPACE_ID } from "@/lib/workspace";
@@ -61,6 +62,10 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
   const planId = searchParams.get("plan");
   const target = useTarget(id);
   const plan = usePlan(planId ?? undefined);
+  // How big the inventory was that the plan was grounded against - null until known.
+  const scan = useScan(plan.data?.scan_id);
+  const inventoryElements =
+    scan.data?.modules.reduce((n, m) => n + m.element_count, 0) ?? null;
   const [draft, setDraft] = useState("");
 
   const createPlan = useCreatePlan();
@@ -294,6 +299,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
           </p>
           <ApprovedPlan
             steps={p.steps}
+            inventoryElements={inventoryElements}
             approvedIds={p.approval.step_ids}
             approvedAt={p.approval.approved_at}
           />
@@ -341,6 +347,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
           <PlanReview
             intent={p.intent}
             steps={p.steps}
+            inventoryElements={inventoryElements}
             busy={approve.isPending || createRun.isPending || discard.isPending}
             error={
               approve.isError

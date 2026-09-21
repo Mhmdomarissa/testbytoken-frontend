@@ -15,6 +15,8 @@ import {
 import { PlanStepRow } from "./PlanStepRow";
 import { PlanReview } from "./PlanReview";
 import { ApprovedPlan } from "./ApprovedPlan";
+import { InventoryContext } from "./InventoryContext";
+import { elementsTouched } from "./reviewState";
 import { exclusionReason as serverExclusionReason } from "@/mocks/planning";
 
 afterEach(cleanup);
@@ -322,6 +324,7 @@ describe("PlanReview", () => {
     const onApprove = vi.fn();
     render(
       <PlanReview
+        inventoryElements={null}
         intent="do it"
         steps={steps}
         busy={false}
@@ -348,6 +351,7 @@ describe("PlanReview", () => {
   it("states every exclusion and disables approval when nothing is selected", () => {
     render(
       <PlanReview
+        inventoryElements={null}
         intent="do it"
         steps={steps}
         busy={false}
@@ -379,6 +383,7 @@ describe("PlanReview", () => {
   it("the approval summary is a polite live region, so a change is announced", () => {
     render(
       <PlanReview
+        inventoryElements={null}
         intent="x"
         steps={steps}
         busy={false}
@@ -395,6 +400,7 @@ describe("PlanReview", () => {
   it("while an approval is in flight, both actions are disabled (no double-fire)", () => {
     render(
       <PlanReview
+        inventoryElements={null}
         intent="x"
         steps={steps}
         busy
@@ -424,6 +430,7 @@ describe("ApprovedPlan", () => {
     const g = ungrounded();
     render(
       <ApprovedPlan
+        inventoryElements={null}
         steps={[a, g, b]}
         approvedIds={[b.id, a.id]}
         approvedAt="2026-09-10T12:00:00Z"
@@ -444,6 +451,7 @@ describe("ApprovedPlan", () => {
     const sys2 = blocked();
     render(
       <ApprovedPlan
+        inventoryElements={null}
         steps={[ran, userLeft, sys1, sys2]}
         approvedIds={[ran.id]}
         approvedAt="2026-09-10T12:00:00Z"
@@ -458,5 +466,42 @@ describe("ApprovedPlan", () => {
     expect(user.textContent).toContain("person dropped this");
     expect(system.textContent).toMatch(/could not approve \(2\)/);
     expect(system.textContent).not.toContain("person dropped this");
+  });
+});
+
+describe("InventoryContext: a plan's steps read against the inventory they came from", () => {
+  const el = (id: string) =>
+    step({
+      binding: {
+        type: "element",
+        element_id: id,
+        label: id,
+        role: null,
+        page_url: "https://x.example.com/",
+        locator: `#${id}`,
+        uniquely_locatable: true,
+      },
+    });
+  const steps = [step(), el("a"), el("b"), el("a"), ungrounded()];
+
+  it("counts DISTINCT inventory elements: page steps, ungrounded steps and repeats touch none/one", () => {
+    expect(elementsTouched(steps)).toBe(2);
+  });
+
+  it("states the reduction from the inventory to the proposal, in plain counts", () => {
+    render(<InventoryContext steps={steps} inventoryElements={30} />);
+    expect(screen.getByTestId("plan-inventory").textContent).toMatch(
+      /These 5 steps touch 2 of the 30 elements in the inventory/,
+    );
+    expect(screen.getByTestId("plan-inventory").textContent).toMatch(
+      /not tested by it/,
+    );
+  });
+
+  it("says nothing until the inventory's size is known - never a guess", () => {
+    const { container } = render(
+      <InventoryContext steps={steps} inventoryElements={null} />,
+    );
+    expect(container.textContent).toBe("");
   });
 });

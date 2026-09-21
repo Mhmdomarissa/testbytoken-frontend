@@ -340,3 +340,43 @@ test("the record keeps the person's exclusions apart from the system's, in words
     fullPage: true,
   });
 });
+
+test("a plan is read against the inventory it came from, and the runs list labels each coverage figure with what it counts", async ({
+  page,
+}) => {
+  await propose(page, "writes: Buy something");
+  await expect(page.getByText("Proposed - nothing has run")).toBeVisible({
+    timeout: 10_000,
+  });
+  // 5 steps drawn from an inventory of 30 elements, touching 2 of them.
+  await expect(page.getByTestId("plan-inventory")).toContainText(
+    "These 5 steps touch 2 of the 30 elements in the inventory the plan was grounded against",
+  );
+
+  await step(page, 3)
+    .getByRole("button", { name: /^Leave out:/ })
+    .click();
+  await page.getByRole("button", { name: "Approve and run 2 steps" }).click();
+  await expect(page.getByTestId("run-started")).toBeVisible({
+    timeout: 10_000,
+  });
+  await expect(page.getByTestId("plan-inventory")).toBeVisible();
+
+  await page.getByRole("link", { name: "View runs" }).click();
+  await expect(page).toHaveURL(/\/runs$/);
+  // The plan run says "plan steps"; the suite runs say "elements". Never a bare "x/y".
+  const plan = page.locator(
+    '[data-testid="pass-rate-coverage"][data-basis="plan"]',
+  );
+  await expect(plan).toHaveCount(1);
+  await expect(plan).toContainText("2 of 5 plan steps covered");
+  const suites = page.locator(
+    '[data-testid="pass-rate-coverage"][data-basis="inventory"]',
+  );
+  expect(await suites.count()).toBeGreaterThan(0);
+  await expect(suites.first()).toContainText("elements covered");
+  await page.screenshot({
+    path: "test-results/runs-basis.png",
+    fullPage: true,
+  });
+});

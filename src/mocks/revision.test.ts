@@ -463,12 +463,20 @@ describe("plan runs: the numbers are OF the plan, and the exclusions travel with
       "pstp_2",
     ]);
     // Coverage is fixed by the approval, from the moment the run exists.
-    expect(created.coverage).toEqual({ generated: 2, candidate: 5 });
+    expect(created.coverage).toEqual({
+      basis: "plan",
+      generated: 2,
+      candidate: 5,
+    });
     const run = await finishedRun(created.id);
     expect(run.status).toBe("passed");
     expect(run.steps.length).toBe(2);
     expect(run.pass_rate).toBe(1);
-    expect(run.coverage).toEqual({ generated: 2, candidate: 5 });
+    expect(run.coverage).toEqual({
+      basis: "plan",
+      generated: 2,
+      candidate: 5,
+    });
     expect(run.proof_id).toBe(`proof_${run.id}`);
   });
 
@@ -499,7 +507,11 @@ describe("plan runs: the numbers are OF the plan, and the exclusions travel with
     });
 
     // coverage, the exclusions, and the uncovered list are one story.
-    expect(snap.coverage).toEqual({ generated: 2, candidate: 5 });
+    expect(snap.coverage).toEqual({
+      basis: "plan",
+      generated: 2,
+      candidate: 5,
+    });
     expect(snap.uncovered_total).toBe(
       snap.coverage.candidate - snap.coverage.generated,
     );

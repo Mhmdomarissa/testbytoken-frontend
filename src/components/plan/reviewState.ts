@@ -111,3 +111,12 @@ export function exclusionReason(
   if (step.blocked !== null) return "blocked";
   return "removed_by_user";
 }
+
+/** Distinct inventory elements the proposed steps touch (page-level and ungrounded steps touch none). */
+export function elementsTouched(steps: PlanStep[]): number {
+  return new Set(
+    steps.flatMap((s) =>
+      s.binding.type === "element" ? [s.binding.element_id] : [],
+    ),
+  ).size;
+}

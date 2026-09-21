@@ -100,6 +100,24 @@ export const ProofSnapshotSchema = z
         id: IdSchema,
         intent: z.string(),
         approved_at: TimestampSchema,
+        grounded_against: z
+          .object({
+            scan_id: IdSchema,
+            elements: z.number().int().min(0),
+            uniquely_locatable: z.number().int().min(0),
+            elements_proposed: z.number().int().min(0),
+          })
+          .openapi({
+            description:
+              "How big the application's inventory was when the plan was " +
+              "made, so 'N steps proposed' can be read against it: `elements` " +
+              "and `uniquely_locatable` are the inventory (scan) the plan was " +
+              "grounded against; `elements_proposed` is how many DISTINCT " +
+              "inventory elements the proposed steps touch. A plan is written " +
+              "from an intent, so it need not propose every groundable " +
+              "element - this is the number that shows the reduction, which " +
+              "`coverage` (proposed vs approved) does not.",
+          }),
         approved_steps: z.array(
           z.object({
             id: IdSchema,
