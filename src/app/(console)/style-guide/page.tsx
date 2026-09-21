@@ -158,7 +158,7 @@ export default function ThemePreviewPage() {
         <div className="flex flex-col gap-2">
           <PassRateCoverage
             passRate={1}
-            coverage={{ generated: 3, candidate: 24 }}
+            coverage={{ basis: "inventory", generated: 3, candidate: 24 }}
           />
           <ResultReason
             variant="ungrounded"

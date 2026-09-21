@@ -9,6 +9,7 @@
 // jsdom environment (hung) before adding this directive.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { server } from "./server";
+import { isPageRequest } from "./handlers";
 import {
   RunDetailSchema,
   InspectResponseSchema,
@@ -178,4 +179,30 @@ describe("inspect fixtures agree with the modules that describe them", () => {
       }
     },
   );
+});
+
+describe("the mock does not answer the framework's page requests", () => {
+  const req = (path: string, headers: Record<string, string> = {}) =>
+    new Request(`http://localhost${path}`, { headers });
+
+  it("recognises a Next RSC fetch, a prefetch and a document navigation", () => {
+    expect(isPageRequest(req("/runs?_rsc=abc"))).toBe(true);
+    expect(isPageRequest(req("/runs", { rsc: "1" }))).toBe(true);
+    expect(
+      isPageRequest(req("/targets", { "next-router-prefetch": "1" })),
+    ).toBe(true);
+    expect(
+      isPageRequest(
+        req("/targets", { accept: "text/html,application/xhtml+xml" }),
+      ),
+    ).toBe(true);
+  });
+
+  it("does not mistake an API call for one", () => {
+    expect(isPageRequest(req("/runs"))).toBe(false);
+    expect(isPageRequest(req("/targets", { accept: "application/json" }))).toBe(
+      false,
+    );
+    expect(isPageRequest(req("/runs?status=running&limit=5"))).toBe(false);
+  });
 });
