@@ -68,20 +68,26 @@ const PUBLIC_ROUTE_PREFIX = "/p/";
 const PUBLIC_ROUTE_BUDGET_BYTES = null;
 
 /**
- * TEMPORARY EXPERIMENT (pre-Phase-B review, item 4): this was 8 KB,
- * added as a hedge when CI (Ubuntu, a floating Node minor version) first
+ * Measured, not guessed (pre-Phase-B review, item 4). This was 8 KB, a
+ * hedge added when CI (Ubuntu, a floating Node minor version) first
  * failed every route by +0.4-2.2 KB against a baseline written locally
- * (macOS, .nvmrc's exact pinned patch). That PR also pinned CI to the
- * exact same .nvmrc version - which may have been the actual fix, making
- * this tolerance redundant rather than load-bearing. Set to 0 to find
- * out empirically rather than guess: if CI is still green at 0, the
- * Node-version pin was sufficient on its own and this constant should
- * stay at 0 (delete this comment and the paragraph above it once
- * confirmed). If CI fails, the failure output tells us the real
- * remaining drift, which becomes the honestly-justified value here -
- * not a guessed round number.
+ * (macOS, a specific Node patch). A follow-up PR pinned CI to that exact
+ * same .nvmrc version, which raised the question: was Node-version drift
+ * the actual cause, making this tolerance redundant? Tested directly by
+ * setting it to 0 and pushing - CI run 35565089141 still failed every
+ * route, by +0.4 to +1.7 KB, always CI-higher than local, never lower.
+ * That rules out Node-version float as the cause (it's now pinned
+ * identically on both sides) and confirms this is genuine macOS/Ubuntu
+ * build non-determinism (not root-caused further - plausibly the native
+ * zlib linked into each platform's Node binary producing slightly
+ * different gzip output for identical input, or filesystem
+ * directory-iteration order affecting Turbopack's chunk concatenation).
+ * 4 KB is ~2.3x the largest single-route drift actually observed
+ * (1.7 KB on /runs) - enough margin to absorb this specific noise
+ * without hiding a real regression, which for an added dependency or
+ * component is easily an order of magnitude bigger than 4 KB.
  */
-const TOLERANCE_BYTES = 0;
+const TOLERANCE_BYTES = 4 * 1024;
 
 const WRITE_MODE = process.argv.includes("--write");
 
