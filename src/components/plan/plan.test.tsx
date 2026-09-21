@@ -135,7 +135,7 @@ describe("PlanStepRow", () => {
     expect(screen.getByTestId("step-binding").textContent).toMatch(
       /ambiguous element.*two matched/,
     );
-    expect(screen.queryByRole("button", { name: "Leave out" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Leave out:/ })).toBeNull();
   });
 
   it("shows a blocked step with the server's reason", () => {
@@ -145,7 +145,7 @@ describe("PlanStepRow", () => {
       </ul>,
     );
     expect(screen.getByText("Blocked")).toBeTruthy();
-    expect(screen.getByText(/read-only account/)).toBeTruthy();
+    expect(screen.getAllByText(/read-only account/).length).toBeGreaterThan(0);
   });
 
   it("scraped text is inert: descriptions, labels, locators, inputs", () => {
@@ -187,6 +187,96 @@ describe("PlanStepRow", () => {
   });
 });
 
+describe("PlanStepRow accessibility", () => {
+  it("a step with no controls is a keyboard stop, and its accessible description says why it can't run", () => {
+    render(
+      <ul>
+        <PlanStepRow
+          step={blocked({ id: "b1", description: "Click Submit" })}
+          position={{ kind: "not-approvable" }}
+          controls={{
+            canMoveUp: false,
+            canMoveDown: false,
+            onMove: vi.fn(),
+            onToggle: vi.fn(),
+          }}
+        />
+        <PlanStepRow
+          step={ungrounded({ id: "u1", description: "Click Remove" })}
+          position={{ kind: "not-approvable" }}
+        />
+      </ul>,
+    );
+    for (const id of ["b1", "u1"]) {
+      const li = screen.getByTestId(`plan-step-${id}`);
+      expect(li.getAttribute("tabindex")).toBe("0");
+      expect(li.getAttribute("role")).toBe("group");
+      const described = document.getElementById(
+        li.getAttribute("aria-describedby")!,
+      )!;
+      expect(described.textContent).toMatch(/cannot be approved/i);
+    }
+    expect(document.getElementById("b1-state")!.textContent).toMatch(
+      /Blocked.*read-only account/,
+    );
+    expect(document.getElementById("u1-state")!.textContent).toMatch(
+      /Not grounded.*ambiguous element.*two matched/,
+    );
+  });
+
+  it("a step WITH controls is not an extra tab stop, but is a named group its buttons sit in", () => {
+    render(
+      <ul>
+        <PlanStepRow
+          step={step({ id: "g1", description: "Open it" })}
+          position={{ kind: "will-run", nth: 1 }}
+          controls={{
+            canMoveUp: false,
+            canMoveDown: true,
+            onMove: vi.fn(),
+            onToggle: vi.fn(),
+          }}
+        />
+      </ul>,
+    );
+    const li = screen.getByTestId("plan-step-g1");
+    expect(li.getAttribute("tabindex")).toBeNull();
+    expect(document.getElementById("g1-state")!.textContent).toBe(
+      "Will run, number 1",
+    );
+    // Buttons are named by the step, and the visible label is inside the name (WCAG 2.5.3).
+    expect(
+      screen.getByRole("button", { name: "Leave out: Open it" }).textContent,
+    ).toBe("Leave out");
+    expect(
+      screen.getByRole("button", { name: "Move down: Open it" }),
+    ).toBeTruthy();
+  });
+
+  it("a left-out step's toggle is named for what it does now, and says so in its state", () => {
+    render(
+      <ul>
+        <PlanStepRow
+          step={step({ id: "l1", description: "Open it" })}
+          position={{ kind: "left-out" }}
+          controls={{
+            canMoveUp: false,
+            canMoveDown: false,
+            onMove: vi.fn(),
+            onToggle: vi.fn(),
+          }}
+        />
+      </ul>,
+    );
+    expect(
+      screen.getByRole("button", { name: "Put back: Open it" }).textContent,
+    ).toBe("Put back");
+    expect(document.getElementById("l1-state")!.textContent).toMatch(
+      /Left out by you/,
+    );
+  });
+});
+
 describe("PlanReview", () => {
   const good1 = step();
   const good2 = step();
@@ -207,7 +297,7 @@ describe("PlanReview", () => {
     const down = () =>
       fireEvent.click(
         screen.getByRole("button", {
-          name: `Move step ${good1.index + 1} down`,
+          name: `Move down: ${good1.description}`,
         }),
       );
     down(); // past the ungrounded step
@@ -236,7 +326,7 @@ describe("PlanReview", () => {
     expect(screen.getByTestId("approval-summary").textContent).toMatch(
       /2 can't be approved/,
     );
-    for (const b of screen.getAllByRole("button", { name: "Leave out" }))
+    for (const b of screen.getAllByRole("button", { name: /^Leave out:/ }))
       fireEvent.click(b);
     expect(screen.getByTestId("approval-summary").textContent).toMatch(
       /No steps selected/,
@@ -248,6 +338,22 @@ describe("PlanReview", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+  });
+
+  it("the approval summary is a polite live region, so a change is announced", () => {
+    render(
+      <PlanReview
+        intent="x"
+        steps={steps}
+        busy={false}
+        error={null}
+        onApprove={vi.fn()}
+        onDiscard={vi.fn()}
+      />,
+    );
+    const summary = screen.getByTestId("approval-summary");
+    expect(summary.getAttribute("role")).toBe("status");
+    expect(summary.getAttribute("aria-live")).toBe("polite");
   });
 
   it("while an approval is in flight, both actions are disabled (no double-fire)", () => {

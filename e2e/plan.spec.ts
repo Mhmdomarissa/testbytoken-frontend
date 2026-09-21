@@ -157,10 +157,10 @@ test("approval sends exactly the chosen steps in the chosen order, then starts a
 
   // Reorder: move step 3 to the top of the approvable steps.
   await step(page, 3)
-    .getByRole("button", { name: /Move step 3 up/ })
+    .getByRole("button", { name: /^Move up:/ })
     .click();
   await step(page, 3)
-    .getByRole("button", { name: /Move step 3 up/ })
+    .getByRole("button", { name: /^Move up:/ })
     .click();
   await expect(step(page, 3)).toContainText("#1");
 
@@ -246,4 +246,52 @@ test("compose needs a finished scan; unknown targets say so", async ({
   await expect(page.getByText("Scan this target first")).toBeVisible();
   await page.goto("/targets/tgt_nope/compose");
   await expect(page.getByText("Target not found")).toBeVisible();
+});
+
+test("keyboard: every step - including the ones that can't run - is reachable by Tab, and announced with why", async ({
+  page,
+}) => {
+  await propose(page, "Buy something");
+  await expect(page.getByText("Proposed - nothing has run")).toBeVisible({
+    timeout: 10_000,
+  });
+
+  const list = page.getByRole("list", { name: "Proposed steps" });
+  await list.getByRole("button").first().focus();
+
+  const visited = new Set<string>();
+  for (let i = 0; i < 16; i++) {
+    const id = await page.evaluate(
+      () =>
+        document.activeElement
+          ?.closest("li[data-testid]")
+          ?.getAttribute("data-testid") ?? null,
+    );
+    if (id) visited.add(id);
+    await page.keyboard.press("Tab");
+  }
+  // All five steps got a keyboard stop, not just the two with buttons.
+  expect([...visited].sort()).toEqual(
+    [1, 2, 3, 4, 5].map((n) => `plan-step-pstp_${n}`),
+  );
+
+  // The blocked step, focused by keyboard, is named and described with the reason.
+  const blockedRow = step(page, 2);
+  await blockedRow.focus();
+  await expect(blockedRow).toBeFocused();
+  await expect(blockedRow).toHaveAccessibleName('Click "Submit"');
+  await expect(blockedRow).toHaveAccessibleDescription(
+    /Blocked, cannot be approved: This account is on the read-only tier/,
+  );
+  const ungrounded = step(page, 4);
+  await ungrounded.focus();
+  await expect(ungrounded).toHaveAccessibleDescription(
+    /Not grounded, cannot be approved: ambiguous element/,
+  );
+
+  // Changing the selection is announced through the live summary.
+  await expect(page.getByTestId("approval-summary")).toHaveAttribute(
+    "aria-live",
+    "polite",
+  );
 });
