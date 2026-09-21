@@ -117,7 +117,7 @@ const RunSharedFields = {
   target_id: IdSchema,
   suite_id: IdSchema.nullable().openapi({
     description:
-      "The suite this run executed, or null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set.",
+      "The suite this run executed: NULLABLE - non-null only for a suite-originated run, null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set. Suites survive alongside plans; no further suite semantics are defined until Phase C.",
   }),
   plan_id: IdSchema.nullable().openapi({
     description:

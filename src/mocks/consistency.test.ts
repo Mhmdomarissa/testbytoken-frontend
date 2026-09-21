@@ -19,6 +19,7 @@ import {
   computeScanState,
   runEventLog,
   scanEventLog,
+  scanFailureFor,
 } from "./lifecycle";
 import {
   applyJobEvents,
@@ -74,22 +75,28 @@ describe.each(TIMELINES)("run timeline: %s", (_name, timeline) => {
 });
 
 describe("scan timelines", () => {
-  const scanAt = (targetId: string, t: number) =>
+  const scanAt = (targetId: string, url: string, t: number) =>
     computeScanState(
-      { ...scanCheckout, target_id: targetId, status: "queued", modules: [] },
+      {
+        ...scanCheckout,
+        target_id: targetId,
+        target_url: url,
+        status: "queued",
+        modules: [],
+      },
       t,
     );
 
   it.each([
-    ["tgt_checkout", "completed"],
-    ["tgt_unreachable", "failed"],
+    ["tgt_checkout", "https://checkout.example.com", "completed"],
+    ["tgt_unreachable", "https://legacy-admin.example.com", "failed"],
   ])(
     "%s: the stream's terminal status is the scan's terminal status (%s)",
-    (targetId, expected) => {
-      const polled = scanAt(targetId, 10_000);
+    (targetId, url, expected) => {
+      const polled = scanAt(targetId, url, 10_000);
       const state = applyJobEvents(
         initialJobEventsState,
-        scanEventLog(10_000, targetId),
+        scanEventLog(10_000, scanFailureFor(url) !== null),
       );
       expect(polled.status).toBe(expected);
       expect(state.status).toBe(polled.status);

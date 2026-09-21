@@ -214,6 +214,9 @@ export function registerProofPaths(registry: OpenAPIRegistry) {
     summary: "Public, unauthenticated proof view",
     description:
       "No cookie required - this is the link a customer shares externally. " +
+      "Revoking sharing (`POST /proofs/{id}/share` with `enabled: false`) " +
+      "kills THIS page and its screenshot URLs and nothing else: the proof " +
+      "itself stays, unchanged, in the owner's authenticated view. " +
       "Rendered by a public Next route handler/page per CLAUDE.md, not proxied " +
       "to the API from a general-purpose route. Screenshot URLs on this response " +
       "are proof-scoped: signed against this proof's own share token, valid only " +
