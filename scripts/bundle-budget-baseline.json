@@ -1,12 +1,12 @@
 {
-  "/": 412296,
+  "/": 412300,
   "/_not-found": 185324,
-  "/runs": 416060,
-  "/sign-in": 283689,
-  "/style-guide": 392324,
-  "/suites": 414527,
-  "/targets": 440013,
-  "/targets/[id]/compose": 425739,
-  "/targets/[id]/inventory": 427551,
-  "/usage": 413510
+  "/runs": 416064,
+  "/sign-in": 283691,
+  "/style-guide": 392328,
+  "/suites": 414531,
+  "/targets": 440017,
+  "/targets/[id]/compose": 426180,
+  "/targets/[id]/inventory": 427555,
+  "/usage": 413514
 }
