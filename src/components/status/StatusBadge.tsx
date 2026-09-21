@@ -3,6 +3,7 @@ import {
   OctagonXIcon,
   LoaderCircleIcon,
   ClockIcon,
+  ClockAlertIcon,
   CircleSlashIcon,
   TriangleAlertIcon,
   type LucideIcon,
@@ -20,7 +21,7 @@ import { cn } from "@/lib/utils";
  * component instead of a one-off styled span.
  */
 export type Status =
-  "pass" | "fail" | "running" | "skipped" | "warning" | "queued";
+  "pass" | "fail" | "running" | "skipped" | "warning" | "queued" | "timed_out";
 
 const STATUS_META: Record<
   Status,
@@ -32,6 +33,11 @@ const STATUS_META: Record<
   queued: { label: "Queued", icon: ClockIcon },
   skipped: { label: "Skipped", icon: CircleSlashIcon },
   warning: { label: "Warning", icon: TriangleAlertIcon },
+  // Distinct from `fail`: own icon (a clock, not an octagon - it reads as
+  // "ran out of time", not "assertion failed"), own color rung, own
+  // label - not `fail` with different text (Phase A review, pre-Phase-B
+  // item 3: timed_out needs the same full treatment every other status got).
+  timed_out: { label: "Timed out", icon: ClockAlertIcon },
 };
 
 export function StatusBadge({
@@ -46,6 +52,14 @@ export function StatusBadge({
 }) {
   const meta = STATUS_META[status];
   const Icon = meta.icon;
+  // `status` values are snake_case (matching the contract's enum, e.g.
+  // `timed_out`); the CSS custom properties they key into use hyphens
+  // (`--status-timed-out-fg`). Without this, `var(--status-timed_out-fg)`
+  // resolves to nothing - not a visible error, just a badge that silently
+  // renders with inherited (default) color/background/border instead of
+  // its own, which is worse than a build error for exactly the WCAG 1.4.1
+  // reason this component exists.
+  const cssName = status.replace(/_/g, "-");
   return (
     <span
       className={cn(
@@ -53,9 +67,9 @@ export function StatusBadge({
         className,
       )}
       style={{
-        color: `var(--status-${status}-fg)`,
-        backgroundColor: `var(--status-${status}-bg)`,
-        borderColor: `var(--status-${status}-border)`,
+        color: `var(--status-${cssName}-fg)`,
+        backgroundColor: `var(--status-${cssName}-bg)`,
+        borderColor: `var(--status-${cssName}-border)`,
       }}
     >
       <Icon

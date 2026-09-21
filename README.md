@@ -81,6 +81,13 @@ console's dependencies. See `PUBLIC_ROUTE_BUDGET_BYTES` in the script:
 intentionally unset, because there's no honest number to write for a
 route that doesn't exist yet.
 
+**Phase C entry criterion:** before `/p/[token]` ships, measure it and
+set `PUBLIC_ROUTE_BUDGET_BYTES` to a real, deliberately tight number (not
+the app-shell ratchet default) in the same PR that builds the route -
+not as a follow-up. Until then `npm run bundle-budget` only warns on
+that route, it doesn't fail; that warning is a placeholder for this
+criterion, not a substitute for it.
+
 ## Mocking (no backend exists)
 
 `npm run dev` works today with no backend: MSW intercepts every endpoint in

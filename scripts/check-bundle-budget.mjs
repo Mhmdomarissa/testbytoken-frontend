@@ -68,19 +68,20 @@ const PUBLIC_ROUTE_PREFIX = "/p/";
 const PUBLIC_ROUTE_BUDGET_BYTES = null;
 
 /**
- * Discovered the hard way: this build is not perfectly byte-reproducible
- * across environments. A baseline written locally (macOS, a given Node
- * patch) failed every single route on CI (Ubuntu, a Node minor-version
- * float) by a small, consistent amount (+0.4 to +2.2 KB, ~0.1-0.5%) - not
- * a real regression, cross-build noise (exact cause not root-caused
- * further: plausibly directory-iteration order affecting chunk
- * concatenation, or a differing Node patch before CI's node-version was
- * pinned to .nvmrc's exact version alongside this). A real regression
- * from an added dependency or component is easily an order of magnitude
- * bigger than this tolerance; this exists to absorb noise, not to hide
- * genuine growth.
+ * TEMPORARY EXPERIMENT (pre-Phase-B review, item 4): this was 8 KB,
+ * added as a hedge when CI (Ubuntu, a floating Node minor version) first
+ * failed every route by +0.4-2.2 KB against a baseline written locally
+ * (macOS, .nvmrc's exact pinned patch). That PR also pinned CI to the
+ * exact same .nvmrc version - which may have been the actual fix, making
+ * this tolerance redundant rather than load-bearing. Set to 0 to find
+ * out empirically rather than guess: if CI is still green at 0, the
+ * Node-version pin was sufficient on its own and this constant should
+ * stay at 0 (delete this comment and the paragraph above it once
+ * confirmed). If CI fails, the failure output tells us the real
+ * remaining drift, which becomes the honestly-justified value here -
+ * not a guessed round number.
  */
-const TOLERANCE_BYTES = 8 * 1024;
+const TOLERANCE_BYTES = 0;
 
 const WRITE_MODE = process.argv.includes("--write");
 

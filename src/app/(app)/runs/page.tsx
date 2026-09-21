@@ -32,10 +32,11 @@ const STATUS_TOKEN: Record<z.infer<typeof RunStatusSchema>, Status> = {
   passed: "pass",
   failed: "fail",
   cancelled: "skipped",
-  // Same color family as `failed` (both are bad outcomes) - the distinct
-  // "timed_out" text label (passed separately below) is what actually
-  // distinguishes it, not the color.
-  timed_out: "fail",
+  // Own status, own icon+color (Phase A review, pre-Phase-B item 3) - a
+  // timeout used to reuse `failed`'s color and icon, distinguished only
+  // by label text, which was exactly the single-channel pattern this
+  // whole exercise exists to eliminate.
+  timed_out: "timed_out",
 };
 
 export default function RunsPage() {
