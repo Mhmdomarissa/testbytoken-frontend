@@ -214,24 +214,35 @@ mutation hook here, and every response is Zod-parsed at the boundary
   the status is terminal); `targets`/`suites` change rarely (60s). Each
   hook's comment says why. (`usage` and suite-authoring endpoints beyond
   what the spine needs are Phase C and intentionally not here yet.)
+- **`tolerant.ts`** — the client parses every response through a
+  _tolerant twin_ of its contract schema (applied once, in `client.ts`): an
+  enum member the client doesn't know becomes an `UnrecognisedValue`
+  instead of failing the parse. A strict schema that rejects an unfamiliar
+  status hides data (one unknown step status used to drop the SSE frame and
+  make the step vanish); see the "Honesty" rules in `CLAUDE.md`. Contract
+  schemas stay strict — they generate `openapi.json` and validate the mock.
 - **`sse/jobEventsReducer.ts`** — the pure `(state, event) => state`
-  reducer `GET /jobs/{id}/events` folds into. Keyed by `Step.index`, with
-  a per-key "last-applied event id" so a shuffled/duplicated/late
-  arrival can never overwrite newer state — verified by
-  `jobEventsReducer.test.ts` against exactly those hostile sequences
-  (shuffled, duplicated, gapped-then-backfilled), not just the happy
-  path.
+  reducer `GET /jobs/{id}/events` folds into. Keyed by `Step.id` (not
+  position — B0.5 B1), with a per-key "last-applied event id" so a
+  shuffled/duplicated/late arrival can never overwrite newer state, and
+  ordering by the contract's numeric event id (B0.5 B2) — verified by
+  `jobEventsReducer.test.ts` against shuffled, duplicated and gapped
+  sequences, mutation-checked.
 - **`sse/useJobEvents.ts`** — the `EventSource` client: reconnects with
   exponential backoff + full jitter (capped at 30s), resumes via an
-  explicit `?since=<last-seen-id>` on every (re)connection (not
-  `EventSource`'s native `Last-Event-ID` header, which some proxies
-  strip), and deliberately does **not** treat a quiet-but-open stream as
-  a failure — Phase A's `LIVE_STALL_TIMELINE` goes quiet for a real 15s
-  before resolving, and forcing a reconnect on an idle timer would
-  misreport a healthy, slow run as a dropped connection. `lastEventAt` is
-  exposed instead, for a consumer to render its own staleness affordance.
-  Not unit-tested itself (jsdom has no `EventSource`) — verified by
-  driving it in a real browser once B7 wires it into a screen.
+  explicit `?since=<last-seen-id>` on every (re)connection, stops for good
+  once `done` arrives (it once reconnected forever after a job finished —
+  found only by running it in a real browser), and uses the contract's
+  15s heartbeat (B0.5 B3) to tell a **quiet job** (heartbeats still
+  arriving — show "no news", stay connected) from a **dead connection** (no
+  frame of any kind for 2.5 intervals — reconnect). Exposes `lastEventAt`,
+  `lastFrameAt`, `reconnectCount` and `unreadableFrameCount` so none of
+  those states is invisible. The dead/quiet decision and the wire format are
+  unit-tested; the hook itself is driven in a real browser by
+  `npm run test:e2e` (Playwright, `e2e/job-events.spec.ts`, via the
+  dev-only `/dev/job-events` harness, which 404s in production). The
+  wall-clock heartbeat watchdog is not yet browser-tested. Not in CI yet —
+  B10 owns that.
 
 ## What is not here yet
 

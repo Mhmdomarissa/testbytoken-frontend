@@ -2,9 +2,32 @@ import { http } from "msw";
 import { z } from "zod";
 import { TargetSchema } from "@/lib/contract";
 import { json, errorResponse, checkSimulatedError } from "../respond";
-import { targets } from "../data";
+import { scanStore, targetStore } from "../store";
+import { resolveScan } from "../lifecycle";
 
-let store = [...targets];
+/**
+ * B0.5 B4: `last_scan` is computed from the scans that actually exist, at
+ * read time - a fixture written last week can't know about a scan started
+ * a second ago, and a stale `null` here would tell a screen "never scanned"
+ * about a target that is mid-crawl.
+ */
+function withLastScan(target: z.infer<typeof TargetSchema>) {
+  const latest = [...scanStore.values()]
+    .filter((s) => s.target_id === target.id)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+  if (!latest) return { ...target, last_scan: null };
+  const current = resolveScan(latest);
+  return {
+    ...target,
+    last_scan: {
+      id: current.id,
+      status: current.status,
+      failure: current.failure,
+      created_at: current.created_at,
+      updated_at: current.updated_at,
+    },
+  };
+}
 
 export const targetHandlers = [
   http.post("*/targets", async ({ request }) => {
@@ -19,45 +42,46 @@ export const targetHandlers = [
       base_url: body.base_url,
       environment: body.environment as
         "dev" | "test" | "staging" | "production",
+      last_scan: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    store = [...store, created];
+    targetStore.set(created.id, created);
     return json(TargetSchema, created, { status: 201 });
   }),
 
   http.get("*/targets", async ({ request }) => {
-    return checkSimulatedError(request) ?? json(z.array(TargetSchema), store);
+    return (
+      checkSimulatedError(request) ??
+      json(z.array(TargetSchema), [...targetStore.values()].map(withLastScan))
+    );
   }),
 
   http.get("*/targets/:id", async ({ params }) => {
-    const target = store.find((t) => t.id === params.id);
+    const target = targetStore.get(params.id as string);
     if (!target) return errorResponse(404, "not_found", "Target not found.");
-    return json(TargetSchema, target);
+    return json(TargetSchema, withLastScan(target));
   }),
 
   http.patch("*/targets/:id", async ({ params, request }) => {
-    const index = store.findIndex((t) => t.id === params.id);
-    if (index === -1)
-      return errorResponse(404, "not_found", "Target not found.");
+    const current = targetStore.get(params.id as string);
+    if (!current) return errorResponse(404, "not_found", "Target not found.");
     const patch = (await request.json()) as Partial<
       z.infer<typeof TargetSchema>
     >;
-    const current = store[index]!;
     const updated = {
       ...current,
       ...patch,
       updated_at: new Date().toISOString(),
     };
-    store = [...store.slice(0, index), updated, ...store.slice(index + 1)];
-    return json(TargetSchema, updated);
+    targetStore.set(updated.id, updated);
+    return json(TargetSchema, withLastScan(updated));
   }),
 
   http.delete("*/targets/:id", async ({ params }) => {
-    const index = store.findIndex((t) => t.id === params.id);
-    if (index === -1)
+    if (!targetStore.delete(params.id as string)) {
       return errorResponse(404, "not_found", "Target not found.");
-    store = [...store.slice(0, index), ...store.slice(index + 1)];
+    }
     return new Response(null, { status: 204 });
   }),
 ];

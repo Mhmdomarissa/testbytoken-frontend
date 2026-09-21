@@ -1,7 +1,12 @@
 import "./zod-openapi-setup";
 import { z } from "zod";
 import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
-import { ErrorSchema, IdSchema, TimestampSchema } from "./common";
+import {
+  ErrorSchema,
+  IdSchema,
+  TimestampSchema,
+  extensibleEnum,
+} from "./common";
 
 /**
  * A workspace boots an engine process and warms a browser for one user.
@@ -9,12 +14,12 @@ import { ErrorSchema, IdSchema, TimestampSchema } from "./common";
  * concept, closer to a session with its own lifecycle.
  */
 
-export const WorkspaceStatusSchema = z
-  .enum(["booting", "ready", "resetting", "error", "terminated"])
-  .openapi({
-    description:
-      "Lifecycle state of the engine process backing this workspace.",
-  });
+export const WorkspaceStatusSchema = extensibleEnum(
+  ["booting", "ready", "resetting", "error", "terminated"],
+  "Lifecycle state of the engine process backing this workspace. Describes " +
+    "the ENGINE PROCESS only - a customer's sign-in state is a LoginSession, " +
+    "not a workspace state.",
+);
 
 export const WorkspaceSchema = z
   .object({

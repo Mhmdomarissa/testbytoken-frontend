@@ -45,6 +45,23 @@ export const MeResponseSchema = z
   .object({
     id: z.string().min(1),
     email: z.email(),
+    capabilities: z
+      .object({
+        write_actions: z.boolean().openapi({
+          description:
+            "Whether this account may run steps that change state in a " +
+            "target application (`action_class: write`). False on the " +
+            "read-only tier. The UI reads this to show write steps blocked " +
+            "up front; the SERVER is still authoritative and marks each " +
+            "affected plan step `blocked`.",
+        }),
+      })
+      .openapi({
+        description:
+          "REQUIRED (B0.5 B7). What this account's tier permits. An object, " +
+          "not a tier name, so a capability can be added without the client " +
+          "having to know what tier implies it.",
+      }),
     created_at: TimestampSchema,
   })
   .openapi("Me");

@@ -109,7 +109,7 @@ describe("ugly-case fixtures are real, schema-valid data", () => {
     const res = await fetch(`${base}/proofs/proof_fail_1`);
     const proof = ProofSchema.parse(await res.json());
     expect(proof.hash).toMatch(/^sha256:/);
-    expect(proof.steps.length).toBeGreaterThan(0);
+    expect(proof.snapshot.steps.length).toBeGreaterThan(0);
   });
 
   it("POST /scans starts a scan queued, not instantly completed", async () => {

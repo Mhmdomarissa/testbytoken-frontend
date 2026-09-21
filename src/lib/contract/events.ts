@@ -1,7 +1,13 @@
 import "./zod-openapi-setup";
 import { z } from "zod";
 import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
-import { IdSchema } from "./common";
+import {
+  EventIdSchema,
+  IdSchema,
+  JobStatusSchema,
+  TimestampSchema,
+  extensibleEnum,
+} from "./common";
 import { StepSchema } from "./runs";
 
 /**
@@ -15,40 +21,61 @@ import { StepSchema } from "./runs";
  * generated, typed, and validated like everything else.
  */
 
+/**
+ * Heartbeat interval, fixed by this contract (B0.5 B3). A constant, not a
+ * negotiation: 15 seconds. `heartbeat.interval_ms` repeats it on the wire so
+ * a frame is self-describing, and so a future change is visible to clients.
+ */
+export const HEARTBEAT_INTERVAL_MS = 15_000;
+
 export const JobEventSchema = z
   .discriminatedUnion("type", [
     z.object({
-      id: z.string().openapi({
-        description:
-          "Monotonically increasing within the job; pass the last-seen value as `?since=` to resume.",
-      }),
+      id: EventIdSchema,
       type: z.literal("status"),
-      status: z.string().openapi({
+      status: JobStatusSchema.openapi({
         description:
-          "New job-level status, e.g. a ScanStatus or RunStatus value.",
+          "New job-level status (B0.5 B5: the same JobStatus vocabulary as " +
+          "the Scan and Run resources, no longer a bare string).",
       }),
     }),
     z.object({
-      id: z.string(),
+      id: EventIdSchema,
       type: z.literal("progress"),
       message: z.string().nullable(),
       percent: z.number().min(0).max(100).nullable(),
     }),
     z.object({
-      id: z.string(),
+      id: EventIdSchema,
       type: z.literal("step"),
       step: StepSchema,
     }),
     z.object({
-      id: z.string(),
+      id: EventIdSchema,
       type: z.literal("log"),
-      level: z.enum(["info", "warning", "error"]),
+      level: extensibleEnum(["info", "warning", "error"], "Log severity."),
       message: z.string(),
     }),
     z.object({
-      id: z.string(),
+      id: EventIdSchema,
       type: z.literal("done"),
-      status: z.string(),
+      status: JobStatusSchema.openapi({
+        description:
+          "Terminal job status. The server closes the stream after this " +
+          "frame; a client MUST NOT reconnect to a job it has received " +
+          "`done` for.",
+      }),
+    }),
+    z.object({
+      type: z.literal("heartbeat"),
+      at: TimestampSchema,
+      interval_ms: z
+        .number()
+        .int()
+        .min(1)
+        .openapi({
+          description: `Always ${HEARTBEAT_INTERVAL_MS} in this version of the contract.`,
+        }),
     }),
   ])
   .openapi("JobEvent");
@@ -68,7 +95,17 @@ export function registerEventPaths(registry: OpenAPIRegistry) {
     tags: ["events"],
     summary: "Subscribe to a job's events (SSE)",
     description:
-      "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`. " +
+      "Server-Sent Events. Each frame is `id: <event id>\\ndata: <JobEvent JSON>\\n\\n`, " +
+      "except `heartbeat`, which has no `id:` line (it is not part of the job's " +
+      "event sequence and never advances `Last-Event-ID` / `?since=`). " +
+      "HEARTBEAT (B0.5 B3, required): the server MUST send a `heartbeat` " +
+      "frame every 15 seconds for as long as the stream is open, whether or " +
+      "not the job is doing anything. A client that has received no frame " +
+      "of any kind for 2.5x the interval (37.5s) can therefore conclude the " +
+      "connection is dead, not merely that the job is quiet - the two are " +
+      "distinguishable facts. " +
+      "EVENT ORDERING (B0.5 B2, required): frame ids are the numeric " +
+      "`EventId` sequence; deliver in increasing order, never reuse. " +
       "Reconnect with `?since=<last-seen id>` to resume without re-delivering " +
       "earlier events. Authenticated by cookie (EventSource sends it " +
       "automatically, same-origin) - DEPLOYMENT REQUIREMENT: the API must be " +

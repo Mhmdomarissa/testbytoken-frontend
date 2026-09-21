@@ -23,9 +23,97 @@ export const TimestampSchema = z.iso.datetime().openapi({
   example: "2026-09-16T14:32:00Z",
 });
 
-export const EnvironmentSchema = z
-  .enum(["dev", "test", "staging", "production"])
-  .openapi({ description: "Named environment a target belongs to." });
+/**
+ * B0.5 B5: every enum in this contract is EXTENSIBLE. The server may add
+ * members at any time; clients MUST tolerate unknown ones (render them as
+ * "unrecognised", never drop the record or fail the response - Phase B
+ * section 1.1). The clause is stated once here and appended to every enum's
+ * description, and marked machine-readably with `x-extensible-enum`, so an
+ * implementer reading any single enum in openapi.json sees it.
+ */
+export const EXTENSIBLE_ENUM_NOTE =
+  "Extensible: new members MAY be added without a version bump. Clients " +
+  "MUST tolerate unknown members - render them as unrecognised, never " +
+  "drop the record or fail the response.";
+
+export function extensibleEnum<const T extends readonly [string, ...string[]]>(
+  values: T,
+  description: string,
+) {
+  return z.enum(values).openapi({
+    description: `${description} ${EXTENSIBLE_ENUM_NOTE}`,
+    "x-extensible-enum": true,
+  });
+}
+
+export const EnvironmentSchema = extensibleEnum(
+  ["dev", "test", "staging", "production"],
+  "Named environment a target belongs to.",
+);
+
+/**
+ * B0.5 B5: ONE vocabulary for the state of a job (a scan or a run). Scan
+ * and run statuses are subsets of it (`.extract`), and `JobEvent.status` /
+ * `done.status` use the whole thing - previously the events carried bare
+ * strings while the resources carried closed enums: same concept, two
+ * representations, and a client had no way to know they agreed.
+ */
+export const JobStatusSchema = extensibleEnum(
+  [
+    "queued",
+    "crawling",
+    "parked",
+    "running",
+    "completed",
+    "passed",
+    "failed",
+    "cancelled",
+    "timed_out",
+  ],
+  "State of a job (a scan or a run). Scan statuses are queued, crawling, " +
+    "parked, completed, failed; run statuses are queued, running, passed, " +
+    "failed, cancelled, timed_out.",
+);
+
+/**
+ * B0.5 B2: the ordering key of a job's event stream. Numeric monotonic
+ * sequence, NOT an opaque string and NOT a ULID - see docs/API_CONTRACT.md
+ * "Event ordering". Canonical decimal only, so the schema itself rejects
+ * anything a client could mis-order.
+ */
+const EVENT_ID_PATTERN = /^(0|[1-9][0-9]*)$/;
+
+/**
+ * The comparison the contract specifies, in one place: an event id's
+ * numeric value, or null if it is not a canonical id. Numeric comparison of
+ * canonical decimal integers is a TOTAL order (no ties between distinct
+ * ids, no incomparable pairs) - which is the whole point of specifying the
+ * format. `null` is "not an id", never "newest".
+ */
+export function eventIdValue(id: string): number | null {
+  if (!EVENT_ID_PATTERN.test(id)) return null;
+  const n = Number(id);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
+export const EventIdSchema = z
+  .string()
+  .regex(EVENT_ID_PATTERN)
+  .refine((v) => eventIdValue(v) !== null, {
+    message: "event id must not exceed 2^53 - 1",
+  })
+  .openapi({
+    type: "string",
+    pattern: "^(0|[1-9][0-9]*)$",
+    description:
+      "Position in the job's event sequence: a non-negative integer in " +
+      "canonical decimal form (no sign, no leading zeros, at most " +
+      "9007199254740991), STRICTLY increasing within a job. Compare " +
+      "numerically. Gaps are permitted; reordering and reuse are not. " +
+      "Pass the last-seen value as `?since=` to resume - events with a " +
+      "greater id are delivered.",
+    example: "42",
+  });
 
 export const ErrorSchema = z
   .object({

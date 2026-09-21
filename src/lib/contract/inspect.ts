@@ -1,7 +1,7 @@
 import "./zod-openapi-setup";
 import { z } from "zod";
 import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
-import { ErrorSchema, IdSchema } from "./common";
+import { ErrorSchema, IdSchema, extensibleEnum } from "./common";
 
 /**
  * Inspect opens one module and lists its elements with the locator the
@@ -11,11 +11,10 @@ import { ErrorSchema, IdSchema } from "./common";
  * on every element in this list.
  */
 
-export const LocatorStrategySchema = z
-  .enum(["css", "xpath", "role", "text", "test_id"])
-  .openapi({
-    description: "How `locator` should be interpreted by the runner.",
-  });
+export const LocatorStrategySchema = extensibleEnum(
+  ["css", "xpath", "role", "text", "test_id"],
+  "How `locator` should be interpreted by the runner.",
+);
 
 export const ElementSchema = z
   .object({
@@ -25,6 +24,20 @@ export const ElementSchema = z
       description:
         "Best-effort human label - visible text, aria-label, or similar.",
     }),
+    role: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          "REQUIRED (B0.5 B6). What the element IS: its computed ARIA role " +
+          "(`button`, `link`, `textbox`, `heading`, `checkbox`...), null when " +
+          "it has no meaningful role (a generic container). Distinct from " +
+          "`locator_strategy`, which is how we FIND it, not what it is - the " +
+          "inventory screen exists to show whether the system understands the " +
+          "app, and the lookup strategy does not answer that. An open string, " +
+          "not an enum: ARIA's vocabulary is large and owned by a standard.",
+        example: "button",
+      }),
     locator: z.string(),
     locator_strategy: LocatorStrategySchema,
     uniquely_locatable: z.boolean().openapi({

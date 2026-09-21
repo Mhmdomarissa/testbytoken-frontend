@@ -26,6 +26,8 @@ import { applyJobEvents, initialJobEventsState } from "./sse/jobEventsReducer";
  */
 
 const step = {
+  id: "stp_1",
+  plan_step_id: null,
   index: 0,
   action: "click",
   target: "#a",
@@ -40,6 +42,8 @@ const run = {
   workspace_id: "w",
   target_id: "t",
   suite_id: "s",
+  plan_id: null,
+  login_session_id: null,
   status: "passed",
   pass_rate: 1,
   coverage: { generated: 3, candidate: 24 },
@@ -75,7 +79,7 @@ describe("site 1: step status", () => {
 
     // Nothing dropped: the step is in reducer state.
     const state = applyJobEvents(initialJobEventsState, [frame.event]);
-    const kept = state.steps[0];
+    const kept = state.steps.stp_1;
     expect(kept).toBeDefined();
     expect(isUnrecognised(kept?.status)).toBe(true);
     expect(kept?.message).toBe("ok"); // the rest of the step survives intact
@@ -106,6 +110,7 @@ describe("site 2: run status", () => {
       RunDetailSchema.safeParse({
         ...run,
         status: "paused_by_engine",
+        report_url: null,
         steps: [],
       }).success,
     ).toBe(false);
@@ -115,6 +120,7 @@ describe("site 2: run status", () => {
     const parsed = tolerant(RunDetailSchema).parse({
       ...run,
       status: "??",
+      report_url: null,
       steps: [],
     });
     expect(parsed.coverage).toEqual({ generated: 3, candidate: 24 });
@@ -144,7 +150,10 @@ describe("site 4: done.status", () => {
     expect(frame.ok).toBe(true);
     if (!frame.ok) return;
     const state = applyJobEvents(initialJobEventsState, [frame.event]);
-    expect(state.status).toBe("exploded");
+    // B0.5 B5: done.status is now an enum like every other status, so an
+    // unfamiliar value is an UnrecognisedValue (no longer a bare string).
+    expect(isUnrecognised(state.status)).toBe(true);
+    expect(state.status).toMatchObject({ raw: "exploded" });
     expect(state.lastEventId).toBe("9");
     const el = chipText(toBadgeStatus(state.status!));
     expect(el.textContent).toContain("exploded");
@@ -214,6 +223,7 @@ describe("the badge never throws, and never impersonates a real state", () => {
     const parsed = tolerant(RunDetailSchema).parse({
       ...run,
       status: { raw: "x", unrecognised: true },
+      report_url: null,
       steps: [],
     });
     expect(parsed.status).toBeInstanceOf(UnrecognisedValue); // wrapped as a *value it didn't understand*, never trusted as ours
@@ -223,8 +233,8 @@ describe("the badge never throws, and never impersonates a real state", () => {
 describe("loud in development, graceful in production", () => {
   it("logs an unrecognised value once per path+value in development", () => {
     const schema = tolerant(RunDetailSchema);
-    schema.parse({ ...run, status: "banana", steps: [] });
-    schema.parse({ ...run, status: "banana", steps: [] });
+    schema.parse({ ...run, status: "banana", report_url: null, steps: [] });
+    schema.parse({ ...run, status: "banana", report_url: null, steps: [] });
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(String(errorSpy.mock.calls[0]?.[0])).toContain("banana");
   });
@@ -235,6 +245,7 @@ describe("loud in development, graceful in production", () => {
       const parsed = tolerant(RunDetailSchema).parse({
         ...run,
         status: "prod-odd",
+        report_url: null,
         steps: [],
       });
       expect(errorSpy).not.toHaveBeenCalled();
@@ -261,8 +272,12 @@ describe("tolerant() covers the whole contract", () => {
   });
 
   it("leaves a known payload completely unchanged", () => {
-    const parsed = tolerant(RunDetailSchema).parse({ ...run, steps: [step] });
-    expect(parsed).toEqual({ ...run, steps: [step] });
+    const parsed = tolerant(RunDetailSchema).parse({
+      ...run,
+      report_url: null,
+      steps: [step],
+    });
+    expect(parsed).toEqual({ ...run, report_url: null, steps: [step] });
   });
 
   it("still rejects genuinely malformed structure - it tolerates vocabulary, not brokenness", () => {
@@ -270,6 +285,7 @@ describe("tolerant() covers the whole contract", () => {
       tolerant(RunDetailSchema).safeParse({
         ...run,
         pass_rate: "high",
+        report_url: null,
         steps: [],
       }).success,
     ).toBe(false);

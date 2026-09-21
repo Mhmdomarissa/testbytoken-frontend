@@ -4,8 +4,10 @@ import type { OpenAPIRegistry } from "@asteasolutions/zod-to-openapi";
 import {
   ErrorSchema,
   IdSchema,
+  JobStatusSchema,
   PaginationQuerySchema,
   TimestampSchema,
+  extensibleEnum,
   paginated,
 } from "./common";
 
@@ -20,32 +22,52 @@ import {
  * without the other.
  */
 
-export const RunStatusSchema = z
-  .enum(["queued", "running", "passed", "failed", "cancelled", "timed_out"])
-  .openapi({
-    description:
-      "Overall run status. `timed_out` is distinct from `failed`: a failure has " +
-      "a specific reason from a specific step; a timeout is the absence of " +
-      "information (the engine stopped responding) and carries no such reason. " +
-      "Added while building the mock's stateful lifecycle simulation (Phase A " +
-      'review, §5) - the review asked for "at least one [run] that stalls and ' +
-      'times out", and the original five-value enum had no way to represent ' +
-      "that outcome distinctly from an ordinary failure.",
-  });
+export const RunStatusSchema = JobStatusSchema.extract([
+  "queued",
+  "running",
+  "passed",
+  "failed",
+  "cancelled",
+  "timed_out",
+]).openapi({
+  description:
+    "Overall run status - the run-shaped subset of the JobStatus vocabulary. " +
+    "`timed_out` is distinct from `failed`: a failure has a specific reason " +
+    "from a specific step; a timeout is the absence of information (the " +
+    "engine stopped responding) and carries no such reason. Extensible: new " +
+    "members MAY be added; clients MUST tolerate unknown members.",
+  "x-extensible-enum": true,
+});
 
 // Same six values as the app's design-token status scale
 // (styles/tokens.css --status-*) - one vocabulary for step status end to
 // end, engine to pixel.
-export const StepStatusSchema = z
-  .enum(["pass", "fail", "running", "skipped", "warning", "queued"])
-  .openapi({
-    description:
-      "Per-step status. Matches the design system's status token names 1:1.",
-  });
+export const StepStatusSchema = extensibleEnum(
+  ["pass", "fail", "running", "skipped", "warning", "queued"],
+  "Per-step status. Matches the design system's status token names 1:1.",
+);
 
 export const StepSchema = z
   .object({
-    index: z.number().int().min(0),
+    id: IdSchema.openapi({
+      description:
+        "REQUIRED (B0.5 B1). Stable identity of this step, unique within its " +
+        "run: minted when the step is created and never derived from its " +
+        "position. Clients key step state on this, not on `index` - a run " +
+        "whose steps are re-indexed (a plan edit, an inserted retry) must " +
+        "not merge two distinct steps into one. The same `id` appears on " +
+        "every event and response that mentions the step.",
+      example: "stp_3f9a1c",
+    }),
+    index: z.number().int().min(0).openapi({
+      description: "Display order only. Not an identity - see `id`.",
+    }),
+    plan_step_id: IdSchema.nullable().openapi({
+      description:
+        "The approved plan step this executed step came from; null for a " +
+        "run that did not come from a plan. Lets a proof say what was " +
+        "approved and what actually ran.",
+    }),
     action: z.string().openapi({
       description:
         "Engine-defined action name, e.g. `click`, `fill`, `navigate`, `assert_visible`. Intentionally an open string, not an enum - the engine's action vocabulary evolves independently of this contract.",
@@ -93,7 +115,18 @@ const RunSharedFields = {
   id: IdSchema,
   workspace_id: IdSchema,
   target_id: IdSchema,
-  suite_id: IdSchema,
+  suite_id: IdSchema.nullable().openapi({
+    description:
+      "The suite this run executed, or null for a run that came from a plan. Exactly one of `suite_id` / `plan_id` is set.",
+  }),
+  plan_id: IdSchema.nullable().openapi({
+    description:
+      "REQUIRED (B0.5 B7). The approved plan this run executes, or null for a suite run. A run references the plan it came from; that plan is immutable.",
+  }),
+  login_session_id: IdSchema.nullable().openapi({
+    description:
+      "The captured login session the run used (B0.5 B8), or null. An opaque reference - the session itself is never returned by any endpoint.",
+  }),
   status: RunStatusSchema,
   pass_rate: z.number().min(0).max(1).openapi({
     description:
@@ -114,14 +147,38 @@ const RunSharedFields = {
 export const RunSummarySchema = z.object(RunSharedFields).openapi("RunSummary");
 
 export const RunDetailSchema = z
-  .object({ ...RunSharedFields, steps: z.array(StepSchema) })
+  .object({
+    ...RunSharedFields,
+    report_url: z
+      .url()
+      .nullable()
+      .openapi({
+        description:
+          "REQUIRED (B0.5 B9). Resolved URL of the engine's generated HTML " +
+          "report (`GET /runs/{id}/report`), or null until the run finishes. " +
+          "Session-scoped, like every other authenticated URL here - never a " +
+          "token in the URL. UNTRUSTED CONTENT: see the endpoint.",
+      }),
+    steps: z.array(StepSchema),
+  })
   .openapi("RunDetail");
 
 export const CreateRunRequestSchema = z
   .object({
     workspace_id: IdSchema,
-    suite_id: IdSchema,
     target_id: IdSchema,
+    suite_id: IdSchema.optional().openapi({
+      description:
+        "Run an existing suite. Exactly one of `suite_id` / `plan_id` MUST be given; anything else is a 422 `invalid_request`.",
+    }),
+    plan_id: IdSchema.optional().openapi({
+      description:
+        "Run an APPROVED plan (B0.5 B7) - what executes is the plan's approved step list, in that order. A plan that is not `approved` is a 409 `plan_not_approved`.",
+    }),
+    login_session_id: IdSchema.optional().openapi({
+      description:
+        "A `completed`, unexpired login session to run under (B0.5 B8). Opaque reference; no credential ever crosses this API.",
+    }),
   })
   .openapi("CreateRunRequest");
 
@@ -204,6 +261,39 @@ export function registerRunPaths(registry: OpenAPIRegistry) {
       },
       409: {
         description: "Run already finished.",
+        content: { "application/json": { schema: ErrorSchema } },
+      },
+    },
+  });
+
+  registry.registerPath({
+    method: "get",
+    path: "/runs/{id}/report",
+    tags: ["runs"],
+    summary: "The engine's generated HTML report for a finished run",
+    description:
+      "REQUIRED (B0.5 B9). **UNTRUSTED CONTENT.** The report is HTML produced " +
+      "from a run against a site we do not control, and it quotes that site's " +
+      "text. It MUST NOT be rendered inline in the app's DOM. The frontend " +
+      "embeds it only in an `<iframe sandbox>` WITHOUT `allow-same-origin`, and " +
+      "the server MUST make that the only safe way to consume it, not merely " +
+      "the recommended one: respond with `Content-Security-Policy: sandbox` " +
+      "(no `allow-same-origin`, no `allow-scripts`), `X-Content-Type-Options: " +
+      "nosniff` and `Content-Disposition: inline`, so even a direct " +
+      "navigation to this URL is sandboxed. Authorization class: " +
+      "session-scoped (same cookie as the rest of the API; never a token in " +
+      "the URL). 404 until the run has finished. There is deliberately no " +
+      "public/proof-scoped variant: the shareable artefact is the Proof " +
+      "snapshot, not this report.",
+    security: [{ cookieAuth: [] }],
+    request: { params: RunIdParam },
+    responses: {
+      200: {
+        description: "The report, as `text/html`. Untrusted - sandbox only.",
+        content: { "text/html": { schema: z.string() } },
+      },
+      404: {
+        description: "Not found, or the run has not finished.",
         content: { "application/json": { schema: ErrorSchema } },
       },
     },

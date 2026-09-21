@@ -1,6 +1,7 @@
 import { http } from "msw";
 import {
   ProofSchema,
+  PublicProofSchema,
   ShareSchema,
   CreateShareRequestSchema,
 } from "@/lib/contract";
@@ -18,7 +19,11 @@ export const proofHandlers = [
 
   http.get("*/p/:token", async ({ params }) => {
     const proof = store.find(
-      (p) => p.share?.token === params.token && p.share?.enabled,
+      (p) =>
+        p.share?.token === params.token &&
+        p.share?.enabled &&
+        (p.share.expires_at === null ||
+          new Date(p.share.expires_at).getTime() > Date.now()),
     );
     if (!proof)
       return errorResponse(
@@ -26,7 +31,16 @@ export const proofHandlers = [
         "not_found",
         "Token invalid, expired, or sharing disabled.",
       );
-    return json(ProofSchema, proof);
+    // B0.5 B10: the public shape is picked field by field, NOT spread from
+    // the owner's Proof - so a field added to Proof later can't leak onto
+    // this page by default. No run id, no share token, nothing that
+    // resolves to authenticated data: the snapshot and nothing else.
+    return json(PublicProofSchema, {
+      id: proof.id,
+      hash: proof.hash,
+      created_at: proof.created_at,
+      snapshot: proof.snapshot,
+    });
   }),
 
   http.post("*/proofs/:id/share", async ({ params, request }) => {
