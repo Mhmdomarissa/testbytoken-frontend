@@ -255,8 +255,22 @@ export const LIVE_STALL_TIMELINE: RunTimeline = {
   steps: [
     step(0, 0, { action: "navigate", target: "https://checkout.example.com/" }),
     step(1, 1200, { action: "click", target: "#add-to-cart" }),
+    // The engine's own verdict on its silence. A REAL step on the
+    // timeline, arriving at the moment of the timeout - not something the
+    // polling path invents on the side. It used to be synthesised inside
+    // computeRunState only, so GET /runs/{id} showed a step the event
+    // stream never carried (src/mocks/consistency.test.ts).
+    step(2, 15_000, {
+      id: "stp_timeout",
+      action: "timeout",
+      target: "engine",
+      status: "fail",
+      message:
+        "No response from the engine for 14s. The run has been marked as timed out.",
+      duration_ms: 13_800,
+    }),
   ],
-  resolvesAt: 15000,
+  resolvesAt: 15_000,
   finalStatus: "timed_out",
 };
 
@@ -299,21 +313,6 @@ export function computeRunState(
     .filter((s) => s.at <= elapsedMs)
     .map((s) => s.step);
   const resolved = elapsedMs >= timeline.resolvesAt;
-
-  if (resolved && timeline.finalStatus === "timed_out") {
-    stepsSoFar.push({
-      id: "stp_timeout",
-      plan_step_id: null,
-      index: stepsSoFar.length,
-      action: "timeout",
-      target: "engine",
-      assertion: null,
-      status: "fail",
-      message: `No response from the engine for ${Math.round((timeline.resolvesAt - (timeline.steps.at(-1)?.at ?? 0)) / 1000)}s. The run has been marked as timed out.`,
-      duration_ms: timeline.resolvesAt - (timeline.steps.at(-1)?.at ?? 0),
-      screenshot_url: null,
-    });
-  }
 
   const passed = stepsSoFar.filter((s) => s.status === "pass").length;
   const pass_rate = stepsSoFar.length > 0 ? passed / stepsSoFar.length : 1;
@@ -363,28 +362,71 @@ export function registerRunTimeline(runId: string, timeline: RunTimeline) {
   LIVE_RUN_TIMELINES.set(runId, timeline);
 }
 
-const cancelledRunIds = new Set<string>();
+/**
+ * Cancelling a run rewrites ITS TIMELINE, and nothing else: the steps that
+ * had already happened stay as they were; every step still to come becomes
+ * `skipped` at the moment of cancellation (the contract: "remaining
+ * scenarios are marked skipped"); the run resolves `cancelled` right then.
+ * Because polling, the SSE backlog and live SSE delivery all derive from
+ * the run's timeline, they can't disagree about a cancellation - the old
+ * version special-cased it in the polling path only, so the event stream
+ * carried on to a `passed` that never happened, and a polled run's
+ * `finished_at` was `new Date()` on every request.
+ */
+export function timelineCancelledAt(
+  timeline: RunTimeline,
+  cancelledAtMs: number,
+): RunTimeline {
+  return {
+    steps: timeline.steps.map((s) =>
+      s.at <= cancelledAtMs
+        ? s
+        : {
+            at: cancelledAtMs,
+            step: {
+              ...s.step,
+              status: "skipped",
+              message: "Skipped: the run was cancelled before this step.",
+              duration_ms: 0,
+              screenshot_url: null,
+            },
+          },
+    ),
+    resolvesAt: cancelledAtMs,
+    finalStatus: "cancelled",
+  };
+}
 
-/** POST /runs/{id}/cancel calls this to freeze a live run's progression. */
+const cancelListeners = new Map<string, Set<() => void>>();
+
+/** The events handler registers here so an OPEN stream hears about a cancellation (returns an unsubscribe). */
+export function onRunCancelled(
+  runId: string,
+  listener: () => void,
+): () => void {
+  const set = cancelListeners.get(runId) ?? new Set();
+  set.add(listener);
+  cancelListeners.set(runId, set);
+  return () => set.delete(listener);
+}
+
+/** POST /runs/{id}/cancel: freeze the run's timeline at THIS moment, then tell any open stream. */
 export function cancelRun(runId: string) {
-  cancelledRunIds.add(runId);
+  const timeline = LIVE_RUN_TIMELINES.get(runId);
+  if (!timeline) return;
+  LIVE_RUN_TIMELINES.set(
+    runId,
+    timelineCancelledAt(
+      timeline,
+      Math.min(elapsedMsFor(runId), timeline.resolvesAt),
+    ),
+  );
+  for (const listener of cancelListeners.get(runId) ?? []) listener();
 }
 
 export function resolveRun(base: Run): Run {
   const timeline = LIVE_RUN_TIMELINES.get(base.id);
   if (!timeline) return base;
-  if (cancelledRunIds.has(base.id)) {
-    const elapsedAtCancel = elapsedMsFor(base.id);
-    return {
-      ...computeRunState(
-        base,
-        timeline,
-        Math.min(elapsedAtCancel, timeline.resolvesAt - 1),
-      ),
-      status: "cancelled",
-      finished_at: new Date().toISOString(),
-    };
-  }
   return computeRunState(base, timeline, elapsedMsFor(base.id));
 }
 

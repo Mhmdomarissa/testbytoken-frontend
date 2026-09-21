@@ -497,8 +497,9 @@ overall `status` is `queued` / `running` / `passed` / `failed` /
 six-value step status above (a run's per-step statuses don't include
 `timed_out`; only the run as a whole times out). `timed_out` means the
 engine stopped responding and produced no further step events before the
-deadline: a diagnostic absence, not a specific assertion failure, so it
-carries no `message` the way a `failed` step does and `proof_id` stays
+deadline: a diagnostic absence, not a specific assertion failure. The run
+carries no failure reason (the engine may append a final `timeout` step
+saying how long it was silent) and `proof_id` stays
 permanently null (no run report was produced). Surfaced by building the
 mock's stateful lifecycle simulation (Phase A review §5) — the original
 five-value enum had no way to represent an engine going silent, only an
@@ -532,7 +533,24 @@ pairwise coverage — not `fail` with a different label.
 
 `GET /jobs/{id}/events` — essential. Watching a real browser execute
 steps live is close to the product's core pitch; polling `GET
-/runs/{id}` on an interval is a degraded fallback, not equivalent.
+/runs/{id}` on an interval is a degraded fallback, not equivalent (slower
+to notice change, no heartbeat-based liveness).
+
+**Which source is authoritative: `GET /runs/{id}` (and `GET /scans/{id}`
+for scans).** The event stream is a delivery mechanism for changes to that
+state, not an independent record of it. If a stream and a fetch ever
+disagree, the fetch wins, and a client reconciles against it whenever a
+stream reconnects or delivers `done`. The server must therefore derive
+both from the same state: every step in the fetched run was delivered (or
+is deliverable via `?since=`) on the stream and vice versa. This includes
+the two cases easiest to get wrong: a `timed_out` run's final step
+(`action: "timeout"`, recording the engine's silence — it is a diagnostic,
+not an assertion failure) and a `cancelled` run, whose not-yet-run steps
+become `skipped` at the moment of cancellation and whose stream ends with
+`done: cancelled`. Found by the reference mock, which served a stalled run
+one way to pollers and another to stream subscribers, and let a cancelled
+run's stream go on to report `passed`
+(`src/mocks/consistency.test.ts` now pins the agreement).
 
 ### suites
 
