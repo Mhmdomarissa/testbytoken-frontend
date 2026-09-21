@@ -16,9 +16,19 @@ import { cn } from "@/lib/utils";
  * review (WCAG 1.4.1: color alone binary-searched every status to the
  * same lightness, making pass/fail indistinguishable for ~6% of male
  * users and identical in greyscale): every status carries three
- * independent channels - color, a distinct-silhouette icon, and a text
- * label. Never render a status as a color swatch alone; use this
- * component instead of a one-off styled span.
+ * independent channels - a filled chip color, a distinct-silhouette
+ * icon, and a text label. Never render a status as a color swatch alone;
+ * use this component instead of a one-off styled span.
+ *
+ * Renders as a FILLED chip (Phase B, B2), not colored text on the page
+ * background: the label/icon are always --color-blue-deep, drawn on top
+ * of a per-status fill (styles/tokens.css's `--status-*-chip-fill`).
+ * This is a real accessibility change, not a restyle - a filled chip's
+ * fill only needs 3:1 against the page (AA non-text) and the label only
+ * needs 4.5:1 against ITS OWN fill, not against the page, which is a
+ * much wider constraint than the old text-on-page approach and is what
+ * let the seven statuses spread further apart (see tokens.css's comment
+ * on `--status-*-chip-fill` for the exact numbers).
  */
 export type Status =
   "pass" | "fail" | "running" | "skipped" | "warning" | "queued" | "timed_out";
@@ -54,23 +64,19 @@ export function StatusBadge({
   const Icon = meta.icon;
   // `status` values are snake_case (matching the contract's enum, e.g.
   // `timed_out`); the CSS custom properties they key into use hyphens
-  // (`--status-timed-out-fg`). Without this, `var(--status-timed_out-fg)`
-  // resolves to nothing - not a visible error, just a badge that silently
-  // renders with inherited (default) color/background/border instead of
-  // its own, which is worse than a build error for exactly the WCAG 1.4.1
-  // reason this component exists.
+  // (`--status-timed-out-chip-fill`). Without this,
+  // `var(--status-timed_out-chip-fill)` resolves to nothing - not a
+  // visible error, just a badge that silently renders with an inherited
+  // (default) fill instead of its own, which is worse than a build error
+  // for exactly the WCAG 1.4.1 reason this component exists.
   const cssName = status.replace(/_/g, "-");
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 border px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide",
+        "inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-(--color-blue-deep)",
         className,
       )}
-      style={{
-        color: `var(--status-${cssName}-fg)`,
-        backgroundColor: `var(--status-${cssName}-bg)`,
-        borderColor: `var(--status-${cssName}-border)`,
-      }}
+      style={{ backgroundColor: `var(--status-${cssName}-chip-fill)` }}
     >
       <Icon
         className={cn("size-3", meta.spin && "animate-spin")}

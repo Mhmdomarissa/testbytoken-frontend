@@ -104,6 +104,48 @@
   --status-skipped-border: #6a6b7a;
 
   /* ---------------------------------------------------------------------
+   * Status chip fills (Phase B, B2) - the seven `-fg` colors above render
+   * as normal-weight TEXT on the page background, which is why their
+   * lightness had to stay inside a narrow band: WCAG normal-text contrast
+   * (>=4.5:1) against a near-black ground only leaves so much room, and
+   * with seven statuses sharing it, the worst adjacent pair tops out
+   * around ~1.11-1.12:1 (see the Isoluminance section above and
+   * docs/DESIGN_SYSTEM_APP.md) - real, but not by much.
+   *
+   * A FILLED chip changes the constraint entirely: the fill only needs
+   * 3:1 against the page (AA non-text, WCAG 1.4.11) - not 4.5:1 - and the
+   * label/icon drawn ON the fill only need 4.5:1 against THAT fill, not
+   * against the page. Fixing the label color to --color-blue-deep (an
+   * existing anchor, not a new "ink" hue) and solving for lightness
+   * against blue-deep instead of against warm-white on a dark page pushes
+   * the usable range from ~[0.25, 0.54] up to ~[0.235, 0.91] - roughly
+   * 3x wider. Same equal-CONTRAST-RATIO ladder method as the `-fg` scale
+   * (WCAG contrast is (L+0.05)/(L'+0.05); equal RATIO steps, not equal
+   * lightness steps - see above), same hues per status for continuity,
+   * chroma re-solved to fit the new lightness (some reduced to stay in
+   * sRGB gamut at the lighter end - `pass` and `running` most visibly).
+   * Result: every pairwise fill-to-fill contrast is ~1.20-1.24:1 - the
+   * common ratio itself, since equal-ratio spacing makes every adjacent
+   * pair equal by construction - versus the old scale's ~1.11-1.12:1.
+   * Measured, reproducible, and asserted in
+   * src/components/status/StatusBadge.test.tsx, not just claimed here.
+   *
+   * StatusBadge renders status chips using ONLY this fill + blue-deep for
+   * both label and icon - the `-fg`/`-bg`/`-border` triad above remains
+   * for its other, pre-existing consumers (globals.css's --destructive
+   * and --chart-* tokens, OfflineBanner's inline warning banner), which
+   * render as text-on-page, not a filled chip, and still need the
+   * original narrower-but-still-AA-safe scale.
+   * ------------------------------------------------------------------- */
+  --status-fail-chip-fill: #d75f64;
+  --status-timed-out-chip-fill: #d87e4c;
+  --status-queued-chip-fill: #b6a28f;
+  --status-skipped-chip-fill: #b4b6c9;
+  --status-warning-chip-fill: #e6c58a;
+  --status-running-chip-fill: #afe7fe;
+  --status-pass-chip-fill: #d7ffdd;
+
+  /* ---------------------------------------------------------------------
    * Typography
    * ------------------------------------------------------------------- */
   /* next/font/google injects --font-cormorant / --font-montserrat from
