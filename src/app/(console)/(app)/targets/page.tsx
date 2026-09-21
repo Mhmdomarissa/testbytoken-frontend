@@ -176,6 +176,26 @@ function TargetRows({
                   Compose test
                 </Link>
               )}
+            <Link
+              href={
+                target.last_scan !== null &&
+                !isUnrecognised(target.last_scan.status) &&
+                target.last_scan.status === "parked"
+                  ? `/targets/${target.id}/login?scan=${target.last_scan.id}`
+                  : `/targets/${target.id}/login`
+              }
+              className={buttonVariants({
+                variant:
+                  target.last_scan !== null &&
+                  !isUnrecognised(target.last_scan.status) &&
+                  target.last_scan.status === "parked"
+                    ? "default"
+                    : "ghost",
+                size: "sm",
+              })}
+            >
+              Sign in
+            </Link>
             <Button
               size="sm"
               variant={target.last_scan === null ? "default" : "outline"}
