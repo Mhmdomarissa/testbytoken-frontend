@@ -31,17 +31,15 @@ export const TimestampSchema = z.iso.datetime().openapi({
  * description, and marked machine-readably with `x-extensible-enum`, so an
  * implementer reading any single enum in openapi.json sees it.
  */
-export const EXTENSIBLE_ENUM_NOTE =
-  "Extensible: new members MAY be added without a version bump. Clients " +
-  "MUST tolerate unknown members - render them as unrecognised, never " +
-  "drop the record or fail the response.";
-
 export function extensibleEnum<const T extends readonly [string, ...string[]]>(
   values: T,
   description: string,
 ) {
   return z.enum(values).openapi({
-    description: `${description} ${EXTENSIBLE_ENUM_NOTE}`,
+    description:
+      `${description} Extensible: new members MAY be added without a version bump. ` +
+      "Clients MUST tolerate unknown members - render them as unrecognised, never " +
+      "drop the record or fail the response.",
     "x-extensible-enum": true,
   });
 }

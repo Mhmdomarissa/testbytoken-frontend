@@ -25,7 +25,8 @@
     "generate:openapi": "tsx scripts/generate-openapi.ts",
     "check:status-contrast": "node scripts/check-status-contrast.mjs",
     "contract-drift": "node scripts/check-contract-drift.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:contract-prose": "node scripts/check-contract-prose.mjs"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
