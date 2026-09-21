@@ -26,7 +26,8 @@
     "check:status-contrast": "node scripts/check-status-contrast.mjs",
     "contract-drift": "node scripts/check-contract-drift.mjs",
     "test:e2e": "playwright test",
-    "check:contract-prose": "node scripts/check-contract-prose.mjs"
+    "check:contract-prose": "node scripts/check-contract-prose.mjs",
+    "check:zod-trim": "node scripts/check-zod-trim.mjs"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
