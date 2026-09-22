@@ -488,9 +488,11 @@ export function computeRunState(
       : null,
     // A finished plan run has a proof (built and frozen on first read, see
     // handlers/proofs.ts); its id is derivable so the run can point at it.
+    // Every finished run gets one, plan-originated or not - B0.5 flagged
+    // this as missing for suite runs, and B8 needs it for all of them.
     proof_id:
       resolved && timeline.finalStatus !== "timed_out"
-        ? (base.proof_id ?? (base.plan_id ? `proof_${base.id}` : null))
+        ? (base.proof_id ?? `proof_${base.id}`)
         : null,
     // B0.5 B9: the report exists once the run has finished (a timed-out run
     // produced none - the engine went silent).

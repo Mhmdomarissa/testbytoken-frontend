@@ -5,10 +5,10 @@ import {
   ShareSchema,
   CreateShareRequestSchema,
 } from "@/lib/contract";
-import { json, errorResponse } from "../respond";
+import { json, errorResponse, rehostMediaUrls } from "../respond";
 import { proofs } from "../data";
 import { resolveRun } from "../lifecycle";
-import { proofForPlanRun, resolvePlan } from "../planning";
+import { proofForPlanRun, proofForRun, resolvePlan } from "../planning";
 import { runStore, targetStore } from "../store";
 
 let store = [...proofs];
@@ -25,23 +25,31 @@ function findProof(id: string) {
   const stored = runStore.get(id.slice("proof_".length));
   if (!stored) return undefined;
   const run = resolveRun(stored);
-  if (!run.plan_id || run.proof_id !== id) return undefined;
-  const plan = resolvePlan(run.plan_id);
+  if (run.proof_id !== id) return undefined;
   const target = targetStore.get(run.target_id);
-  if (!plan || plan.status !== "approved" || !target) return undefined;
-  const proof = proofForPlanRun(run, plan, target);
+  if (!target) return undefined;
+  let proof: ReturnType<typeof proofForRun> | undefined;
+  if (run.plan_id) {
+    const plan = resolvePlan(run.plan_id);
+    if (!plan || plan.status !== "approved") return undefined;
+    proof = proofForPlanRun(run, plan, target);
+  } else {
+    proof = proofForRun(run, target);
+  }
   store = [...store, proof];
   return proof;
 }
 
 export const proofHandlers = [
-  http.get("*/proofs/:id", async ({ params }) => {
+  http.get("*/proofs/:id", async ({ params, request }) => {
     const proof = findProof(params.id as string);
     if (!proof) return errorResponse(404, "not_found", "Proof not found.");
-    return json(ProofSchema, proof);
+    const origin = new URL(request.url).origin;
+    return json(ProofSchema, rehostMediaUrls(proof, origin));
   }),
 
-  http.get("*/p/:token", async ({ params }) => {
+  http.get("*/p/:token", async ({ params, request }) => {
+    const origin = new URL(request.url).origin;
     const proof = store.find(
       (p) =>
         p.share?.token === params.token &&
@@ -59,12 +67,18 @@ export const proofHandlers = [
     // the owner's Proof - so a field added to Proof later can't leak onto
     // this page by default. No run id, no share token, nothing that
     // resolves to authenticated data: the snapshot and nothing else.
-    return json(PublicProofSchema, {
-      id: proof.id,
-      hash: proof.hash,
-      created_at: proof.created_at,
-      snapshot: proof.snapshot,
-    });
+    return json(
+      PublicProofSchema,
+      rehostMediaUrls(
+        {
+          id: proof.id,
+          hash: proof.hash,
+          created_at: proof.created_at,
+          snapshot: proof.snapshot,
+        },
+        origin,
+      ),
+    );
   }),
 
   http.post("*/proofs/:id/share", async ({ params, request }) => {
