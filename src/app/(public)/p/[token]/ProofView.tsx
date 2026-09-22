@@ -14,6 +14,7 @@ import { PassRateCoverage } from "@/components/status/PassRateCoverage";
 import { EmptyState } from "@/components/state/EmptyState";
 import { runStatusLabel } from "@/components/run/runStatus";
 import { StepList } from "@/components/run/StepList";
+import { useFocusRegionOnChange } from "@/hooks/useFocusRegionOnChange";
 import { UncoveredList } from "./UncoveredList";
 import { PlanSummary } from "./PlanSummary";
 
@@ -77,9 +78,15 @@ export function ProofView({ token }: { token: string }) {
     };
   }, [token]);
 
+  // The console has ShellMain.tsx for the same reason: this page is often
+  // reached by a same-tab client-side transition (SharePanel's "View
+  // public page" link), not only a fresh cold load - without this, focus
+  // drops to <body> exactly like an unhandled route change (Phase B B10).
+  const focusRef = useFocusRegionOnChange<HTMLElement>(state.status);
+
   if (state.status === "loading") {
     return (
-      <Shell>
+      <Shell focusRef={focusRef}>
         <p role="status" className="text-sm text-muted-foreground">
           Loading…
         </p>
@@ -89,7 +96,7 @@ export function ProofView({ token }: { token: string }) {
 
   if (state.status === "not-found") {
     return (
-      <Shell>
+      <Shell focusRef={focusRef}>
         <EmptyState
           icon={ShieldOffIcon}
           title="This link isn't available"
@@ -101,7 +108,7 @@ export function ProofView({ token }: { token: string }) {
 
   if (state.status === "error") {
     return (
-      <Shell>
+      <Shell focusRef={focusRef}>
         <p role="alert" className="text-sm text-destructive">
           {state.message}
         </p>
@@ -113,7 +120,7 @@ export function ProofView({ token }: { token: string }) {
   const verdict = snapshot.verdict;
 
   return (
-    <Shell>
+    <Shell focusRef={focusRef}>
       <div className="flex flex-col gap-6">
         <header className="flex flex-col gap-2">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -201,9 +208,19 @@ export function ProofView({ token }: { token: string }) {
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({
+  children,
+  focusRef,
+}: {
+  children: React.ReactNode;
+  focusRef: React.RefObject<HTMLElement | null>;
+}) {
   return (
-    <main className="mx-auto flex min-h-svh max-w-2xl flex-col gap-6 px-6 py-10">
+    <main
+      ref={focusRef}
+      tabIndex={-1}
+      className="mx-auto flex min-h-svh max-w-2xl flex-col gap-6 px-6 py-10"
+    >
       {children}
     </main>
   );

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { LinkIcon } from "lucide-react";
 import { useSetShare } from "@/lib/api/queries/proofs";
 import { ApiError } from "@/lib/api/errors";
+import { useFocusRegionOnChange } from "@/hooks/useFocusRegionOnChange";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
@@ -32,10 +33,22 @@ export function SharePanel({
 }) {
   const setShare = useSetShare(proofId);
   const [copied, setCopied] = useState(false);
+  // The button that triggers share-on/share-off gets unmounted as part of
+  // that swap (two separate returns below) - without this, focus drops to
+  // <body> the same way an unhandled route change does (Phase B B10, see
+  // ShellMain.tsx).
+  const focusRef = useFocusRegionOnChange<HTMLDivElement>(
+    share === null || !share.enabled ? "off" : "on",
+  );
 
   if (share === null || !share.enabled) {
     return (
-      <div className="flex flex-col gap-2" data-testid="share-off">
+      <div
+        ref={focusRef}
+        tabIndex={-1}
+        className="flex flex-col gap-2"
+        data-testid="share-off"
+      >
         <p className="text-sm text-muted-foreground">
           This proof is not shared. Sharing creates a public link that needs no
           sign-in.
@@ -60,7 +73,12 @@ export function SharePanel({
   }
 
   return (
-    <div className="flex flex-col gap-2" data-testid="share-on">
+    <div
+      ref={focusRef}
+      tabIndex={-1}
+      className="flex flex-col gap-2"
+      data-testid="share-on"
+    >
       <p className="text-sm text-muted-foreground">
         Anyone with this link can view this proof - no sign-in needed.
       </p>
