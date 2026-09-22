@@ -128,6 +128,28 @@ included). A credential form means the product has been misread.
   its CI step, `e2e/zod-messages.spec.ts` and `dev/zod-messages`.** The
   loader fails the build loudly if zod's source no longer matches - that is
   a prompt to check upstream, not to loosen the pattern.
+- **`/p/[token]`'s client-side fetch + zod parse** (`ProofView.tsx`, added
+  Phase B B9, 2026-09-22) exists only because there is no backend yet - MSW
+  intercepts in the browser's own JS context, not on the server, so this
+  page has to fetch and parse client-side to see the mock at all. That's a
+  pre-backend workaround, not the intended shape: this route is one of the
+  three named in "Architecture" above where a Next-side handler is
+  sanctioned, specifically so it can fetch and validate server-side and
+  ship a static page with no client JS for data-fetching at all. **Once a
+  real backend exists, rebuild this as a server component** doing a
+  server-side fetch + parse, and drop `MockingProvider` from
+  `(public)/layout.tsx` and its boundary-test leaf allowance along with it.
+  Don't let "once a real backend exists" become never - it's not blocked
+  on anything else once the backend is there.
+- **`StepList`'s client-side scroll-windowing, reused as-is on the public
+  proof page** (added Phase B B9, 2026-09-22): `StepList` is a client
+  component (`useState`/`useEffect`) built for a live run that can have an
+  unbounded number of steps. A proof's step list is small, fixed, and
+  frozen - it never needs virtualization - so reusing the windowed
+  component here is a convenience cost, not a requirement, independent of
+  the fetch/zod cost above. When the fetch/parse rework above happens,
+  reconsider whether the public page needs its own plain, non-windowed,
+  server-renderable step list instead of pulling in `StepList` as-is.
 
 ## Process
 
