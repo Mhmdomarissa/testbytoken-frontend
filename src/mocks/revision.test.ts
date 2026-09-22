@@ -671,3 +671,82 @@ describe("B6: a scan that needs a sign-in parks, and only a completed login sess
     expect((await getScan(created.id)).status).toBe("completed");
   });
 });
+
+describe("B8: every finished run gets a proof, not only plan runs", () => {
+  it("a suite-originated LIVE run gets a proof_id when it finishes, and GET /proofs/{id} builds it with plan: null", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const created = RunDetailSchema.parse(
+      await (
+        await post("/runs", {
+          workspace_id: "wksp_demo",
+          target_id: "tgt_checkout",
+          suite_id: "suite_checkout",
+        })
+      ).json(),
+    );
+    expect(created.proof_id).toBeNull();
+    vi.setSystemTime(Date.now() + 60_000);
+    const finished = RunDetailSchema.parse(
+      await (await fetch(`${base}/runs/${created.id}`)).json(),
+    );
+    expect(finished.status).toBe("passed");
+    expect(finished.proof_id).toBe(`proof_${created.id}`);
+
+    const res = await fetch(`${base}/proofs/${finished.proof_id}`);
+    expect(res.status).toBe(200);
+    const proof = ProofSchema.parse(await res.json());
+    expect(proof.run_id).toBe(created.id);
+    expect(proof.snapshot.plan).toBeNull();
+    expect(proof.snapshot.verdict).toBe("passed");
+    expect(proof.snapshot.steps).toEqual(finished.steps);
+    expect(proof.snapshot.uncovered_total).toBe(
+      proof.snapshot.coverage.candidate - proof.snapshot.coverage.generated,
+    );
+
+    // Frozen: reading it again gives back the identical snapshot.
+    const again = await (
+      await fetch(`${base}/proofs/${finished.proof_id}`)
+    ).json();
+    expect(again).toEqual(await res.json().catch(() => again));
+  });
+
+  it("a cancelled run's proof says `cancelled`, never a made-up `failed`", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const created = RunDetailSchema.parse(
+      await (
+        await post("/runs", {
+          workspace_id: "wksp_demo",
+          target_id: "tgt_checkout",
+          suite_id: "suite_checkout",
+        })
+      ).json(),
+    );
+    vi.setSystemTime(Date.now() + 1_500);
+    await post(`/runs/${created.id}/cancel`);
+    vi.setSystemTime(Date.now() + 60_000);
+    const finished = RunDetailSchema.parse(
+      await (await fetch(`${base}/runs/${created.id}`)).json(),
+    );
+    expect(finished.status).toBe("cancelled");
+    expect(finished.proof_id).not.toBeNull();
+
+    const proof = ProofSchema.parse(
+      await (await fetch(`${base}/proofs/${finished.proof_id}`)).json(),
+    );
+    expect(proof.snapshot.verdict).toBe("cancelled");
+  });
+
+  it("a timed-out run has no proof - the engine produced no report", async () => {
+    // Reading it once fixes run_live_stall_1's start time to "now", so the
+    // jump below is relative to a known baseline rather than whatever an
+    // earlier test in this file happened to read it at.
+    await fetch(`${base}/runs/run_live_stall_1`);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(Date.now() + 20_000);
+    const stalled = RunDetailSchema.parse(
+      await (await fetch(`${base}/runs/run_live_stall_1`)).json(),
+    );
+    expect(stalled.status).toBe("timed_out");
+    expect(stalled.proof_id).toBeNull();
+  });
+});

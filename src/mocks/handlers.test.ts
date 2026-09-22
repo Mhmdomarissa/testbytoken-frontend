@@ -9,7 +9,7 @@
 // jsdom environment (hung) before adding this directive.
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { server } from "./server";
-import { isPageRequest } from "./handlers";
+import { isPageRequest } from "./handlers/index";
 import {
   RunDetailSchema,
   InspectResponseSchema,
@@ -204,5 +204,34 @@ describe("the mock does not answer the framework's page requests", () => {
       false,
     );
     expect(isPageRequest(req("/runs?status=running&limit=5"))).toBe(false);
+  });
+
+  it("never passes through a path that can't possibly be a page, even with a document Accept header", () => {
+    // Regression: a sandboxed <iframe src="/runs/{id}/report"> sends
+    // `Accept: text/html` just like a real page visit - the heuristic
+    // above can't tell them apart, so these two shapes are excluded
+    // outright. Confirmed by loading the report in a real browser
+    // (e2e/media.spec.ts) and finding it 404 through Next before this
+    // exclusion existed.
+    expect(
+      isPageRequest(
+        req("/runs/run_pass_1/report", {
+          accept: "text/html,application/xhtml+xml",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isPageRequest(
+        req("/screenshots/0.png", {
+          accept:
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      isPageRequest(
+        req("/screenshots/run_fail_1/2.png", { accept: "text/html" }),
+      ),
+    ).toBe(false);
   });
 });

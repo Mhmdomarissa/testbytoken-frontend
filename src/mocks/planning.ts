@@ -7,7 +7,7 @@ import type {
   ProofSnapshotSchema,
   RunDetailSchema,
 } from "@/lib/contract";
-import { elementsForModule, modCheckout } from "./data";
+import { elementsForModule, modCheckout, uncoveredFixture } from "./data";
 import { mockAccount, planStore, scanStore } from "./store";
 
 type Plan = z.infer<typeof PlanSchema>;
@@ -356,6 +356,55 @@ export function groundedAgainst(plan: Plan) {
   };
 }
 
+/**
+ * The frozen proof of a FINISHED run - the shared part, plan or not.
+ * `verdict` is the run's own terminal status
+ * (`passed`/`failed`/`cancelled`/`timed_out`), never collapsed to
+ * pass/fail: a cancelled run's proof must say `cancelled`, not invent a
+ * "failed" the run never reported (CLAUDE.md - never render a status the
+ * server didn't send).
+ */
+function baseSnapshot(
+  run: z.infer<typeof RunDetailSchema>,
+  target: { name: string; base_url: string },
+  plan: z.infer<typeof ProofSnapshotSchema>["plan"],
+  uncovered: z.infer<typeof ProofSnapshotSchema>["uncovered"],
+): z.infer<typeof ProofSnapshotSchema> {
+  const finished = run.finished_at ?? new Date().toISOString();
+  return {
+    verdict: run.status as "passed" | "failed" | "cancelled" | "timed_out",
+    pass_rate: run.pass_rate,
+    coverage: run.coverage,
+    target: { name: target.name, base_url: target.base_url },
+    started_at: run.started_at,
+    finished_at: finished,
+    duration_ms:
+      new Date(finished).getTime() - new Date(run.started_at).getTime(),
+    token_cost: run.token_cost,
+    steps: run.steps,
+    plan,
+    uncovered_total: uncovered.length,
+    uncovered,
+  };
+}
+
+function proofFromSnapshot(
+  run: z.infer<typeof RunDetailSchema>,
+  snapshot: z.infer<typeof ProofSnapshotSchema>,
+): z.infer<typeof ProofSchema> {
+  return {
+    id: run.proof_id!,
+    run_id: run.id,
+    hash: `sha256:${[...JSON.stringify(snapshot)]
+      .reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
+      .toString(16)
+      .padStart(8, "0")}`,
+    share: null,
+    created_at: snapshot.finished_at,
+    snapshot,
+  };
+}
+
 /** The frozen proof of a FINISHED plan run: what ran, what was approved, and every step that did not run with who excluded it. */
 export function proofForPlanRun(
   run: z.infer<typeof RunDetailSchema>,
@@ -368,19 +417,10 @@ export function proofForPlanRun(
     const reason = exclusionReason(step, approvedIds);
     return reason ? [{ step, reason }] : [];
   });
-  const finished = run.finished_at ?? new Date().toISOString();
-  const snapshot: z.infer<typeof ProofSnapshotSchema> = {
-    verdict: run.status === "passed" ? "passed" : "failed",
-    pass_rate: run.pass_rate,
-    coverage: run.coverage,
-    target: { name: target.name, base_url: target.base_url },
-    started_at: run.started_at,
-    finished_at: finished,
-    duration_ms:
-      new Date(finished).getTime() - new Date(run.started_at).getTime(),
-    token_cost: run.token_cost,
-    steps: run.steps,
-    plan: {
+  const snapshot = baseSnapshot(
+    run,
+    target,
+    {
       id: plan.id,
       intent: plan.intent,
       approved_at: plan.approval!.approved_at,
@@ -404,23 +444,34 @@ export function proofForPlanRun(
         reason,
       })),
     },
-    uncovered_total: excluded.length,
-    uncovered: excluded.map(({ step, reason }) => ({
+    excluded.map(({ step, reason }) => ({
       label: step.description,
       page_url: pageUrlFor(step, target.base_url),
       reason_code: reason,
       reason: reasonText(step, reason),
     })),
-  };
-  return {
-    id: run.proof_id!,
-    run_id: run.id,
-    hash: `sha256:${[...JSON.stringify(snapshot)]
-      .reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
-      .toString(16)
-      .padStart(8, "0")}`,
-    share: null,
-    created_at: finished,
-    snapshot,
-  };
+  );
+  return proofFromSnapshot(run, snapshot);
+}
+
+/**
+ * The frozen proof of a FINISHED run that did NOT come from a plan (a
+ * suite run, or any other origin): same shape, `plan: null`. Surfaced by
+ * building B8 against a live suite run and finding it never got a
+ * `proof_id` at all - only plan runs did (flagged at B0.5, unfixed until
+ * now: `findProof` in handlers/proofs.ts only ever built one for a run
+ * with `plan_id` set). Reuses the reference mock's one `uncovered`
+ * fixture (the three elements that were not uniquely locatable) rather
+ * than fabricating new placeholder text - this mock does not model
+ * per-element scenario generation for a suite, so it is honest about
+ * being a stand-in, not a real computation.
+ */
+export function proofForRun(
+  run: z.infer<typeof RunDetailSchema>,
+  target: { name: string; base_url: string },
+): z.infer<typeof ProofSchema> {
+  return proofFromSnapshot(
+    run,
+    baseSnapshot(run, target, null, uncoveredFixture),
+  );
 }

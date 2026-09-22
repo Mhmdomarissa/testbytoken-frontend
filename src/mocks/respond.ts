@@ -1,5 +1,6 @@
 import { HttpResponse, type JsonBodyType } from "msw";
 import type { z } from "zod";
+import { REPORT_ORIGIN, SCREENSHOT_ORIGIN } from "./data";
 
 /**
  * Parses every mock response through its own Zod schema before sending it.
@@ -48,4 +49,32 @@ export function checkSimulatedError(request: Request) {
     );
   }
   return null;
+}
+
+/**
+ * Rewrites every occurrence of the mock's fake report/screenshot origins
+ * onto the REQUEST's own origin, wherever they appear in a response body
+ * (report_url, every step's screenshot_url, nested inside a Proof
+ * snapshot...). See data.ts's REPORT_ORIGIN/SCREENSHOT_ORIGIN comment for
+ * why this exists: those origins don't resolve in a real browser, and a
+ * same-origin URL is what actually loads through MSW's service worker for
+ * an <img> or a sandboxed <iframe>. A plain string search-and-replace over
+ * the object tree - simpler and harder to miss a field than threading an
+ * origin through every fixture and every layer that builds one.
+ */
+export function rehostMediaUrls<T>(value: T, origin: string): T {
+  if (typeof value === "string") {
+    return value
+      .replace(REPORT_ORIGIN, origin)
+      .replace(SCREENSHOT_ORIGIN, origin) as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => rehostMediaUrls(v, origin)) as T;
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, rehostMediaUrls(v, origin)]),
+    ) as T;
+  }
+  return value;
 }

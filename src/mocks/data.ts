@@ -388,8 +388,24 @@ export const suiteCheckoutVersions: z.infer<typeof SuiteVersionSchema>[] = [
 // ---------------------------------------------------------------------
 
 /** Session-scoped, resolved report URL (docs/API_CONTRACT.md) - served by handlers/runs.ts. */
+/**
+ * Fake external origins for the engine's report and screenshots - modelling
+ * what a real backend would look like (a separate domain, CLAUDE.md). They
+ * exist only as placeholders in fixtures: no browser can resolve them
+ * (there is no real DNS entry), so every response that carries one is
+ * REHOSTED onto the mock's own origin at request time
+ * (`rehostMediaUrls` in respond.ts) before it reaches the client - MSW's
+ * browser worker only intercepts same-origin subresource loads (img/iframe
+ * src), not cross-origin ones, so an un-rehosted URL would 404 for real in
+ * a browser even though it round-trips fine through a plain `fetch()` in a
+ * test. `GET /screenshots/*` and `GET /runs/:id/report` are what those
+ * rehosted URLs actually resolve to.
+ */
+export const REPORT_ORIGIN = "https://api.testbytoken.example";
+export const SCREENSHOT_ORIGIN = "https://screenshots.testbytoken.example";
+
 export function reportUrl(runId: string): string {
-  return `https://api.testbytoken.example/runs/${runId}/report`;
+  return `${REPORT_ORIGIN}/runs/${runId}/report`;
 }
 
 function step(
@@ -406,7 +422,7 @@ function step(
     status: "pass",
     message: "OK",
     duration_ms: 420,
-    screenshot_url: `https://screenshots.testbytoken.example/${index}.png`,
+    screenshot_url: `${SCREENSHOT_ORIGIN}/screenshots/${index}.png`,
     ...overrides,
   };
 }
@@ -466,8 +482,7 @@ export const runFailed: z.infer<typeof RunDetailSchema> = {
         "but it was not found on the page. The element may be behind a " +
         "cookie-consent overlay that this scenario doesn't dismiss.",
       duration_ms: 5000,
-      screenshot_url:
-        "https://screenshots.testbytoken.example/run_fail_1/2.png",
+      screenshot_url: `${SCREENSHOT_ORIGIN}/screenshots/run_fail_1/2.png`,
     }),
     step(3, {
       action: "click",
@@ -572,7 +587,9 @@ export const runs = [
  * The 3 candidates behind "21 of 24 covered" - which ones, and why. Lengths
  * MUST agree (uncovered_total = candidate - generated); a test enforces it.
  */
-const uncoveredFixture: z.infer<typeof ProofSnapshotSchema>["uncovered"] = [
+export const uncoveredFixture: z.infer<
+  typeof ProofSnapshotSchema
+>["uncovered"] = [
   {
     label: "Remove",
     page_url: pageHome.url,

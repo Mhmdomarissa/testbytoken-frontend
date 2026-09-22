@@ -1,6 +1,7 @@
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { toBadgeStatus } from "@/components/status/badgeStatus";
 import { UnrecognisedValue } from "@/lib/api/tolerant";
+import { Screenshot } from "./Screenshot";
 import type { Step } from "./reconcile";
 
 export const ROW_HEIGHT = 84;
@@ -98,6 +99,20 @@ export function StepRow({
               step.message
             )}
           </p>
+          {/* Only in full (non-compact) rows: a compact row has a fixed
+              height the windowing math depends on, so it never grows to
+              fit a thumbnail. Every step still gets one somewhere - the
+              short-run list is all full rows, and a windowed list's
+              failed/warning steps are also listed in full above it
+              (StepList's failures summary). */}
+          {!compact && step.screenshot_url && (
+            <div className="pl-10">
+              <Screenshot
+                url={step.screenshot_url}
+                alt={`Screenshot after step ${position}: ${step.action} ${step.target}`}
+              />
+            </div>
+          )}
         </>
       )}
     </li>
