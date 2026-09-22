@@ -69,13 +69,14 @@ const BASELINE_PATH = path.join(
  * carrying the full shell, React Query, and tooltip/toast providers this
  * page skips), but still dominated by the same zod + framework floor
  * every route in this app pays (roughly 240 KB of the total is shared
- * with `/sign-in`, not specific to this page). Set from this PR's own
- * bundle-budget CI run (316,195 bytes gzipped, Ubuntu) rather than a
- * local macOS measurement - see TOLERANCE_BYTES below for why the two
- * platforms don't agree exactly.
+ * with `/sign-in`, not specific to this page). Set from CI's own
+ * bundle-budget run (Ubuntu) rather than a local macOS measurement - see
+ * TOLERANCE_BYTES below for why the two platforms don't agree exactly.
+ * Bumped once since B9 (B10: PublicMain.tsx, the route group's own main
+ * landmark and focus-management fix, applies to this route too).
  */
 const PUBLIC_ROUTE_PREFIX = "/p/";
-const PUBLIC_ROUTE_BUDGET_BYTES = 316195;
+const PUBLIC_ROUTE_BUDGET_BYTES = 316460;
 
 /**
  * ZERO - not a hedge, because the drift this used to hedge against is not
