@@ -112,7 +112,7 @@ export default function ThemePreviewPage() {
         <div className="flex flex-wrap items-center gap-3">
           <Input placeholder="https://app.example.com" className="max-w-xs" />
           <Select items={environmentItems}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-48" aria-label="Environment">
               <SelectValue />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
