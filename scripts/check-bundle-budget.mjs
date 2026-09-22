@@ -65,19 +65,17 @@ const BASELINE_PATH = path.join(
  * Deliberately tight cap for any public, unauthenticated proof route
  * (path starting with "/p/"), enforced separately from - and well below -
  * the ratcheted app-shell baselines below. B9 built the route
- * (`/p/[token]`) and measured it locally (macOS) at 315,465 bytes gzipped
- * - well under any console route (each 410-440 KB, carrying the full
- * shell, React Query, and tooltip/toast providers this page skips), but
- * still dominated by the same zod + framework floor every route in this
- * app pays (roughly 240 KB of the total is shared with `/sign-in`, not
- * specific to this page). Set here at that measured number rather than a
- * padded guess, matching TOLERANCE_BYTES's reasoning below: per this same
- * PR's own bundle-budget CI run, adjust this to CI's exact reported byte
- * count (Ubuntu's gzip output differs slightly from macOS's) - the same
- * one-time correction every ratcheted baseline entry gets.
+ * (`/p/[token]`) - well under any console route (each 410-440 KB,
+ * carrying the full shell, React Query, and tooltip/toast providers this
+ * page skips), but still dominated by the same zod + framework floor
+ * every route in this app pays (roughly 240 KB of the total is shared
+ * with `/sign-in`, not specific to this page). Set from this PR's own
+ * bundle-budget CI run (316,195 bytes gzipped, Ubuntu) rather than a
+ * local macOS measurement - see TOLERANCE_BYTES below for why the two
+ * platforms don't agree exactly.
  */
 const PUBLIC_ROUTE_PREFIX = "/p/";
-const PUBLIC_ROUTE_BUDGET_BYTES = 315465;
+const PUBLIC_ROUTE_BUDGET_BYTES = 316195;
 
 /**
  * ZERO - not a hedge, because the drift this used to hedge against is not
