@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/shell/AppSidebar";
 import { TopBar } from "@/components/shell/TopBar";
 import { OfflineBanner } from "@/components/shell/OfflineBanner";
+import { ShellMain } from "@/components/shell/ShellMain";
 
 export default function AppShellLayout({
   children,
@@ -14,7 +15,7 @@ export default function AppShellLayout({
       <SidebarInset>
         <OfflineBanner />
         <TopBar />
-        <div className="flex-1 overflow-y-auto p-6">{children}</div>
+        <ShellMain>{children}</ShellMain>
       </SidebarInset>
     </SidebarProvider>
   );

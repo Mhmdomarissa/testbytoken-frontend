@@ -16,6 +16,7 @@ import { useScan } from "@/lib/api/queries/scans";
 import { ApiError } from "@/lib/api/errors";
 import { isUnrecognised } from "@/lib/api/tolerant";
 import { DEMO_WORKSPACE_ID } from "@/lib/workspace";
+import { useFocusRegionOnChange } from "@/hooks/useFocusRegionOnChange";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { EmptyState } from "@/components/state/EmptyState";
 import { ErrorState } from "@/components/state/ErrorState";
@@ -80,6 +81,17 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
         : `/targets/${id}/compose?plan=${next}`,
     );
 
+  // The form, or the plan's status, gets replaced wholesale as things
+  // progress (propose -> proposed -> approved) - the button that triggered
+  // each swap is gone once it happens, so without this the browser drops
+  // focus to <body> (Phase B B10 - the same class of bug ShellMain.tsx
+  // fixes for a route change, here for an in-place one instead).
+  const composePhase =
+    planId === null
+      ? "form"
+      : `plan:${plan.isPending ? "loading" : plan.isError ? "error" : String(plan.data?.status)}`;
+  const focusRef = useFocusRegionOnChange<HTMLDivElement>(composePhase);
+
   if (target.isPending) return <ListSkeleton rows={3} />;
   if (target.isError) {
     return target.error instanceof ApiError && target.error.status === 404 ? (
@@ -133,7 +145,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
       !isUnrecognised(lastScan.status) &&
       lastScan.status === "completed";
     return (
-      <div className="flex flex-col gap-6">
+      <div ref={focusRef} tabIndex={-1} className="flex flex-col gap-6">
         {heading}
         {!scanReady ? (
           <EmptyState
@@ -377,7 +389,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div ref={focusRef} tabIndex={-1} className="flex flex-col gap-6">
       {heading}
       {body}
     </div>

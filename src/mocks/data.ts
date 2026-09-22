@@ -278,7 +278,13 @@ const elementsByModule: Record<string, z.infer<typeof ElementSchema>[]> = {
       page_url: pageHome.url,
       label: "Remove",
       role: "button",
-      locator: ".line-item button.remove",
+      // A real crawler reflects whatever markup a target page actually has,
+      // including someone else's injected attribute value - the locator it
+      // derives can carry that straight through. This is the same XSS
+      // fixture as PAGE_XSS_TITLE, in the one field of this element that
+      // reaches compose (planning.ts's ambiguous_element reason quotes
+      // this locator verbatim - see PlanStepRow.tsx's Binding component).
+      locator: `.line-item button.remove[title="${PAGE_XSS_TITLE}"]`,
       locator_strategy: "css",
       uniquely_locatable: false,
       reason_not_locatable: "duplicate_locator",
@@ -477,10 +483,17 @@ export const runFailed: z.infer<typeof RunDetailSchema> = {
       target: "#confirm-button",
       assertion: "is visible within 5000ms",
       status: "fail",
+      // Failure messages are engine-composed (see lifecycle.ts's
+      // scanFailureFor comment), but the engine can and does echo back
+      // fragments of what it actually saw on the page - a real failure
+      // message can carry hostile content same as a page title or element
+      // label (CLAUDE.md's Security section names "error text" alongside
+      // them explicitly). This run reaches both /runs/run_fail_1 and,
+      // once shared, /p/{token} - one fixture, both screens, for real.
       message:
         'Expected element "#confirm-button" to be visible within 5000ms, ' +
         "but it was not found on the page. The element may be behind a " +
-        "cookie-consent overlay that this scenario doesn't dismiss.",
+        `cookie-consent overlay that this scenario doesn't dismiss. Its own title read: ${PAGE_XSS_TITLE}`,
       duration_ms: 5000,
       screenshot_url: `${SCREENSHOT_ORIGIN}/screenshots/run_fail_1/2.png`,
     }),
@@ -594,7 +607,12 @@ export const uncoveredFixture: z.infer<
     label: "Remove",
     page_url: pageHome.url,
     reason_code: "not_uniquely_locatable",
-    reason: 'More than one element matched ".line-item button.remove".',
+    // Same hostile fixture, same reasoning as el_duplicate's locator above -
+    // this is the one field of the proof page's own "Not covered" section
+    // that echoes a locator (UncoveredList.tsx), independent of that
+    // element's fixture (this list is proof-snapshot-only, not derived
+    // from it programmatically).
+    reason: `More than one element matched ".line-item button.remove[title=\\"${PAGE_XSS_TITLE}\\"]".`,
   },
   {
     label: "Save",

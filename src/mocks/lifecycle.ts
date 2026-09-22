@@ -6,7 +6,7 @@ import type {
   StepSchema,
   JobEventSchema,
 } from "@/lib/contract";
-import { modCheckout, modSettings, reportUrl } from "./data";
+import { modCheckout, modSettings, PAGE_XSS_TITLE, reportUrl } from "./data";
 
 type Scan = z.infer<typeof ScanSchema>;
 type Plan = z.infer<typeof PlanSchema>;
@@ -389,9 +389,12 @@ export const LIVE_FAIL_TIMELINE: RunTimeline = timeline({
       target: "#confirm-button",
       assertion: "is visible within 5000ms",
       status: "fail",
+      // Same hostile fixture as the static run_fail_1 (data.ts), reachable
+      // live via run_live_fail_1 - B10's XSS pass and its live-lifecycle
+      // pass share this one touch.
       message:
         'Expected element "#confirm-button" to be visible within 5000ms, ' +
-        "but it was not found on the page.",
+        `but it was not found on the page. Its own title read: ${PAGE_XSS_TITLE}`,
       duration_ms: 5000,
     }),
     step(3, 2600, {
