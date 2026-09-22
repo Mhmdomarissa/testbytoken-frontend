@@ -428,6 +428,55 @@ describe("B10: proofs are frozen, self-contained, and the public one leaks nothi
     expect((await fetch(`${base}/p/${revoked.token}`)).status).toBe(404); // disabled
     expect((await fetch(`${base}/p/${enabled.token}`)).status).toBe(404); // rotated away
   });
+
+  it("the share link is actually navigable - the mock's own origin, not a fake external domain", async () => {
+    const share = z
+      .object({ url: z.string() })
+      .parse(
+        await (
+          await post("/proofs/proof_pass_1/share", { enabled: true })
+        ).json(),
+      );
+    expect(share.url.startsWith(base)).toBe(true);
+  });
+
+  it("B9: proof-scoped screenshots are signed, never carry the share token itself, and stop working the instant sharing is revoked", async () => {
+    const share = z
+      .object({ token: z.string() })
+      .parse(
+        await (
+          await post("/proofs/proof_pass_1/share", { enabled: true })
+        ).json(),
+      );
+    const pub = PublicProofSchema.parse(
+      await (await fetch(`${base}/p/${share.token}`)).json(),
+    );
+    const shot = pub.snapshot.steps.find(
+      (s) => s.screenshot_url,
+    )?.screenshot_url;
+    expect(shot).toBeTruthy();
+    const shotUrl = new URL(shot!);
+    expect(shotUrl.searchParams.get("sig")).toBeTruthy();
+    // The whole point: this is a SIGNATURE derived from the token, not the token.
+    expect(shot).not.toContain(share.token);
+
+    expect((await fetch(shot!)).status).toBe(200);
+
+    await post("/proofs/proof_pass_1/share", { enabled: false });
+    expect((await fetch(shot!)).status).toBe(404);
+
+    // The SAME screenshot, fetched session-scoped (unsigned), is unaffected -
+    // revoking SHARING doesn't touch the owner's own authenticated access.
+    const owner = ProofSchema.parse(
+      await (await fetch(`${base}/proofs/proof_pass_1`)).json(),
+    );
+    const ownerShot = owner.snapshot.steps.find(
+      (s) => s.screenshot_url,
+    )?.screenshot_url;
+    expect(ownerShot).toBeTruthy();
+    expect(new URL(ownerShot!).searchParams.get("sig")).toBeNull();
+    expect((await fetch(ownerShot!)).status).toBe(200);
+  });
 });
 
 describe("plan runs: the numbers are OF the plan, and the exclusions travel with the result", () => {

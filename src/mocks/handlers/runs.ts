@@ -7,7 +7,12 @@ import {
   paginated,
 } from "@/lib/contract";
 import { HttpResponse } from "msw";
-import { json, errorResponse, checkSimulatedError } from "../respond";
+import {
+  json,
+  errorResponse,
+  checkSimulatedError,
+  rehostMediaUrls,
+} from "../respond";
 import { loginSessionStore, runStore } from "../store";
 import { resolveLoginSession } from "../login";
 import { planCoverage, resolvePlan } from "../planning";
@@ -129,10 +134,11 @@ export const runHandlers = [
     return json(RunListResponseSchema, { data: page, next_cursor });
   }),
 
-  http.get("*/runs/:id", async ({ params }) => {
+  http.get("*/runs/:id", async ({ params, request }) => {
     const run = runStore.get(params.id as string);
     if (!run) return errorResponse(404, "not_found", "Run not found.");
-    return json(RunDetailSchema, resolveRun(run));
+    const origin = new URL(request.url).origin;
+    return json(RunDetailSchema, rehostMediaUrls(resolveRun(run), origin));
   }),
 
   // B0.5 B9: the engine's HTML report. UNTRUSTED content, served so that
