@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { LinkIcon } from "lucide-react";
 import { useSetShare } from "@/lib/api/queries/proofs";
 import { ApiError } from "@/lib/api/errors";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 
@@ -82,6 +83,16 @@ export function SharePanel({
         >
           {copied ? "Copied" : "Copy"}
         </Button>
+        {/* A same-tab Link, not target="_blank": the owner previewing their
+            own share is common enough to be worth one click, and this is
+            an ordinary client-side navigation like any other in this app -
+            "Back" returns here. */}
+        <Link
+          href={`/p/${share.token}`}
+          className={buttonVariants({ variant: "ghost" })}
+        >
+          View public page
+        </Link>
       </div>
       {setShare.isError && (
         <p role="alert" className="text-sm text-destructive">

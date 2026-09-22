@@ -40,26 +40,49 @@ function findProof(id: string) {
   return proof;
 }
 
+/**
+ * The live proof behind a share token, or undefined if the token is
+ * unknown, disabled, or expired - the one check that decides whether
+ * `/p/{token}`, its OG image, and every proof-scoped screenshot URL it
+ * handed out are servable. Exported so opengraph-image.tsx (server-only,
+ * no HTTP path back into this mock - see its own file comment) can ask
+ * the exact same question the HTTP handler below does, not a
+ * hand-rolled copy of it.
+ */
+export function findProofByShareToken(token: string) {
+  return [...proofStore.values()].find(
+    (p) =>
+      p.share?.token === token &&
+      p.share?.enabled &&
+      (p.share.expires_at === null ||
+        new Date(p.share.expires_at).getTime() > Date.now()),
+  );
+}
+
 export const proofHandlers = [
   http.get("*/proofs/:id", async ({ params, request }) => {
     const proof = findProof(params.id as string);
     if (!proof) return errorResponse(404, "not_found", "Proof not found.");
     const origin = new URL(request.url).origin;
+    // share.url is fully derived from (origin, token) - rebuilt here
+    // rather than trusted from storage, so a fixture's placeholder value
+    // (see data.ts's DEMO_SHARE_TOKEN) or a stale origin can never leak
+    // through to the owner's own view.
+    const withCurrentShareUrl = proof.share
+      ? {
+          ...proof,
+          share: { ...proof.share, url: `${origin}/p/${proof.share.token}` },
+        }
+      : proof;
     // Session-scoped (this endpoint): authorized by the cookie, same as any
     // other API call - no signature needed on the screenshot URLs
     // themselves (docs/API_CONTRACT.md).
-    return json(ProofSchema, rehostMediaUrls(proof, origin));
+    return json(ProofSchema, rehostMediaUrls(withCurrentShareUrl, origin));
   }),
 
   http.get("*/p/:token", async ({ params, request }) => {
     const origin = new URL(request.url).origin;
-    const proof = [...proofStore.values()].find(
-      (p) =>
-        p.share?.token === params.token &&
-        p.share?.enabled &&
-        (p.share.expires_at === null ||
-          new Date(p.share.expires_at).getTime() > Date.now()),
-    );
+    const proof = findProofByShareToken(params.token as string);
     if (!proof)
       return errorResponse(
         404,
