@@ -314,10 +314,10 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
                 <span className="font-mono">{createRun.data.id}</span>).
               </span>
               <Link
-                href="/runs"
+                href={`/runs/${createRun.data.id}`}
                 className={buttonVariants({ variant: "outline", size: "sm" })}
               >
-                View runs
+                Watch this run
               </Link>
             </div>
           )}

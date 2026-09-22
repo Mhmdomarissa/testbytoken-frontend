@@ -1,0 +1,105 @@
+import { StatusBadge } from "@/components/status/StatusBadge";
+import { toBadgeStatus } from "@/components/status/badgeStatus";
+import { UnrecognisedValue } from "@/lib/api/tolerant";
+import type { Step } from "./reconcile";
+
+export const ROW_HEIGHT = 84;
+
+const isRunning = (s: Step) =>
+  !(s.status instanceof UnrecognisedValue) && s.status === "running";
+
+/**
+ * One step exactly as the server reported it. Everything a tested site
+ * wrote (target, message, assertion) is inert text. The CURRENT step is the
+ * one the server reports as `running` - never one inferred from position or
+ * from "the last one that arrived" - and is marked with an inset bar, the
+ * chip, and `aria-current` (words and shape, not colour alone).
+ *
+ * `compact` is for long runs: a fixed height so the list can be windowed,
+ * with the text clamped and the full value in `title`. Failures are also
+ * listed in full outside the window (StepList), so nothing important is
+ * only readable by hovering.
+ */
+export function StepRow({
+  step,
+  position,
+  total,
+  compact,
+  style,
+}: {
+  step: Step;
+  /** 1-based position in the whole list. */
+  position: number;
+  total: number;
+  compact: boolean;
+  /** Windowing positions the row absolutely; the row itself stays the list item. */
+  style?: React.CSSProperties;
+}) {
+  const running = isRunning(step);
+  return (
+    <li
+      data-testid={`step-${step.id}`}
+      data-status={
+        step.status instanceof UnrecognisedValue ? "unrecognised" : step.status
+      }
+      data-current={running ? "true" : undefined}
+      aria-current={running ? "step" : undefined}
+      aria-posinset={position}
+      aria-setsize={total}
+      style={compact ? { height: ROW_HEIGHT, ...style } : style}
+      className={`flex flex-col gap-1 border-b border-border px-3 py-2 text-sm ${
+        running ? "shadow-[inset_4px_0_0_var(--status-running-chip-fill)]" : ""
+      } ${compact ? "overflow-hidden" : ""}`}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="w-8 shrink-0 font-mono text-xs text-muted-foreground tabular-nums"
+        >
+          {step.index + 1}
+        </span>
+        <StatusBadge status={toBadgeStatus(step.status)} />
+        <span className="shrink-0 font-mono text-xs">{step.action}</span>
+        <span
+          className={`min-w-0 font-mono text-xs text-muted-foreground ${
+            compact ? "truncate" : "break-all"
+          }`}
+          title={step.target}
+        >
+          {step.target}
+        </span>
+        {!running && (
+          <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
+            {step.duration_ms} ms
+          </span>
+        )}
+      </div>
+      {running ? (
+        <p className="pl-10 text-xs text-muted-foreground">In progress.</p>
+      ) : (
+        <>
+          {step.assertion && (
+            <p
+              className={`pl-10 text-xs text-muted-foreground ${
+                compact ? "truncate" : "break-words"
+              }`}
+              title={step.assertion}
+            >
+              Asserts: {step.assertion}
+            </p>
+          )}
+          <p
+            className={`pl-10 ${compact ? "line-clamp-2" : "break-words"}`}
+            title={step.message}
+          >
+            {step.message === "" ? (
+              <span className="text-muted-foreground">(no message)</span>
+            ) : (
+              step.message
+            )}
+          </p>
+        </>
+      )}
+    </li>
+  );
+}

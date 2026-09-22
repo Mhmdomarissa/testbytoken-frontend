@@ -95,7 +95,11 @@ function RunsList() {
           <TableBody>
             {runs.data.data.map((run) => (
               <TableRow key={run.id}>
-                <TableCell className="font-mono text-xs">{run.id}</TableCell>
+                <TableCell className="font-mono text-xs">
+                  <Link href={`/runs/${run.id}`} className="underline">
+                    {run.id}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <StatusBadge status={toBadgeStatus(run.status)} />
                 </TableCell>

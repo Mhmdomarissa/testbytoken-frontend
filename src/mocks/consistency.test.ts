@@ -147,8 +147,11 @@ describe("cancellation reaches the event stream too", () => {
     const events = await sseEvents(created.id);
     const done = events.find((e) => e.type === "done");
     expect(done?.status).toBe("cancelled");
-    const steps = events.filter((e) => e.type === "step").map((e) => e.step.id);
-    expect(steps).toEqual(polled.steps.map((s) => s.id)); // no steps the poll doesn't show
+    // What a client builds from the stream is exactly what the poll shows.
+    const streamed = applyJobEvents(initialJobEventsState, events);
+    expect(
+      Object.values(streamed.steps).sort((a, b) => a.index - b.index),
+    ).toEqual(polled.steps);
   });
 
   it("an ALREADY-OPEN stream hears the cancellation and closes on `done: cancelled`", async () => {

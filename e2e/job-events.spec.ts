@@ -79,7 +79,9 @@ test("a dropped connection is a visible state, and the client resumes via ?since
   for (let i = 0; i < 5; i++) {
     await expect(page.getByTestId(`step-${i}`)).toHaveText(`${i}:pass`);
   }
-  await expect(page.getByTestId("last-event-id")).toHaveText("5"); // the `done` frame
+  // Ids 0..8 are the nine frames (four steps are reported `running` before
+  // they finish), and 9 is `done`: numbered by position, none skipped.
+  await expect(page.getByTestId("last-event-id")).toHaveText("9");
 });
 
 test("a legitimately quiet stream is not mistaken for a dead one", async ({
