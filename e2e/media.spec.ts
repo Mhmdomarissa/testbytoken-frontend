@@ -95,7 +95,10 @@ test("the engine's report actually loads (its real content, not a 404), sandboxe
 test("share: create a public link, copy it, then revoke it", async ({
   page,
 }) => {
-  await page.goto("/runs/run_pass_1");
+  // run_fail_1, not run_pass_1: B9's `share_demo` fixture (used to exercise
+  // a genuinely cold, no-account visitor in e2e/proof.spec.ts) pre-shares
+  // run_pass_1's proof, so it no longer starts share-off.
+  await page.goto("/runs/run_fail_1");
   await expect(page.getByTestId("share-off")).toBeVisible();
 
   await page.getByRole("button", { name: "Create a public link" }).click();
@@ -103,7 +106,10 @@ test("share: create a public link, copy it, then revoke it", async ({
   await expect(on).toBeVisible();
   const link = on.getByRole("textbox");
   const url = await link.inputValue();
-  expect(url).toMatch(/^https:\/\/testbytoken\.example\/p\//);
+  // The mock's own origin, not a fake external domain (B9: a share link
+  // has to actually be navigable - see revision.test.ts).
+  expect(new URL(url).origin).toBe(new URL(page.url()).origin);
+  expect(new URL(url).pathname).toMatch(/^\/p\//);
   await page.screenshot({ path: "test-results/run-share-on.png" });
 
   await page.getByRole("button", { name: "Revoke link" }).click();
