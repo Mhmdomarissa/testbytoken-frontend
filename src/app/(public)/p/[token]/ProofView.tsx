@@ -82,7 +82,7 @@ export function ProofView({ token }: { token: string }) {
   // reached by a same-tab client-side transition (SharePanel's "View
   // public page" link), not only a fresh cold load - without this, focus
   // drops to <body> exactly like an unhandled route change (Phase B B10).
-  const focusRef = useFocusRegionOnChange<HTMLElement>(state.status);
+  const focusRef = useFocusRegionOnChange<HTMLDivElement>(state.status);
 
   if (state.status === "loading") {
     return (
@@ -213,16 +213,21 @@ function Shell({
   focusRef,
 }: {
   children: React.ReactNode;
-  focusRef: React.RefObject<HTMLElement | null>;
+  focusRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  // A plain div, not another <main> - PublicMain.tsx (the layout) already
+  // owns the one main landmark and its own route-change focus; this ref
+  // handles the SEPARATE in-place swap within this same route (loading ->
+  // ready), which a route-level fix can't see because the URL never
+  // changes for it.
   return (
-    <main
+    <div
       ref={focusRef}
       tabIndex={-1}
       className="mx-auto flex min-h-svh max-w-2xl flex-col gap-6 px-6 py-10"
     >
       {children}
-    </main>
+    </div>
   );
 }
 
