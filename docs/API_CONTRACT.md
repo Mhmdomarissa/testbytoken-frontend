@@ -485,6 +485,15 @@ snapshot    { verdict, pass_rate, coverage{generated,candidate},
   authenticated view it is permanent and unchanged, and sharing can be
   re-enabled (which mints a new token — the old link stays dead). There is
   no "delete proof" operation in this contract.
+- **Disabling preserves the token; only re-enabling rotates it.**
+  `enabled: false` flips the flag and leaves the existing token as-is — it
+  does not reissue one. The token is dead either way (kept off by
+  `enabled`, not by having vanished), but a stable token means a revoked
+  link's own requests stay distinguishable, in logs, from a probe against a
+  token that was never valid — the same request keeps failing for the same
+  reason, not a different one after the fact. `enabled: true` on an
+  already-disabled share mints a fresh token (per above); `enabled: true`
+  on an already-enabled one is a no-op on the token.
 
 _Why._ As first specified, the public page couldn't show the pass rate
 _and_ coverage §1.2 requires, or what wasn't covered, because that data

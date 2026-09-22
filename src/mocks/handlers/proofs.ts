@@ -128,8 +128,19 @@ export const proofHandlers = [
     const current = proofStore.get(params.id as string);
     if (!current) return errorResponse(404, "not_found", "Proof not found.");
     const body = CreateShareRequestSchema.parse(await request.json());
-    const token = `share_${Math.random().toString(36).slice(2, 10)}`;
     const origin = new URL(request.url).origin;
+    // Disabling preserves the token; only re-enabling FROM disabled mints a
+    // fresh one (docs/API_CONTRACT.md) - rotating on every call, including
+    // disable, made a revoked link's requests indistinguishable in logs
+    // from a probe against a token that was never valid, and made the
+    // `enabled` check in findProofByShareToken untestable in isolation:
+    // the old token was already gone from the store on the very next call
+    // regardless of whether `enabled` itself was ever consulted.
+    const wasEnabled = current.share?.enabled ?? false;
+    const rotate = !current.share || (body.enabled && !wasEnabled);
+    const token = rotate
+      ? `share_${Math.random().toString(36).slice(2, 10)}`
+      : current.share!.token;
     const share = {
       token,
       url: `${origin}/p/${token}`,

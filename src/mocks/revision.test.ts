@@ -406,27 +406,40 @@ describe("B10: proofs are frozen, self-contained, and the public one leaks nothi
     expect(JSON.stringify(body)).not.toContain(token); // no share token echoed back
   });
 
-  it("revoking the share kills the public page entirely - the DISABLED token itself, not just a rotated-away old one", async () => {
-    const enabled = z
-      .object({ token: z.string() })
-      .parse(
-        await (
-          await post("/proofs/proof_fail_1/share", { enabled: true })
-        ).json(),
-      );
+  it("revoking disables the token in place - it stays dead because `enabled` says so, not because it vanished", async () => {
+    const shareResponse = z.object({ token: z.string(), enabled: z.boolean() });
+    const enabled = shareResponse.parse(
+      await (
+        await post("/proofs/proof_fail_1/share", { enabled: true })
+      ).json(),
+    );
     expect((await fetch(`${base}/p/${enabled.token}`)).status).toBe(200);
 
-    // Sharing again mints a new token; with enabled:false THAT token must be dead too.
-    const revoked = z
-      .object({ token: z.string(), enabled: z.boolean() })
-      .parse(
-        await (
-          await post("/proofs/proof_fail_1/share", { enabled: false })
-        ).json(),
-      );
+    // Disabling PRESERVES the token (docs/API_CONTRACT.md): this proves it
+    // by asserting the two responses share the same token, not merely that
+    // both end up 404 - the old test here could pass even when disabling
+    // silently rotated the token too, which made the `enabled` check
+    // itself untestable (every old token was gone regardless of it).
+    const revoked = shareResponse.parse(
+      await (
+        await post("/proofs/proof_fail_1/share", { enabled: false })
+      ).json(),
+    );
     expect(revoked.enabled).toBe(false);
-    expect((await fetch(`${base}/p/${revoked.token}`)).status).toBe(404); // disabled
-    expect((await fetch(`${base}/p/${enabled.token}`)).status).toBe(404); // rotated away
+    expect(revoked.token).toBe(enabled.token); // preserved, not reissued
+    expect((await fetch(`${base}/p/${enabled.token}`)).status).toBe(404); // dead via `enabled`, same token
+
+    // Re-enabling FROM disabled mints a FRESH token - the old one, even
+    // though it was only ever disabled (never forgotten), stays dead: a
+    // revoked link can't be resurrected by flipping sharing back on.
+    const reEnabled = shareResponse.parse(
+      await (
+        await post("/proofs/proof_fail_1/share", { enabled: true })
+      ).json(),
+    );
+    expect(reEnabled.token).not.toBe(enabled.token); // rotated
+    expect((await fetch(`${base}/p/${enabled.token}`)).status).toBe(404); // still dead
+    expect((await fetch(`${base}/p/${reEnabled.token}`)).status).toBe(200); // the new link works
   });
 
   it("the share link is actually navigable - the mock's own origin, not a fake external domain", async () => {
