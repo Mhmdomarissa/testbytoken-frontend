@@ -141,7 +141,7 @@ Craft, not redesign. Every screen already works and every rule it follows was
 hard-won. The goal is that using it feels considered, not that it looks
 different.
 
-**One screen per PR.** If a PR changes what a screen *says* or *reports* rather
+**One screen per PR.** If a PR changes what a screen _says_ or _reports_ rather
 than how it feels, it has gone too far.
 
 ### P1 — Motion, used sparingly and for meaning
