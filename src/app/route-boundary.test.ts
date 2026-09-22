@@ -39,11 +39,26 @@ const CONSOLE_ONLY = [
   "app/(console)",
 ];
 
-/** A public page (the proof page): none of the console, and no mock plumbing at all. */
+/**
+ * A public page (the proof page): none of the console, and no mock
+ * plumbing beyond the one-time dev gate.
+ *
+ * `MockingProvider` is a leaf here for the same reason it is for the auth
+ * tier below: this page talks to the mock backend directly with a plain
+ * `fetch()` (docs/API_CONTRACT.md - no data layer, no query hooks), and in
+ * THIS phase (no real backend yet) that fetch needs MSW's worker running
+ * in the page's own tab to resolve at all - found by loading the actual
+ * share flow in a real browser and watching the fetch fall through to
+ * Next's own router instead of the mock, because nothing on this page had
+ * started a client for the service worker to hand the request to. In
+ * production this component is a no-op (its own top-of-file comment: it
+ * gates on `NODE_ENV === "development"`), so this is a dev-only leaf, not
+ * a real dependency the shipped page carries.
+ */
 export const PUBLIC_TIER: Tier = {
   forbiddenPaths: [...CONSOLE_ONLY, "mocks"],
   forbiddenPackages: ["@tanstack/react-query", "msw"],
-  leaves: [],
+  leaves: ["mocks/MockingProvider.tsx"],
 };
 
 /**
@@ -148,11 +163,27 @@ export function findViolations(
   return violations;
 }
 
+/**
+ * Next's `opengraph-image.tsx` file convention is a special ROUTE, not a
+ * page or a component something else imports: it runs entirely server-side
+ * (it renders a PNG and returns it as bytes) and never ships a line of its
+ * own code to any browser. The console-bloat concern this whole boundary
+ * exists for - "a phone opening a shared proof link downloads the whole
+ * console first" - does not apply to a file that phone never receives any
+ * part of. It is therefore the one file under `(public)` allowed to import
+ * the mock directly (see its own top-of-file comment for why it has to:
+ * the mock has no server-side HTTP leg to fetch from instead, in this
+ * phase). Every OTHER file under `(public)` - the page, and anything it
+ * renders to the client - is still walked and still held to the full rule.
+ */
+const SERVER_ONLY_EXEMPT = /opengraph-image\.tsx$/;
+
 function filesUnder(dir: string): string[] {
   if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = path.join(dir, e.name);
     if (e.isDirectory()) return filesUnder(p);
+    if (SERVER_ONLY_EXEMPT.test(e.name)) return [];
     return /\.(ts|tsx)$/.test(e.name) && !/\.test\./.test(e.name) ? [p] : [];
   });
 }
@@ -224,24 +255,53 @@ describe("findViolations (so the checks above can't pass by walking nothing)", (
     expect(findViolations([path.join(dir, "b.tsx")], dir)).toHaveLength(1);
   });
 
-  it("the auth tier allows the mock gate as a leaf, but not what a console page would bring", () => {
+  it("both the auth and public tiers allow the mock gate as a leaf, but not what a console page would bring", () => {
     const dir = tree({
       "auth/page.tsx": `import { MockingProvider } from "@/mocks/MockingProvider";`,
       "mocks/MockingProvider.tsx": `import("./browser");`,
       "mocks/browser.ts": `import { setupWorker } from "msw";`,
       "auth/bad.tsx": `import { QueryProvider } from "@/lib/api/QueryProvider";`,
       "lib/api/QueryProvider.tsx": ``,
+      "auth/session.tsx": `import { setMockSessionCookie } from "@/mocks/session-cookie-workaround";`,
+      "mocks/session-cookie-workaround.ts": ``,
     });
     expect(
       findViolations([path.join(dir, "auth/page.tsx")], dir, AUTH_TIER),
     ).toEqual([]);
     expect(
+      findViolations([path.join(dir, "auth/page.tsx")], dir, PUBLIC_TIER),
+    ).toEqual([]);
+    expect(
       findViolations([path.join(dir, "auth/bad.tsx")], dir, AUTH_TIER),
     ).toHaveLength(1);
-    // ...while the public tier refuses even the mock gate.
     expect(
-      findViolations([path.join(dir, "auth/page.tsx")], dir, PUBLIC_TIER),
+      findViolations([path.join(dir, "auth/bad.tsx")], dir, PUBLIC_TIER),
     ).toHaveLength(1);
+    // The session-cookie workaround is a leaf for AUTH_TIER only - the
+    // public tier has no sign-in flow and no reason to touch it.
+    expect(
+      findViolations([path.join(dir, "auth/session.tsx")], dir, AUTH_TIER),
+    ).toEqual([]);
+    expect(
+      findViolations([path.join(dir, "auth/session.tsx")], dir, PUBLIC_TIER),
+    ).toHaveLength(1);
+  });
+
+  it("opengraph-image.tsx is exempt from the mock-import rule (it never ships to a client); a page.tsx doing the same thing is still caught", () => {
+    const dir = tree({
+      "p/[token]/opengraph-image.tsx": `import { x } from "@/mocks/data";`,
+      "p/[token]/page.tsx": `import { x } from "@/mocks/data";`,
+      "mocks/data.ts": `export const x = 1;`,
+    });
+    const entries = filesUnder(dir);
+    // The walk target list itself excludes the OG image file...
+    expect(entries.some((f) => f.endsWith("opengraph-image.tsx"))).toBe(false);
+    expect(entries.some((f) => f.endsWith("page.tsx"))).toBe(true);
+    // ...so only page.tsx's identical violation is ever found.
+    const found = findViolations(entries, dir);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain("page.tsx");
+    expect(found[0]).not.toContain("opengraph-image");
   });
 
   it("passes a clean tree", () => {

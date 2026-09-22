@@ -3,10 +3,12 @@ import type {
   LoginSessionSchema,
   TargetSchema,
   PlanSchema,
+  ProofSchema,
   RunDetailSchema,
   ScanSchema,
 } from "@/lib/contract";
 import {
+  proofs as initialProofs,
   runs as initialRuns,
   scans as initialScans,
   targets as initialTargets,
@@ -52,6 +54,18 @@ export const loginSessionStore = new Map<
     completionResult: "completed" | "no_session_detected" | null;
   }
 >();
+
+/**
+ * Proofs, keyed by id. Was a private `let store = [...proofs]` inside
+ * handlers/proofs.ts - moved here for the exact reason the comment above
+ * exists: `handlers/screenshots.ts` needs to check a share's token against
+ * this same set (B9 - a proof-scoped screenshot URL must stop working the
+ * instant sharing is revoked, which means validating it against LIVE share
+ * state, not a copy only proofs.ts could see).
+ */
+export const proofStore = new Map<string, z.infer<typeof ProofSchema>>(
+  initialProofs.map((p) => [p.id, p]),
+);
 
 /**
  * What this mock account's tier permits (`GET /auth/me`'s `capabilities`).

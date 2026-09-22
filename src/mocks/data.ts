@@ -651,8 +651,31 @@ function proofFor(
   };
 }
 
+/**
+ * A demo token baked into the FIXTURE, not minted via POST /proofs/{id}/share
+ * at runtime - so a genuinely cold visitor (a fresh browser, no prior
+ * sign-in, nothing created in this session) can open `/p/share_demo`
+ * directly. Every other share in this mock only exists because an
+ * authenticated session created it a moment earlier, which cannot exercise
+ * "someone with no account opens a link a stranger sent them" - the exact
+ * case B9 exists for. `url` is a placeholder; the public page never reads
+ * `share.url` (PublicProofSchema has no `share` field at all - only the
+ * owner's GET /proofs/{id} does, and that handler rebuilds it from the
+ * request's own origin before returning it, never trusting this stored
+ * value).
+ */
+const DEMO_SHARE_TOKEN = "share_demo";
+
 export const proofs = [
-  proofFor(runPassed, "sha256:1a79a4d60de6718e8e5b326e338ae533"),
+  {
+    ...proofFor(runPassed, "sha256:1a79a4d60de6718e8e5b326e338ae533"),
+    share: {
+      token: DEMO_SHARE_TOKEN,
+      url: `https://testbytoken.example/p/${DEMO_SHARE_TOKEN}`,
+      enabled: true,
+      expires_at: null,
+    },
+  },
   proofFor(runFailed, "sha256:9f2c134e5b0a9c1de3f6e9d0f5b2a7c8"),
   proofFor(runLong, "sha256:6c56f1b0e5b6a4d2f8c9e1a3b5d7f9a1"),
 ];

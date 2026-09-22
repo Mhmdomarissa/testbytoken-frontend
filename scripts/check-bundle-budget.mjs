@@ -64,12 +64,18 @@ const BASELINE_PATH = path.join(
 /**
  * Deliberately tight cap for any public, unauthenticated proof route
  * (path starting with "/p/"), enforced separately from - and well below -
- * the ratcheted app-shell baselines below. NOT SET: there is no such
- * route yet to measure honestly. When one exists, measure it, then set
- * this to a real, deliberately tight number and explain the choice here.
+ * the ratcheted app-shell baselines below. B9 built the route
+ * (`/p/[token]`) - well under any console route (each 410-440 KB,
+ * carrying the full shell, React Query, and tooltip/toast providers this
+ * page skips), but still dominated by the same zod + framework floor
+ * every route in this app pays (roughly 240 KB of the total is shared
+ * with `/sign-in`, not specific to this page). Set from this PR's own
+ * bundle-budget CI run (316,195 bytes gzipped, Ubuntu) rather than a
+ * local macOS measurement - see TOLERANCE_BYTES below for why the two
+ * platforms don't agree exactly.
  */
 const PUBLIC_ROUTE_PREFIX = "/p/";
-const PUBLIC_ROUTE_BUDGET_BYTES = null;
+const PUBLIC_ROUTE_BUDGET_BYTES = 316195;
 
 /**
  * ZERO - not a hedge, because the drift this used to hedge against is not
