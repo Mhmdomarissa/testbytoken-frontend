@@ -1,15 +1,15 @@
 {
-  "/": 330244,
+  "/": 330215,
   "/_not-found": 185799,
-  "/overview": 413512,
-  "/runs": 417551,
-  "/runs/[id]": 438222,
+  "/overview": 413492,
+  "/runs": 417531,
+  "/runs/[id]": 438242,
   "/sign-in": 283888,
   "/style-guide": 393684,
-  "/suites": 415743,
-  "/targets": 441323,
-  "/targets/[id]/compose": 429058,
-  "/targets/[id]/inventory": 428800,
-  "/targets/[id]/login": 426217,
-  "/usage": 414726
+  "/suites": 415723,
+  "/targets": 441303,
+  "/targets/[id]/compose": 429038,
+  "/targets/[id]/inventory": 428780,
+  "/targets/[id]/login": 426197,
+  "/usage": 414706
 }
