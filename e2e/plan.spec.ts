@@ -270,7 +270,7 @@ test("keyboard: every step - including the ones that can't run - is reachable by
     const id = await page.evaluate(
       () =>
         document.activeElement
-          ?.closest("li[data-testid]")
+          ?.closest('[data-testid^="plan-step-"]')
           ?.getAttribute("data-testid") ?? null,
     );
     if (id) visited.add(id);

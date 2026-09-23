@@ -38,133 +38,138 @@ export function PlanStepRow({
   const write = isWrite(step);
   const leftOut = position.kind === "left-out";
 
+  // The group role sits on an inner element, not the <li>: an <li> given
+  // another role stops being a list item, and its <ol> fails WCAG 1.3.1
+  // (axe's `list` rule - found once axe first saw an approved plan).
   return (
-    <li
-      data-testid={`plan-step-${step.id}`}
-      data-position={position.kind}
-      role="group"
-      aria-labelledby={`${step.id}-title`}
-      aria-describedby={`${step.id}-state`}
-      // A step that can't be approved has NO controls, so without this it has
-      // no keyboard stop at all and a keyboard or switch user would tab
-      // straight past the very steps this screen exists to surface. Steps with
-      // controls are already reached through them (and announced as part of
-      // this group).
-      tabIndex={approvable.ok ? undefined : 0}
-      className={`flex flex-col gap-2 border border-border p-3 text-sm focus-visible:outline-2 focus-visible:outline-ring ${
-        approvable.ok ? "" : "bg-card"
-      } ${leftOut ? "opacity-70" : ""}`}
-    >
-      <span id={`${step.id}-state`} className="sr-only">
-        {stateText(step, position)}
-      </span>
-      <div className="flex flex-wrap items-start gap-2">
-        <span
-          aria-hidden="true"
-          className="min-w-6 font-mono text-xs text-muted-foreground"
-        >
-          {position.kind === "will-run" ? `#${position.nth}` : "-"}
+    <li>
+      <div
+        data-testid={`plan-step-${step.id}`}
+        data-position={position.kind}
+        role="group"
+        aria-labelledby={`${step.id}-title`}
+        aria-describedby={`${step.id}-state`}
+        // A step that can't be approved has NO controls, so without this it has
+        // no keyboard stop at all and a keyboard or switch user would tab
+        // straight past the very steps this screen exists to surface. Steps with
+        // controls are already reached through them (and announced as part of
+        // this group).
+        tabIndex={approvable.ok ? undefined : 0}
+        className={`flex flex-col gap-2 border border-border p-3 text-sm focus-visible:outline-2 focus-visible:outline-ring ${
+          approvable.ok ? "" : "bg-card"
+        } ${leftOut ? "opacity-70" : ""}`}
+      >
+        <span id={`${step.id}-state`} className="sr-only">
+          {stateText(step, position)}
         </span>
-        <p
-          id={`${step.id}-title`}
-          className="min-w-0 flex-1 break-words font-medium"
-        >
-          {step.description}
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          {position.kind === "will-run" && (
-            <span className="text-xs text-muted-foreground">Will run</span>
-          )}
-          {leftOut && <StatusBadge status="skipped" label="Left out" />}
-          {!approvable.ok && approvable.why === "ungrounded" && (
-            <StatusBadge status="warning" label="Not grounded" />
-          )}
-          {!approvable.ok && approvable.why === "blocked" && (
-            <StatusBadge status="warning" label="Blocked" />
-          )}
+        <div className="flex flex-wrap items-start gap-2">
+          <span
+            aria-hidden="true"
+            className="min-w-6 font-mono text-xs text-muted-foreground"
+          >
+            {position.kind === "will-run" ? `#${position.nth}` : "-"}
+          </span>
+          <p
+            id={`${step.id}-title`}
+            className="min-w-0 flex-1 break-words font-medium"
+          >
+            {step.description}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {position.kind === "will-run" && (
+              <span className="text-xs text-muted-foreground">Will run</span>
+            )}
+            {leftOut && <StatusBadge status="skipped" label="Left out" />}
+            {!approvable.ok && approvable.why === "ungrounded" && (
+              <StatusBadge status="warning" label="Not grounded" />
+            )}
+            {!approvable.ok && approvable.why === "blocked" && (
+              <StatusBadge status="warning" label="Blocked" />
+            )}
+          </div>
         </div>
+
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">Action</dt>
+          <dd className="min-w-0 break-words font-mono">
+            {step.action}
+            {step.input !== null && (
+              <>
+                {" "}
+                <span className="text-muted-foreground">with input</span>{" "}
+                <span data-testid="step-input">&quot;{step.input}&quot;</span>
+              </>
+            )}
+          </dd>
+
+          <dt className="text-muted-foreground">Effect</dt>
+          <dd data-testid="step-effect">
+            {!write
+              ? "Read-only - only observes"
+              : "Changes state in your application"}
+            {isUnrecognised(step.action_class) && (
+              <span className="text-muted-foreground">
+                {" "}
+                (unrecognised class &quot;{truncateRaw(step.action_class.raw)}
+                &quot; - treated as a write)
+              </span>
+            )}
+          </dd>
+
+          <dt className="text-muted-foreground">Bound to</dt>
+          <dd className="min-w-0 break-words" data-testid="step-binding">
+            <Binding step={step} />
+          </dd>
+        </dl>
+
+        {!approvable.ok && approvable.why === "blocked" && step.blocked && (
+          <p className="break-words border-l-2 border-border pl-3 text-xs">
+            <span className="font-medium">
+              Blocked ({humanise(step.blocked.reason_code)}):
+            </span>{" "}
+            {step.blocked.message}
+          </p>
+        )}
+
+        {controls && (
+          <div className="flex flex-wrap gap-2">
+            {approvable.ok ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={controls.onToggle}
+                  aria-label={`${leftOut ? "Put back" : "Leave out"}: ${step.description}`}
+                >
+                  {leftOut ? "Put back" : "Leave out"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Move up: ${step.description}`}
+                  disabled={!controls.canMoveUp}
+                  onClick={() => controls.onMove(-1)}
+                >
+                  <ArrowUpIcon />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Move down: ${step.description}`}
+                  disabled={!controls.canMoveDown}
+                  onClick={() => controls.onMove(1)}
+                >
+                  <ArrowDownIcon />
+                </Button>
+              </>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                This step can&apos;t be approved, so it can&apos;t run.
+              </span>
+            )}
+          </div>
+        )}
       </div>
-
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt className="text-muted-foreground">Action</dt>
-        <dd className="min-w-0 break-words font-mono">
-          {step.action}
-          {step.input !== null && (
-            <>
-              {" "}
-              <span className="text-muted-foreground">with input</span>{" "}
-              <span data-testid="step-input">&quot;{step.input}&quot;</span>
-            </>
-          )}
-        </dd>
-
-        <dt className="text-muted-foreground">Effect</dt>
-        <dd data-testid="step-effect">
-          {!write
-            ? "Read-only - only observes"
-            : "Changes state in your application"}
-          {isUnrecognised(step.action_class) && (
-            <span className="text-muted-foreground">
-              {" "}
-              (unrecognised class &quot;{truncateRaw(step.action_class.raw)}
-              &quot; - treated as a write)
-            </span>
-          )}
-        </dd>
-
-        <dt className="text-muted-foreground">Bound to</dt>
-        <dd className="min-w-0 break-words" data-testid="step-binding">
-          <Binding step={step} />
-        </dd>
-      </dl>
-
-      {!approvable.ok && approvable.why === "blocked" && step.blocked && (
-        <p className="break-words border-l-2 border-border pl-3 text-xs">
-          <span className="font-medium">
-            Blocked ({humanise(step.blocked.reason_code)}):
-          </span>{" "}
-          {step.blocked.message}
-        </p>
-      )}
-
-      {controls && (
-        <div className="flex flex-wrap gap-2">
-          {approvable.ok ? (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={controls.onToggle}
-                aria-label={`${leftOut ? "Put back" : "Leave out"}: ${step.description}`}
-              >
-                {leftOut ? "Put back" : "Leave out"}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Move up: ${step.description}`}
-                disabled={!controls.canMoveUp}
-                onClick={() => controls.onMove(-1)}
-              >
-                <ArrowUpIcon />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={`Move down: ${step.description}`}
-                disabled={!controls.canMoveDown}
-                onClick={() => controls.onMove(1)}
-              >
-                <ArrowDownIcon />
-              </Button>
-            </>
-          ) : (
-            <span className="text-xs text-muted-foreground">
-              This step can&apos;t be approved, so it can&apos;t run.
-            </span>
-          )}
-        </div>
-      )}
     </li>
   );
 }
