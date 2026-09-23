@@ -49,18 +49,14 @@ export function SharePanel({
     acted.current = false;
     (on ? linkRef : createRef).current?.focus();
   }, [on]);
+  // A failed request swapped nothing, so there is nothing to follow - and a
+  // later change this person didn't make mustn't inherit the intent.
+  useEffect(() => {
+    if (setShare.isError) acted.current = false;
+  }, [setShare.isError]);
   const toggle = (enabled: boolean) => {
     acted.current = true;
-    setShare.mutate(
-      { enabled },
-      {
-        // Nothing swapped, so nothing to follow - and a later change this
-        // person didn't make mustn't inherit the intent.
-        onError: () => {
-          acted.current = false;
-        },
-      },
-    );
+    setShare.mutate({ enabled });
   };
 
   if (!on) {
