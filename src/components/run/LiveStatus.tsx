@@ -97,11 +97,25 @@ export function LiveStatus({
       data-testid="connection-banner"
       data-state={live.state}
       role={alarming ? "alert" : "status"}
-      className={`flex flex-col gap-1 border p-3 text-sm ${
+      className={`flex flex-col gap-1 border px-4 py-3 text-sm transition-colors duration-(--duration-base) ${
         alarming ? "border-(--status-warning-chip-fill)" : "border-border"
       }`}
     >
-      <p>{live.text}</p>
+      <p className="flex items-center gap-2.5">
+        {/* The stream's own state as a light: breathing only while it is
+            connected or connecting, still otherwise. The words carry it. */}
+        <span
+          aria-hidden="true"
+          className={`size-2 shrink-0 ${
+            alarming
+              ? "bg-(--status-warning-chip-fill)"
+              : live.state === "live" || live.state === "connecting"
+                ? "breathe-dot bg-(--status-running-chip-fill)"
+                : "bg-(--border-strong)"
+          }`}
+        />
+        {live.text}
+      </p>
       {reconnects > 0 && (
         <p className="text-xs text-muted-foreground">
           The stream has dropped and reconnected {reconnects}{" "}

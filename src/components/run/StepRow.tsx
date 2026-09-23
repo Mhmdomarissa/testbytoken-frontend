@@ -48,14 +48,20 @@ export function StepRow({
       aria-posinset={position}
       aria-setsize={total}
       style={compact ? { height: ROW_HEIGHT, ...style } : style}
-      className={`flex flex-col gap-1 border-b border-border px-3 py-2 text-sm ${
-        running ? "shadow-[inset_4px_0_0_var(--status-running-chip-fill)]" : ""
-      } ${compact ? "overflow-hidden" : ""}`}
+      // Motion here follows the row's own server-reported status: it
+      // arrives when its first event does (full rows only - a windowed
+      // row is recycled on scroll), breathes while `running`, and its
+      // mark draws when it becomes pass or fail. See globals.css.
+      className={`draw-result flex flex-col border-b border-border px-4 text-sm ${
+        running
+          ? "breathe shadow-[inset_4px_0_0_var(--status-running-chip-fill)]"
+          : ""
+      } ${compact ? "gap-1 overflow-hidden py-2" : "arrive gap-1.5 py-3"}`}
     >
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="w-8 shrink-0 font-mono text-xs text-muted-foreground tabular-nums"
+          className="w-8 shrink-0 text-sm font-light text-(--text-tertiary) tabular-nums"
         >
           {step.index + 1}
         </span>
@@ -76,12 +82,12 @@ export function StepRow({
         )}
       </div>
       {running ? (
-        <p className="pl-10 text-xs text-muted-foreground">In progress.</p>
+        <p className="pl-10.5 text-xs text-muted-foreground">In progress.</p>
       ) : (
         <>
           {step.assertion && (
             <p
-              className={`pl-10 text-xs text-muted-foreground ${
+              className={`pl-10.5 text-xs text-muted-foreground ${
                 compact ? "truncate" : "break-words"
               }`}
               title={step.assertion}
@@ -90,7 +96,7 @@ export function StepRow({
             </p>
           )}
           <p
-            className={`pl-10 ${compact ? "line-clamp-2" : "break-words"}`}
+            className={`pl-10.5 ${compact ? "line-clamp-2" : "break-words"}`}
             title={step.message}
           >
             {step.message === "" ? (
@@ -106,7 +112,7 @@ export function StepRow({
               failed/warning steps are also listed in full above it
               (StepList's failures summary). */}
           {!compact && step.screenshot_url && (
-            <div className="pl-10">
+            <div className="pl-10.5">
               <Screenshot
                 url={step.screenshot_url}
                 alt={`Screenshot after step ${position}: ${step.action} ${step.target}`}

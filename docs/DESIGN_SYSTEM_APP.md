@@ -522,15 +522,19 @@ rectangular.
 
 ### Utilities (`src/app/globals.css`)
 
-| Utility                    | What moves                                                            | Reduced-motion still alternative               |
-| -------------------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
-| `arrive`                   | Clip reveal + 8px rise, spring                                        | Simply present                                 |
-| `stagger-arrive`           | Its children `arrive` in turn (index from `:nth-child`, capped at 10) | All present at once                            |
-| `fill-in`                  | A bar scales to the value the server sent                             | Drawn at its value                             |
-| `sheen`                    | A faint gold sweep over skeleton blocks                               | Plain blocks; the adjacent words say "loading" |
-| `glow-hover`, `glow-focus` | Box-shadow / border colour only                                       | Unchanged - colour isn't motion                |
+| Utility                                        | What moves                                                                                     | Reduced-motion still alternative                                      |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `arrive`                                       | Clip reveal + 8px rise, spring                                                                 | Simply present                                                        |
+| `stagger-arrive`                               | Its children `arrive` in turn (index from `:nth-child`, capped at 10)                          | All present at once                                                   |
+| `fill-in`                                      | A bar scales to the value the server sent                                                      | Drawn at its value                                                    |
+| `sheen`                                        | A faint gold sweep over skeleton blocks                                                        | Plain blocks; the adjacent words say "loading"                        |
+| `glow-hover`, `glow-focus`                     | Box-shadow / border colour only                                                                | Unchanged - colour isn't motion                                       |
+| `draw-result`                                  | On an element with `data-status`: a pass/fail mark strokes itself in; the chip fill crossfades | The mark is simply there                                              |
+| `breathe`                                      | A slow tint on `::before`, only on what the server reports running                             | A steady tint (bar, chip, label and `aria-current` still say running) |
+| `breathe-dot`                                  | The live-stream indicator, only while connected or connecting                                  | Steady                                                                |
+| `.animate-spin`, `.animate-pulse` (pre-Part P) | Existing spinners and skeleton pulses                                                          | Static icon / block, beside words that say what's happening           |
 
-Two implementation notes, each learned the hard way in P1:
+Implementation notes, each learned the hard way (P1, P2):
 
 - **Arrivals clip; they don't fade.** Content is at full contrast
   throughout, only unmasked - an axe run landing mid-animation measures the
@@ -542,6 +546,15 @@ Two implementation notes, each learned the hard way in P1:
   here silently merged with it and clipped skeleton fills to text (they
   rendered empty). Hence `sheen`.
 
+- **One `animation` per element.** Two utilities that each set
+  `animation` on the same element silently cancel - the running row
+  arrived but never breathed until the breath moved to its own `::before`.
+  Probe the computed `animationName`; a screenshot can't show it.
+- **A reduced-motion override must match the specificity of what it
+  overrides.** `draw-result` targets `:is([data-status="pass"], …)`, so
+  its override does too (`:is([data-status])`) - a plainer selector
+  lost, and marks kept drawing under reduced motion until probed.
+
 Every utility declares its reduced-motion rule **beside** its animation,
 so the two can't drift apart. "Reduced" here means **still**, not faster.
 
@@ -552,3 +565,10 @@ so the two can't drift apart. "Reduced" here means **still**, not faster.
   each step's state is an edge of light that crossfades on toggle,
   hover/focus glow, and a plan-shaped skeleton (`sheen`) while the planner
   works - so loading resolves into the plan rather than swapping for it.
+- **Run watch (P2):** each step arrives when its first event does
+  (full rows only - windowed rows are recycled on scroll); the running row
+  breathes while, and only while, the server says running; a pass or fail
+  mark draws when that event arrives and never before; the run's summary
+  carries its reported status as an edge that crossfades between real
+  states; a finished run's pass rate and coverage are drawn as two bars -
+  always together, each one server number, never combined, never counted.

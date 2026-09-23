@@ -254,3 +254,117 @@
     box-shadow: var(--glow-focus);
   }
 }
+
+/* A result drawing itself (P2, run watch). Put on the element that
+   carries `data-status`: only a pass or fail mark draws, keyed on that
+   attribute, so it draws when the event saying so arrives and never
+   before. Lucide's strokes are all shorter than --draw-length, so one
+   dash covers each. The chip's fill crossfades between the two real
+   states it moved between. */
+@keyframes draw {
+  from {
+    stroke-dashoffset: var(--draw-length);
+  }
+}
+
+@utility draw-result {
+  --draw-length: 80;
+  & [style*="--status-"] {
+    transition: background-color var(--duration-base) var(--ease-in-out);
+  }
+  &:is(
+      [data-status="pass"],
+      [data-status="fail"],
+      [data-status="passed"],
+      [data-status="failed"]
+    )
+    svg
+    :is(path, circle, line, polyline, polygon, rect) {
+    stroke-dasharray: var(--draw-length);
+    animation: draw var(--duration-draw) var(--ease-out) backwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Still alternative: the mark is simply there. [data-status] keeps
+       this at the drawing rule's specificity, so it actually wins. */
+    &:is([data-status]) svg :is(path, circle, line, polyline, polygon, rect) {
+      animation: none;
+      stroke-dasharray: none;
+    }
+  }
+}
+
+/* The running state, alive: a slow breath of the running tint - only on
+   what the server reports as running, and only while it does. */
+@keyframes breathe {
+  0%,
+  100% {
+    background-color: color-mix(
+      in oklch,
+      var(--status-running-bg) 30%,
+      transparent
+    );
+  }
+  50% {
+    background-color: color-mix(
+      in oklch,
+      var(--status-running-bg) 85%,
+      transparent
+    );
+  }
+}
+
+/* On its own layer (::before), not the element: an element can hold one
+   `animation` value, and the row also arrives - on the element itself the
+   two silently cancelled (caught by probing the live run, P2). */
+@utility breathe {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    animation: breathe var(--duration-breathe) var(--ease-in-out) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* Still alternative: a steady tint; the bar, chip, label and
+       aria-current already say "running". */
+    &::before {
+      animation: none;
+      background-color: color-mix(
+        in oklch,
+        var(--status-running-bg) 60%,
+        transparent
+      );
+    }
+  }
+}
+
+@keyframes breathe-dot {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@utility breathe-dot {
+  animation: breathe-dot var(--duration-breathe) var(--ease-in-out) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+/* The spinning/pulsing icons and skeletons that predate Part P had no
+   reduced-motion path. Unlayered, so it beats the utilities layer. Still
+   alternative: a static icon or block - each already sits beside words
+   ("Running", "Engine starting", a loading message). */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse {
+    animation: none;
+  }
+}
