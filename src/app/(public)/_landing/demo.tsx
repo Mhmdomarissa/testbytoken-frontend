@@ -24,7 +24,7 @@ import { DEMO_WORKSPACE_ID } from "@/lib/workspace";
 import { useFocusRegionOnChange } from "@/hooks/useFocusRegionOnChange";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { toBadgeStatus } from "@/components/status/badgeStatus";
-import { PassRateCoverage } from "@/components/status/PassRateCoverage";
+import { RunPassRate } from "@/components/status/RunPassRate";
 import { ListSkeleton } from "@/components/state/ListSkeleton";
 import { PlanReview } from "@/components/plan/PlanReview";
 import { ApprovedPlan } from "@/components/plan/ApprovedPlan";
@@ -608,10 +608,12 @@ function DemoRun({
               Waiting for the first report.
             </span>
           )}
-          {server && serverTerminal ? (
-            <PassRateCoverage
+          {server ? (
+            <RunPassRate
+              status={server.status}
               passRate={server.pass_rate}
               coverage={server.coverage}
+              pendingText="The pass rate is reported when the run finishes."
             />
           ) : (
             <span className="text-sm text-muted-foreground">

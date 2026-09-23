@@ -11,7 +11,7 @@ import { ApiError } from "@/lib/api/errors";
 import { UnrecognisedValue } from "@/lib/api/tolerant";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { toBadgeStatus } from "@/components/status/badgeStatus";
-import { PassRateCoverage } from "@/components/status/PassRateCoverage";
+import { RunPassRate } from "@/components/status/RunPassRate";
 import { EmptyState } from "@/components/state/EmptyState";
 import { ErrorState } from "@/components/state/ErrorState";
 import { ListSkeleton } from "@/components/state/ListSkeleton";
@@ -19,7 +19,6 @@ import { LiveStatus, liveState } from "@/components/run/LiveStatus";
 import { StepList } from "@/components/run/StepList";
 import { EngineReport } from "@/components/run/EngineReport";
 import { SharePanel } from "@/components/run/SharePanel";
-import { ResultBars } from "@/components/run/ResultBars";
 import { reconcileRun } from "@/components/run/reconcile";
 import { isRunOver, runStatusLabel } from "@/components/run/runStatus";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -221,17 +220,16 @@ function Watch({ params }: { params: Promise<{ id: string }> }) {
             Waiting for the first report.
           </span>
         )}
-        {server && serverTerminal ? (
-          <div className="flex flex-col gap-3">
-            <PassRateCoverage
-              passRate={server.pass_rate}
-              coverage={server.coverage}
-            />
-            <ResultBars
-              passRate={server.pass_rate}
-              coverage={server.coverage}
-            />
-          </div>
+        {/* The server's own record decides, not the stream: a pass rate is
+            the server's figure for a run the SERVER says is over. */}
+        {server ? (
+          <RunPassRate
+            status={server.status}
+            passRate={server.pass_rate}
+            coverage={server.coverage}
+            pendingText="The pass rate is reported when the run finishes."
+            bars
+          />
         ) : (
           <span
             className="text-sm text-muted-foreground"
