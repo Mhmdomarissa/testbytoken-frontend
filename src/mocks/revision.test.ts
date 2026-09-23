@@ -645,11 +645,7 @@ describe("plan runs: the numbers are OF the plan, and the exclusions travel with
     ]);
     const run = await finishedRun(created.id);
     expect(run.status).toBe("failed");
-    expect(run.steps.map((s) => s.status)).toEqual([
-      "pass",
-      "fail",
-      "skipped",
-    ]);
+    expect(run.steps.map((s) => s.status)).toEqual(["pass", "fail", "skipped"]);
     const failedStep = run.steps.find((s) => s.status === "fail");
     expect(failedStep?.message.length).toBeGreaterThan(20);
     // Coverage is still of the PLAN (3 approved of 5 proposed), not
