@@ -21,18 +21,15 @@ import { useFocusRegionOnChange } from "@/hooks/useFocusRegionOnChange";
  * shell for the session (e.g. straight from sign-in) - exactly the kind of
  * hop this exists to catch, not a hard page load with its own fine
  * default focus state. `tabIndex={-1}` makes it programmatically focusable
- * without joining the normal Tab order.
+ * without joining the normal Tab order - and, being no control, it shows no
+ * ring (see the `[tabindex="-1"]:focus` rule in globals.css).
  */
 export function ShellMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const ref = useFocusRegionOnChange<HTMLElement>(pathname);
 
   return (
-    <main
-      ref={ref}
-      tabIndex={-1}
-      className="flex-1 overflow-y-auto p-6 focus-visible:outline-2 focus-visible:outline-ring"
-    >
+    <main ref={ref} tabIndex={-1} className="flex-1 overflow-y-auto p-6">
       {children}
     </main>
   );
