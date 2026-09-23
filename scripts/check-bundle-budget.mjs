@@ -73,10 +73,13 @@ const BASELINE_PATH = path.join(
  * bundle-budget run (Ubuntu) rather than a local macOS measurement - see
  * TOLERANCE_BYTES below for why the two platforms don't agree exactly.
  * Bumped once since B9 (B10: PublicMain.tsx, the route group's own main
- * landmark and focus-management fix, applies to this route too).
+ * landmark and focus-management fix, applies to this route too), and by
+ * 5 bytes in Part L with none of this route's own source changed: content-
+ * hashed chunk names shifted when other routes' chunks did, and the
+ * runtime that lists them moved with them.
  */
 const PUBLIC_ROUTE_PREFIX = "/p/";
-const PUBLIC_ROUTE_BUDGET_BYTES = 316460;
+const PUBLIC_ROUTE_BUDGET_BYTES = 316465;
 
 /**
  * ZERO - not a hedge, because the drift this used to hedge against is not
