@@ -2,6 +2,17 @@ import path from "node:path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    // The landing page's stock photography (docs/PHASE_LANDING_POLISH.md,
+    // L5): served through the image optimizer rather than vendored.
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        pathname: "/photo-*",
+      },
+    ],
+  },
   turbopack: {
     rules: {
       // Strip the OpenAPI-only layer (descriptions, path registration,

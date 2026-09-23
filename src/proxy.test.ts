@@ -10,6 +10,7 @@ const req = (pathname: string, cookie?: string) =>
 
 describe("proxy: which routes need a session", () => {
   it.each([
+    "/",
     "/p/abc123",
     "/p/abc123/opengraph-image",
     "/sign-in",
@@ -20,7 +21,6 @@ describe("proxy: which routes need a session", () => {
   });
 
   it.each([
-    "/",
     "/overview",
     "/targets",
     "/runs",

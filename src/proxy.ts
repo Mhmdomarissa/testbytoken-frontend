@@ -20,9 +20,13 @@ const CONSOLE_HOME = "/overview";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has(SESSION_COOKIE);
-  const isPublicPath = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+  // "/" (the landing page) is matched exactly: as a prefix it would match
+  // every path there is.
+  const isPublicPath =
+    pathname === "/" ||
+    PUBLIC_PATHS.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
+    );
 
   if (!hasSession && !isPublicPath) {
     const signInUrl = new URL("/sign-in", request.url);
