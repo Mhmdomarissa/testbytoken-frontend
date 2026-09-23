@@ -1,5 +1,5 @@
 {
-  "/": 329673,
+  "/": 330119,
   "/_not-found": 185799,
   "/overview": 413512,
   "/runs": 417551,
@@ -8,7 +8,7 @@
   "/style-guide": 393684,
   "/suites": 415743,
   "/targets": 441323,
-  "/targets/[id]/compose": 428495,
+  "/targets/[id]/compose": 429058,
   "/targets/[id]/inventory": 428800,
   "/targets/[id]/login": 426217,
   "/usage": 414726
