@@ -523,7 +523,7 @@ function liveRunBase(id: string): z.infer<typeof RunDetailSchema> {
     login_session_id: null,
     report_url: null,
     status: "running",
-    pass_rate: 1,
+    pass_rate: null,
     coverage: { basis: "inventory", generated: 21, candidate: 24 },
     token_cost: 1.1,
     proof_id: null,
@@ -633,13 +633,38 @@ export const uncoveredFixture: z.infer<
  * is copied in here at creation, so nothing it renders reads through to a
  * live run, and re-running or renaming anything later cannot change it.
  */
+const TERMINAL_VERDICTS = [
+  "passed",
+  "failed",
+  "cancelled",
+  "timed_out",
+] as const;
+
+/**
+ * A proof exists only for a finished run, so building one for anything
+ * else is a bug in this mock - thrown, not papered over. Returns the
+ * run's own terminal status (never collapsed to pass/fail: a cancelled
+ * run's proof says cancelled) and its pass rate, which the contract only
+ * guarantees non-null once the run is terminal.
+ */
+export function terminalResult(run: z.infer<typeof RunDetailSchema>): {
+  verdict: (typeof TERMINAL_VERDICTS)[number];
+  pass_rate: number;
+} {
+  const verdict = TERMINAL_VERDICTS.find((v) => v === run.status);
+  if (!verdict || run.pass_rate === null) {
+    throw new Error(
+      `mock: a proof was built for run ${run.id}, which is ${run.status} (pass_rate ${run.pass_rate}) - only a finished run has one`,
+    );
+  }
+  return { verdict, pass_rate: run.pass_rate };
+}
+
 function snapshotFor(
   run: z.infer<typeof RunDetailSchema>,
 ): z.infer<typeof ProofSnapshotSchema> {
-  const verdict = run.status === "passed" ? "passed" : "failed";
   return {
-    verdict,
-    pass_rate: run.pass_rate,
+    ...terminalResult(run),
     coverage: run.coverage,
     target: { name: targetCheckout.name, base_url: targetCheckout.base_url },
     started_at: run.started_at,

@@ -574,10 +574,13 @@
             "x-extensible-enum": true
           },
           "pass_rate": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 1,
-            "description": "Fraction of the scenarios/steps that RAN which passed. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5."
+            "description": "Fraction of the scenarios/steps that RAN which passed. NULL while `status` is `queued` or `running`, and non-null once it is terminal (`passed`, `failed`, `cancelled`, `timed_out`): a rate over the steps so far is not the run's pass rate, and must not be reported as one. A client MUST NOT render a pass rate for a status it does not recognise as terminal, whatever this field holds. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5."
           },
           "coverage": {
             "$ref": "#/components/schemas/Coverage"
@@ -854,10 +857,13 @@
             "x-extensible-enum": true
           },
           "pass_rate": {
-            "type": "number",
+            "type": [
+              "number",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 1,
-            "description": "Fraction of the scenarios/steps that RAN which passed. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5."
+            "description": "Fraction of the scenarios/steps that RAN which passed. NULL while `status` is `queued` or `running`, and non-null once it is terminal (`passed`, `failed`, `cancelled`, `timed_out`): a rate over the steps so far is not the run's pass rate, and must not be reported as one. A client MUST NOT render a pass rate for a status it does not recognise as terminal, whatever this field holds. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5."
           },
           "coverage": {
             "$ref": "#/components/schemas/Coverage"

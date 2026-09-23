@@ -114,6 +114,23 @@ describe("run emitting ordered step events over time", () => {
     });
   });
 
+  it("pass_rate is null at every moment before the run resolves, for every timeline", () => {
+    for (const t of [
+      LIVE_PASS_TIMELINE,
+      LIVE_FAIL_TIMELINE,
+      LIVE_STALL_TIMELINE,
+    ]) {
+      for (let ms = 0; ms < t.resolvesAt; ms += 250) {
+        const run = computeRunState(baseRun, t, ms);
+        expect(run.status).toBe("running");
+        expect(run.pass_rate).toBeNull();
+      }
+      expect(
+        computeRunState(baseRun, t, t.resolvesAt).pass_rate,
+      ).not.toBeNull();
+    }
+  });
+
   it("clears proof_id until resolved, then restores it", () => {
     expect(computeRunState(baseRun, LIVE_PASS_TIMELINE, 0).proof_id).toBeNull();
     const finished = computeRunState(
@@ -160,10 +177,20 @@ describe("a run that fails partway", () => {
     expect(run.steps.some((s) => s.status === "skipped")).toBe(true);
   });
 
-  it("before the failure, still reports the honest in-progress pass_rate", () => {
+  it("before the failure, reports NO pass rate - not the 100% of the two steps so far", () => {
+    // This used to assert pass_rate 1 here: "100% pass" for a run that
+    // ends at 50%, and the runs list rendered exactly that. A rate over
+    // the steps so far is not the run's pass rate (docs/API_CONTRACT.md).
     const run = computeRunState(baseRun, LIVE_FAIL_TIMELINE, 1300);
-    expect(run.pass_rate).toBe(1); // both steps so far passed
     expect(run.status).toBe("running");
+    expect(run.pass_rate).toBeNull();
+    const finished = computeRunState(
+      baseRun,
+      LIVE_FAIL_TIMELINE,
+      LIVE_FAIL_TIMELINE.resolvesAt,
+    );
+    expect(finished.status).toBe("failed");
+    expect(finished.pass_rate).toBe(0.5);
   });
 });
 

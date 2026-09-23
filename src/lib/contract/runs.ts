@@ -20,6 +20,12 @@ import {
  * can hide low coverage. Both fields are required (not optional) on every
  * shape below, including the list view, so the UI can never render one
  * without the other.
+ *
+ * pass_rate is NULL until the run is terminal (Part P follow-up). A pass
+ * rate over the steps that have run so far is a number about a run that
+ * hasn't finished - "100% pass" on a run that ends at 50% - and the UI
+ * rendered exactly that on the runs list. Nullable, not optional: the key
+ * is always present, so "missing" and "not yet" stay distinguishable.
  */
 
 export const RunStatusSchema = JobStatusSchema.extract([
@@ -141,9 +147,9 @@ const RunSharedFields = {
       "The captured login session the run used (B0.5 B8), or null. An opaque reference - the session itself is never returned by any endpoint.",
   }),
   status: RunStatusSchema,
-  pass_rate: z.number().min(0).max(1).openapi({
+  pass_rate: z.number().min(0).max(1).nullable().openapi({
     description:
-      "Fraction of the scenarios/steps that RAN which passed. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5.",
+      "Fraction of the scenarios/steps that RAN which passed. NULL while `status` is `queued` or `running`, and non-null once it is terminal (`passed`, `failed`, `cancelled`, `timed_out`): a rate over the steps so far is not the run's pass rate, and must not be reported as one. A client MUST NOT render a pass rate for a status it does not recognise as terminal, whatever this field holds. Always present alongside coverage - and never a substitute for it: for a plan run, 2 of 5 proposed steps approved and both passing is a pass_rate of 1 with coverage 2 of 5.",
   }),
   coverage: CoverageSchema,
   token_cost: z

@@ -7,7 +7,12 @@ import type {
   ProofSnapshotSchema,
   RunDetailSchema,
 } from "@/lib/contract";
-import { elementsForModule, modCheckout, uncoveredFixture } from "./data";
+import {
+  elementsForModule,
+  modCheckout,
+  terminalResult,
+  uncoveredFixture,
+} from "./data";
 import { mockAccount, planStore, scanStore } from "./store";
 
 type Plan = z.infer<typeof PlanSchema>;
@@ -395,8 +400,7 @@ function baseSnapshot(
 ): z.infer<typeof ProofSnapshotSchema> {
   const finished = run.finished_at ?? new Date().toISOString();
   return {
-    verdict: run.status as "passed" | "failed" | "cancelled" | "timed_out",
-    pass_rate: run.pass_rate,
+    ...terminalResult(run),
     coverage: run.coverage,
     target: { name: target.name, base_url: target.base_url },
     started_at: run.started_at,
