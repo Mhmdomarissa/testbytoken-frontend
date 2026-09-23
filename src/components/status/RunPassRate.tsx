@@ -1,6 +1,6 @@
+import type { ReactNode } from "react";
 import type { UnrecognisedValue } from "@/lib/api/tolerant";
 import { isRunOver } from "@/components/run/runStatus";
-import { ResultBars } from "@/components/run/ResultBars";
 import { PassRateCoverage } from "./PassRateCoverage";
 
 type Coverage = Parameters<typeof PassRateCoverage>[0]["coverage"];
@@ -24,7 +24,7 @@ export function RunPassRate({
   passRate,
   coverage,
   pendingText = "Reported when the run finishes.",
-  bars = false,
+  children,
   className,
 }: {
   status: string | UnrecognisedValue | null | undefined;
@@ -32,8 +32,13 @@ export function RunPassRate({
   coverage: Coverage;
   /** What to say while the run hasn't finished. */
   pendingText?: string;
-  /** Also draw the pass and coverage bars (run detail). */
-  bars?: boolean;
+  /**
+   * More to show once a pass rate has passed the gate (run detail's bars),
+   * given the gated value - so nothing downstream can get a pass rate this
+   * component wouldn't show. A render function rather than an import here,
+   * so surfaces that don't draw bars don't ship them.
+   */
+  children?: (passRate: number) => ReactNode;
   className?: string;
 }) {
   if (!isRunOver(status)) {
@@ -56,23 +61,18 @@ export function RunPassRate({
       </span>
     );
   }
-  if (!bars) {
-    return (
-      <PassRateCoverage
-        passRate={passRate}
-        coverage={coverage}
-        className={className}
-      />
-    );
-  }
+  const figure = (
+    <PassRateCoverage
+      passRate={passRate}
+      coverage={coverage}
+      className={className}
+    />
+  );
+  if (!children) return figure;
   return (
     <div className="flex flex-col gap-3">
-      <PassRateCoverage
-        passRate={passRate}
-        coverage={coverage}
-        className={className}
-      />
-      <ResultBars passRate={passRate} coverage={coverage} />
+      {figure}
+      {children(passRate)}
     </div>
   );
 }

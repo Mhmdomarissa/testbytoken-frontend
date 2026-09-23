@@ -12,6 +12,7 @@ import { UnrecognisedValue } from "@/lib/api/tolerant";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { toBadgeStatus } from "@/components/status/badgeStatus";
 import { RunPassRate } from "@/components/status/RunPassRate";
+import { ResultBars } from "@/components/run/ResultBars";
 import { EmptyState } from "@/components/state/EmptyState";
 import { ErrorState } from "@/components/state/ErrorState";
 import { ListSkeleton } from "@/components/state/ListSkeleton";
@@ -228,8 +229,11 @@ function Watch({ params }: { params: Promise<{ id: string }> }) {
             passRate={server.pass_rate}
             coverage={server.coverage}
             pendingText="The pass rate is reported when the run finishes."
-            bars
-          />
+          >
+            {(passRate) => (
+              <ResultBars passRate={passRate} coverage={server.coverage} />
+            )}
+          </RunPassRate>
         ) : (
           <span
             className="text-sm text-muted-foreground"
