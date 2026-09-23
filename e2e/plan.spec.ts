@@ -362,7 +362,19 @@ test("a plan is read against the inventory it came from, and the runs list label
   });
   await expect(page.getByTestId("plan-inventory")).toBeVisible();
 
-  await page.getByRole("link", { name: "Runs", exact: true }).click();
+  // A running run has no pass rate, so no pass-rate-and-coverage figure to
+  // label (e2e/pass-rate-honesty.spec.ts): watch it to its verdict first.
+  await page.getByRole("link", { name: "Watch this run" }).click();
+  await expect(page.getByTestId("run-status")).toHaveAttribute(
+    "data-status",
+    "passed",
+    { timeout: 15_000 },
+  );
+
+  await page
+    .locator('[data-slot="sidebar"]')
+    .getByRole("link", { name: "Runs", exact: true })
+    .click();
   await expect(page).toHaveURL(/\/runs$/);
   // The plan run says "plan steps"; the suite runs say "elements". Never a bare "x/y".
   const plan = page.locator(

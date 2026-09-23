@@ -94,7 +94,7 @@ export const runHandlers = [
       login_session_id: body.login_session_id ?? null,
       report_url: null,
       status: "running" as const,
-      pass_rate: 1,
+      pass_rate: null,
       coverage,
       token_cost: 1.1,
       proof_id: null,

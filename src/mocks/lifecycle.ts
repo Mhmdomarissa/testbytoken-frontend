@@ -510,7 +510,13 @@ export function computeRunState(
   const resolved = elapsedMs >= timeline.resolvesAt;
 
   const passed = stepsSoFar.filter((s) => s.status === "pass").length;
-  const pass_rate = stepsSoFar.length > 0 ? passed / stepsSoFar.length : 1;
+  // Null until the run is over (docs/API_CONTRACT.md): a rate over the
+  // steps so far is not the run's pass rate.
+  const pass_rate = !resolved
+    ? null
+    : stepsSoFar.length > 0
+      ? passed / stepsSoFar.length
+      : 1;
 
   const startedAtMs = startTimeFor(base.id);
 
