@@ -107,6 +107,14 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* tabindex="-1" means focusable by script, never by Tab: <main> on a
+     route change (B10) and the in-place focus regions. Focus goes there so
+     the next Tab and the screen reader start in the right place - it isn't
+     a control, so it shows no ring (Chrome otherwise paints one whenever
+     the last input was the keyboard). Interactive elements keep theirs. */
+  [tabindex="-1"]:focus {
+    outline: none;
+  }
   body {
     @apply bg-background text-foreground;
   }
