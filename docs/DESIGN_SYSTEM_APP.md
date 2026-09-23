@@ -572,3 +572,16 @@ so the two can't drift apart. "Reduced" here means **still**, not faster.
   carries its reported status as an edge that crossfades between real
   states; a finished run's pass rate and coverage are drawn as two bars -
   always together, each one server number, never combined, never counted.
+- **Between screens (P3):** a route change crossfades the old screen out
+  (`--duration-fast`) and rises the new one in (`--duration-enter`,
+  `--ease-spring`), using the browser's View Transitions API through
+  React's `<ViewTransition update="route">` in `ShellMain`/`PublicMain` -
+  native, no library, no Next flag. Only `update`: nothing animates on
+  first paint. The loading-to-content reveal inside a navigation gets the
+  same crossfade, so a skeleton resolves rather than swaps. Two guarantees,
+  both asserted after the transition has **finished**
+  (`e2e/view-transitions.spec.ts`): focus is still on `<main>` where B10
+  put it (a transition around that commit could otherwise steal or reset
+  it), and under reduced motion every view-transition animation - ours and
+  the browser's default root crossfade - is removed, so the route change
+  is the instant swap it would be without transitions.

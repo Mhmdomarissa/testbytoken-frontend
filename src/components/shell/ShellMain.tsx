@@ -1,5 +1,6 @@
 "use client";
 
+import { ViewTransition } from "react";
 import { usePathname } from "next/navigation";
 import { useFocusRegionOnChange } from "@/hooks/useFocusRegionOnChange";
 
@@ -30,7 +31,15 @@ export function ShellMain({ children }: { children: React.ReactNode }) {
 
   return (
     <main ref={ref} tabIndex={-1} className="flex-1 overflow-y-auto p-6">
-      {children}
+      {/* A route change crossfades the screen out and the next one in
+          (the "route" view-transition class, globals.css) - two real
+          screens, nothing anticipated. "update" only: nothing animates
+          on first paint. The browser snapshots, React commits, and the
+          focus effect above still lands on this <main> - see
+          e2e/view-transitions.spec.ts. */}
+      <ViewTransition default="none" update="route">
+        {children}
+      </ViewTransition>
     </main>
   );
 }

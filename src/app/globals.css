@@ -376,3 +376,40 @@
     animation: none;
   }
 }
+
+/* Between screens (P3): a route change crossfades the old screen out and
+   rises the new one in. React's <ViewTransition update="route"> in
+   ShellMain/PublicMain names the boundary; the browser does the rest - no
+   library, no JS animation. Both ends are real screens; nothing on the
+   new one is shown before it has rendered. */
+@keyframes route-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes route-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+::view-transition-old(.route) {
+  animation: route-out var(--duration-fast) var(--ease-out) both;
+}
+
+::view-transition-new(.route) {
+  animation: route-in var(--duration-base) var(--ease-out) both;
+}
+
+/* Still alternative: the instant swap the browser does without a
+   transition. Every view-transition animation - ours and the UA's default
+   root crossfade - is removed, not shortened. */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
