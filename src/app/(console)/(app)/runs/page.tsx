@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/state/EmptyState";
 import { ErrorState } from "@/components/state/ErrorState";
 import { StatusBadge } from "@/components/status/StatusBadge";
 import { toBadgeStatus } from "@/components/status/badgeStatus";
-import { PassRateCoverage } from "@/components/status/PassRateCoverage";
+import { RunPassRate } from "@/components/status/RunPassRate";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -104,7 +104,8 @@ function RunsList() {
                   <StatusBadge status={toBadgeStatus(run.status)} />
                 </TableCell>
                 <TableCell>
-                  <PassRateCoverage
+                  <RunPassRate
+                    status={run.status}
                     passRate={run.pass_rate}
                     coverage={run.coverage}
                   />

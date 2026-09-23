@@ -668,6 +668,20 @@ coverage.candidate` is what makes that visible. This applies to `RunSummary`
 (the list view) too, not just `RunDetail` — the UI must never be able to
 render one number without the other, including in a table of many runs.
 
+**`pass_rate` is `null` until the run is terminal** (added 2026-09-23). It
+is `null` while `status` is `queued` or `running`, and non-null once the
+run is `passed`, `failed`, `cancelled` or `timed_out`. A rate over the
+steps that have run so far is not the run's pass rate: the runs list once
+showed "100% pass" on four running runs, one of which finished at 50%. The
+key stays present (nullable, not optional), so "missing" and "not yet" are
+distinguishable. A client must not render a pass rate for any status it
+doesn't recognise as terminal, whatever the field holds — in this UI,
+every run surface goes through `RunPassRate`
+(`src/components/status/pass-rate-gate.test.ts` keeps it that way).
+`coverage` is unaffected: it is known from the start (the suite's
+generation, or the plan's approval) and is always present. A proof's
+`pass_rate` is always non-null: a proof exists only for a finished run.
+
 **Every element in an inspect inventory carries `uniquely_locatable`.**
 That boolean is what `coverage` is built from, and it's what explains to a
 customer _why_ an element didn't get a test — not a vague "we couldn't
