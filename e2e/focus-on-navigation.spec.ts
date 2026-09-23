@@ -54,51 +54,83 @@ async function expectFocusInMain(page: Page, afterWhat: string) {
     .toBe("IN_MAIN");
 }
 
-test.beforeEach(async ({ page }) => {
-  await signIn(page);
+test.describe("signed out", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  // Out to the sample report by its client-side link, then back: both are
+  // soft navigations inside the (public) group, so both need PublicMain's
+  // focus move. (The proof page deliberately carries no link back to `/`:
+  // next/link would cost that page ~3 KB against its tight budget.)
+  test("the landing page and the sample report it links to each put focus inside main", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page
+      .getByRole("contentinfo")
+      .or(page.locator("footer"))
+      .getByRole("link", { name: "Sample report" })
+      .click();
+    await page.waitForURL(/\/p\/share_demo$/);
+    await expectFocusInMain(page, "the sample report");
+
+    await page.goBack();
+    await page.waitForURL((url) => url.pathname === "/");
+    await expectFocusInMain(page, "the landing page");
+  });
 });
 
-test("every console route reached via the sidebar puts focus inside main, not stuck on the sidebar or lost to <body>", async ({
-  page,
-}) => {
-  const sidebar = page.locator('[data-slot="sidebar"]');
+test.describe("signed in", () => {
+  test.beforeEach(async ({ page }) => {
+    await signIn(page);
+  });
 
-  for (const name of ["Targets", "Runs", "Suites", "Usage"]) {
-    await sidebar.getByRole("link", { name, exact: true }).click();
-    await expectFocusInMain(page, name);
-  }
-});
+  test("every console route reached via the sidebar puts focus inside main, not stuck on the sidebar or lost to <body>", async ({
+    page,
+  }) => {
+    const sidebar = page.locator('[data-slot="sidebar"]');
 
-test("every route one hop deeper - inventory, compose, login, run detail, and the public proof page", async ({
-  page,
-}) => {
-  await page.goto("/targets");
-  const row = page.getByTestId("target-tgt_checkout");
+    for (const name of ["Targets", "Runs", "Suites", "Usage"]) {
+      await sidebar.getByRole("link", { name, exact: true }).click();
+      await expectFocusInMain(page, name);
+    }
 
-  await row.getByRole("link", { name: "Inventory" }).click();
-  await page.waitForURL(/\/inventory$/);
-  await expectFocusInMain(page, "inventory");
+    // The console home, reached the only way the sidebar offers: its wordmark.
+    await sidebar.getByRole("link", { name: "Test by Token" }).click();
+    await page.waitForURL(/\/overview$/);
+    await expectFocusInMain(page, "overview");
+  });
 
-  await page.goBack();
-  await page.waitForURL(/\/targets$/);
-  await row.getByRole("link", { name: "Compose test" }).click();
-  await page.waitForURL(/\/compose$/);
-  await expectFocusInMain(page, "compose");
+  test("every route one hop deeper - inventory, compose, login, run detail, and the public proof page", async ({
+    page,
+  }) => {
+    await page.goto("/targets");
+    const row = page.getByTestId("target-tgt_checkout");
 
-  await page.goBack();
-  await page.waitForURL(/\/targets$/);
-  await row.getByRole("link", { name: "Sign in" }).click();
-  await page.waitForURL(/\/login$/);
-  await expectFocusInMain(page, "the login handoff");
+    await row.getByRole("link", { name: "Inventory" }).click();
+    await page.waitForURL(/\/inventory$/);
+    await expectFocusInMain(page, "inventory");
 
-  // run_fail_1, not run_pass_1: the latter carries B9's fixture-baked
-  // demo share (already enabled), so "Create a public link" below
-  // wouldn't be there to click.
-  await page.goto("/runs");
-  await page.getByRole("link", { name: "run_fail_1" }).click();
-  await expectFocusInMain(page, "run detail");
+    await page.goBack();
+    await page.waitForURL(/\/targets$/);
+    await row.getByRole("link", { name: "Compose test" }).click();
+    await page.waitForURL(/\/compose$/);
+    await expectFocusInMain(page, "compose");
 
-  await page.getByRole("button", { name: "Create a public link" }).click();
-  await page.getByRole("link", { name: "View public page" }).click();
-  await expectFocusInMain(page, "the public proof page");
+    await page.goBack();
+    await page.waitForURL(/\/targets$/);
+    await row.getByRole("link", { name: "Sign in" }).click();
+    await page.waitForURL(/\/login$/);
+    await expectFocusInMain(page, "the login handoff");
+
+    // run_fail_1, not run_pass_1: the latter carries B9's fixture-baked
+    // demo share (already enabled), so "Create a public link" below
+    // wouldn't be there to click.
+    await page.goto("/runs");
+    await page.getByRole("link", { name: "run_fail_1" }).click();
+    await expectFocusInMain(page, "run detail");
+
+    await page.getByRole("button", { name: "Create a public link" }).click();
+    await page.getByRole("link", { name: "View public page" }).click();
+    await expectFocusInMain(page, "the public proof page");
+  });
 });

@@ -41,7 +41,7 @@ test("sign-in through a completed scan, cold, with no console or page errors alo
   await page
     .getByRole("button", { name: "Continue (dev - no backend yet)" })
     .click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
+  await page.waitForURL(/\/overview$/);
 
   // The app home renders real content on the FIRST paint, not a
   // permanently-stuck skeleton or an error that only clears on reload.

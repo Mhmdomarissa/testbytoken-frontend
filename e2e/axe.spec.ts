@@ -42,6 +42,10 @@ test.describe("public routes", () => {
   test("the public proof page", async ({ page }) => {
     await checkPage(page, "/p/share_demo");
   });
+
+  test("the landing page", async ({ page }) => {
+    await checkPage(page, "/");
+  });
 });
 
 test.describe("console routes", () => {
@@ -50,7 +54,7 @@ test.describe("console routes", () => {
   });
 
   test("app home", async ({ page }) => {
-    await checkPage(page, "/");
+    await checkPage(page, "/overview");
   });
 
   test("targets", async ({ page }) => {

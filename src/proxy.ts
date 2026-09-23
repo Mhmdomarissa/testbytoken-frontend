@@ -15,13 +15,18 @@ import type { NextRequest } from "next/server";
 const SESSION_COOKIE = "session";
 // "/p" is the public proof page (B9): opened cold by someone with no account.
 const PUBLIC_PATHS = ["/sign-in", "/style-guide", "/p"];
+const CONSOLE_HOME = "/overview";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has(SESSION_COOKIE);
-  const isPublicPath = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
+  // "/" (the landing page) is matched exactly: as a prefix it would match
+  // every path there is.
+  const isPublicPath =
+    pathname === "/" ||
+    PUBLIC_PATHS.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
+    );
 
   if (!hasSession && !isPublicPath) {
     const signInUrl = new URL("/sign-in", request.url);
@@ -29,8 +34,11 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(signInUrl);
   }
 
-  if (hasSession && pathname === "/sign-in") {
-    return NextResponse.redirect(new URL("/", request.url));
+  // Done here, before anything renders, rather than in the page: a
+  // client-side redirect would paint the page first and then jump, which
+  // on a slow connection reads as broken.
+  if (hasSession && (pathname === "/sign-in" || pathname === "/")) {
+    return NextResponse.redirect(new URL(CONSOLE_HOME, request.url));
   }
 
   return NextResponse.next();
