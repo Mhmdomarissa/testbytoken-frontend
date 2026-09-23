@@ -76,10 +76,13 @@ const BASELINE_PATH = path.join(
  * landmark and focus-management fix, applies to this route too), and by
  * 5 bytes in Part L with none of this route's own source changed: content-
  * hashed chunk names shifted when other routes' chunks did, and the
- * runtime that lists them moved with them.
+ * runtime that lists them moved with them. Bumped by 52 bytes in Part P
+ * (P2, run watch): this page renders StepRow, which now carries the
+ * motion classes (a result's mark drawing in, rows arriving) - the
+ * proof's own steps get the same treatment as the run screen's.
  */
 const PUBLIC_ROUTE_PREFIX = "/p/";
-const PUBLIC_ROUTE_BUDGET_BYTES = 316465;
+const PUBLIC_ROUTE_BUDGET_BYTES = 316517;
 
 /**
  * ZERO - not a hedge, because the drift this used to hedge against is not
