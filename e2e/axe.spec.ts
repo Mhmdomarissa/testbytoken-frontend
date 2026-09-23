@@ -50,7 +50,7 @@ test.describe("console routes", () => {
   });
 
   test("app home", async ({ page }) => {
-    await checkPage(page, "/");
+    await checkPage(page, "/overview");
   });
 
   test("targets", async ({ page }) => {

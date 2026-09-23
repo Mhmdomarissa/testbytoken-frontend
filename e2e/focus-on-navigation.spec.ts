@@ -67,6 +67,11 @@ test("every console route reached via the sidebar puts focus inside main, not st
     await sidebar.getByRole("link", { name, exact: true }).click();
     await expectFocusInMain(page, name);
   }
+
+  // The console home, reached the only way the sidebar offers: its wordmark.
+  await sidebar.getByRole("link", { name: "Test by Token" }).click();
+  await page.waitForURL(/\/overview$/);
+  await expectFocusInMain(page, "overview");
 });
 
 test("every route one hop deeper - inventory, compose, login, run detail, and the public proof page", async ({

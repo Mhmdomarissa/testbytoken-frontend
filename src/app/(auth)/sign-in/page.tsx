@@ -68,7 +68,7 @@ function SignInForm() {
       // on) is silently dropped because MSW serves this via a Service
       // Worker, which cannot set cookies that way.
       setMockSessionCookie();
-      router.push(searchParams.get("from") ?? "/");
+      router.push(searchParams.get("from") ?? "/overview");
       router.refresh();
     } catch {
       setError("Link expired or invalid.");

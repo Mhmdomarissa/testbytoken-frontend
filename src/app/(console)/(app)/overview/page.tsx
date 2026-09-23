@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { navItems } from "@/components/shell/nav-items";
 
-export default function AppHomePage() {
+export default function OverviewPage() {
   return (
     <div className="flex max-w-lg flex-col gap-4">
       <h2 className="font-heading text-2xl font-light">Welcome back</h2>

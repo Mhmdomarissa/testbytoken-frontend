@@ -60,7 +60,7 @@ test("the entire spine, keyboard only, in one sitting: sign-in through share", a
     .getByRole("button", { name: "Continue (dev - no backend yet)" })
     .focus();
   await page.keyboard.press("Enter");
-  await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
+  await page.waitForURL(/\/overview$/);
   await expectFocusNotLost(page, "sign-in");
 
   // Sign-in lands on the app home, not /targets directly.

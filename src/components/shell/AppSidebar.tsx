@@ -39,7 +39,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="px-3 py-3">
-        <Link href="/" className="font-heading text-lg font-light">
+        <Link href="/overview" className="font-heading text-lg font-light">
           Test by Token
         </Link>
       </SidebarHeader>

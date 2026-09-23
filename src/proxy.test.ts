@@ -21,6 +21,7 @@ describe("proxy: which routes need a session", () => {
 
   it.each([
     "/",
+    "/overview",
     "/targets",
     "/runs",
     "/suites",
@@ -36,5 +37,20 @@ describe("proxy: which routes need a session", () => {
     expect(proxy(req("/products")).headers.get("location")).toContain(
       "/sign-in",
     );
+  });
+});
+
+describe("proxy: a signed-in visitor is sent to the console home, before anything renders", () => {
+  it.each(["/", "/sign-in"])("%s redirects to /overview", (pathname) => {
+    const location = proxy(req(pathname, "session=demo_user")).headers.get(
+      "location",
+    );
+    expect(new URL(location!).pathname).toBe("/overview");
+  });
+
+  it("/overview itself is served, not redirected again", () => {
+    expect(
+      proxy(req("/overview", "session=demo_user")).headers.get("location"),
+    ).toBeNull();
   });
 });
