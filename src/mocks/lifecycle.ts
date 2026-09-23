@@ -7,6 +7,7 @@ import type {
   JobEventSchema,
 } from "@/lib/contract";
 import { modCheckout, modSettings, PAGE_XSS_TITLE, reportUrl } from "./data";
+import { planIntendsRunFailure } from "./planning";
 
 type Scan = z.infer<typeof ScanSchema>;
 type Plan = z.infer<typeof PlanSchema>;
@@ -441,9 +442,20 @@ export const LIVE_STALL_TIMELINE: RunTimeline = timeline({
  * A run of an APPROVED plan (B0.5 B7): one executed step per approved plan
  * step, in the approved order, each pointing back at its plan step
  * (`plan_step_id`) - so a proof can say what was approved and what ran.
+ *
+ * Ends `passed` unless `planIntendsRunFailure` says otherwise (the
+ * "fail-run:" intent convention, planning.ts) - in which case one approved
+ * step fails with a real message and every approved step after it is
+ * marked skipped, same shape as LIVE_FAIL_TIMELINE's partial failure. The
+ * failure lands on the second-to-last approved step (so a plan with 2+
+ * approved steps always shows at least one pass, the fail, and a skip
+ * after it); a single-step plan just fails that one step. Keyed on the
+ * plan's own intent, never a fixture id, so it works for any target.
  */
 export function timelineForPlan(plan: Plan): RunTimeline {
   const approvedIds = plan.approval?.step_ids ?? [];
+  const failing = planIntendsRunFailure(plan);
+  const failAt = Math.max(0, approvedIds.length - 2);
   const steps = approvedIds.map((planStepId, i) => {
     const planStep = plan.steps.find((s) => s.id === planStepId)!;
     const target =
@@ -452,6 +464,28 @@ export function timelineForPlan(plan: Plan): RunTimeline {
         : planStep.binding.type === "page"
           ? planStep.binding.page_url
           : "";
+    if (failing && i === failAt) {
+      return step(i, i * 1_200, {
+        id: `stp_${planStepId}`,
+        plan_step_id: planStepId,
+        action: planStep.action,
+        target,
+        status: "fail",
+        message: `Expected "${planStep.description}" to succeed, but the engine reported a failure.`,
+        duration_ms: 1_400,
+      });
+    }
+    if (failing && i > failAt) {
+      return step(i, i * 1_200, {
+        id: `stp_${planStepId}`,
+        plan_step_id: planStepId,
+        action: planStep.action,
+        target,
+        status: "skipped",
+        message: "Skipped after prior failure",
+        duration_ms: 0,
+      });
+    }
     return step(i, i * 1_200, {
       id: `stp_${planStepId}`,
       plan_step_id: planStepId,
@@ -463,7 +497,7 @@ export function timelineForPlan(plan: Plan): RunTimeline {
   return timeline({
     steps,
     resolvesAt: steps.length * 1_200 + 700,
-    finalStatus: "passed",
+    finalStatus: failing ? "failed" : "passed",
   });
 }
 

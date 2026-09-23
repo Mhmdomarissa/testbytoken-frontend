@@ -13,8 +13,9 @@ import {
   LIVE_STALL_TIMELINE,
   SCAN_TIMELINE,
   timelineCancelledAt,
+  timelineForPlan,
 } from "./lifecycle";
-import type { RunDetailSchema, ScanSchema } from "@/lib/contract";
+import type { PlanSchema, RunDetailSchema, ScanSchema } from "@/lib/contract";
 import type { z } from "zod";
 
 /**
@@ -201,6 +202,87 @@ describe("a run that stalls and times out", () => {
       LIVE_STALL_TIMELINE.resolvesAt,
     );
     expect(run.proof_id).toBeNull();
+  });
+});
+
+function planStep(
+  id: string,
+  overrides: Partial<z.infer<typeof PlanSchema>["steps"][number]> = {},
+): z.infer<typeof PlanSchema>["steps"][number] {
+  return {
+    id,
+    index: 0,
+    description: `Step ${id}`,
+    action: "click",
+    input: null,
+    action_class: "read",
+    binding: { type: "page", page_url: "https://checkout.example.com/" },
+    blocked: null,
+    ...overrides,
+  };
+}
+
+function basePlan(
+  intent: string,
+  stepIds: string[],
+): z.infer<typeof PlanSchema> {
+  const steps = stepIds.map((id, i) => planStep(id, { index: i }));
+  return {
+    id: "plan_test_1",
+    workspace_id: "wksp_demo",
+    target_id: "tgt_checkout",
+    scan_id: "scan_checkout_1",
+    intent,
+    status: "approved",
+    steps,
+    failure: null,
+    approval: { approved_at: new Date().toISOString(), step_ids: stepIds },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+describe("timelineForPlan", () => {
+  it("an ordinary intent resolves passed, one executed step per approved plan step", () => {
+    const plan = basePlan("check that checkout works", ["a", "b"]);
+    const timeline = timelineForPlan(plan);
+    expect(timeline.finalStatus).toBe("passed");
+    const finished = timeline.steps.filter((s) => s.step.status !== "running");
+    expect(finished.map((f) => f.step.status)).toEqual(["pass", "pass"]);
+    expect(finished.map((f) => f.step.plan_step_id)).toEqual(["a", "b"]);
+  });
+
+  it("a 'fail-run:' intent fails partway - a pass, a real failure message, then skipped - never all green", () => {
+    const plan = basePlan("fail-run: buy something", ["a", "b", "c"]);
+    const timeline = timelineForPlan(plan);
+    expect(timeline.finalStatus).toBe("failed");
+    const finished = timeline.steps.filter((s) => s.step.status !== "running");
+    expect(finished.map((f) => f.step.status)).toEqual([
+      "pass",
+      "fail",
+      "skipped",
+    ]);
+    const failed = finished.find((f) => f.step.status === "fail")!;
+    expect(failed.step.message.length).toBeGreaterThan(20);
+  });
+
+  it("a 'fail-run:' intent with only one approved step just fails that step", () => {
+    const plan = basePlan("fail-run: buy something", ["a"]);
+    const timeline = timelineForPlan(plan);
+    expect(timeline.finalStatus).toBe("failed");
+    const finished = timeline.steps.filter((s) => s.step.status !== "running");
+    expect(finished.map((f) => f.step.status)).toEqual(["fail"]);
+  });
+
+  it("resolving a failed plan-run's timeline through computeRunState reports the honest, lower pass_rate", () => {
+    const plan = basePlan("fail-run: buy something", ["a", "b", "c"]);
+    const timeline = timelineForPlan(plan);
+    const run = computeRunState(baseRun, timeline, timeline.resolvesAt);
+    expect(run.status).toBe("failed");
+    expect(run.pass_rate).toBeCloseTo(1 / 3);
+    // A failed run still produces a proof - only a timed-out one doesn't.
+    expect(run.proof_id).not.toBeNull();
+    expect(run.report_url).not.toBeNull();
   });
 });
 
