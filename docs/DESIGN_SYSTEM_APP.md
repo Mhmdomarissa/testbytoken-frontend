@@ -13,7 +13,9 @@ re-derive or guess at it later.
 - Zero border radius, everywhere.
 - Cormorant Garamond for headings (weight 300), Montserrat for UI/body
   (300–700), uppercase labels at 600–700 with 0.14em–0.26em tracking.
-- Motion is color transitions only — no entrance animation, no parallax.
+- Motion was colour transitions only through Phase B. Part P relaxed it for
+  motion that shows a state changing - see "Motion" below; decoration and
+  parallax are still out.
 - No grey scale — text hierarchy is opacity on `warm-white`, not a
   separate neutral palette.
 
@@ -459,3 +461,94 @@ reason about. (An earlier draft of this doc assumed the older
 subtraction-based chain and a clamping edge case that turned out not to
 apply to this shadcn version - corrected here once the real generated CSS
 was in hand.)
+
+## Motion
+
+Part P (`docs/PHASE_LANDING_POLISH.md`, P1) relaxed "colour transitions
+only" for one purpose: **motion that shows a state changing is
+information; motion that exists to look modern is noise.** The first kind
+is allowed, built from the tokens below. The second isn't.
+
+### The honesty rules
+
+This product's claim is that nothing is hidden or invented, and motion can
+break that as easily as a default status can (CLAUDE.md, "Honesty").
+
+1. **Motion never shows a state or a number that didn't happen.** No
+   counting a pass rate or coverage up from zero: every in-between value is
+   a number the server never sent. Animate **bars and fills**, never
+   **digits**. A figure appears at its value, or not at all.
+2. **No transition shows a status before its event arrives.** A step's
+   mark draws when the event saying "pass" arrives, not when the step
+   starts. Nothing anticipates.
+3. **Crossfading between two real states is fine; anticipating one isn't.**
+   A step row's edge fading from gold (will run) to quiet (left out) when
+   the person toggles it is two real states. A chip easing towards "passed"
+   while the run is still running is not.
+4. **Arriving content is already complete.** A staggered list reveals
+   items that are all already known; it never implies more are coming, or
+   that some were added later. A list that genuinely grows (live steps)
+   arrives as the events do, and that is the only reason it grows.
+5. **Nothing moves to decorate.** No parallax, no idle loops, no motion on
+   content that isn't changing. The one continuous motion permitted is the
+   "running" state, and only while the server says it is running.
+
+### Tokens (`styles/tokens.css`)
+
+| Token                | Value                            | For                                           |
+| -------------------- | -------------------------------- | --------------------------------------------- |
+| `--duration-fast`    | 150ms                            | Colour, border, glow: hover, focus, selection |
+| `--duration-base`    | 260ms                            | Crossfades between two real states            |
+| `--duration-enter`   | 420ms                            | Something arriving: a step, a plan            |
+| `--duration-draw`    | 520ms                            | A result's mark drawing itself; a bar filling |
+| `--duration-breathe` | 2400ms                           | One cycle of the "running" state              |
+| `--ease-out`         | `cubic-bezier(0.22, 1, 0.36, 1)` | Settling into place                           |
+| `--ease-in-out`      | `cubic-bezier(0.65, 0, 0.35, 1)` | Crossfades, the running breath                |
+| `--ease-spring`      | `linear(…)`                      | Arrival with weight                           |
+| `--stagger-step`     | 45ms                             | Delay between siblings arriving together      |
+
+`--ease-spring` is a damped spring (ζ = 0.76, ω = 13, 2.5% overshoot)
+sampled into CSS `linear()` - computed, not eyeballed, and needing no
+JavaScript. Components use these tokens, never one-off durations or
+curves; `--motion-duration`/`--motion-easing` remain as aliases for their
+older consumers.
+
+**Gold as light.** On this dark ground, hover and focus read as a gold edge
+and a soft glow, not a colour swap: `--glow-hover`, `--glow-focus`, built
+from `--color-gold` by transparency only (no new hue). The focus indicator
+keeps its solid 2px gold outline (gold on blue-deep, ~8:1) - the glow is
+added around it, never instead of it. Zero radius still: the glow is
+rectangular.
+
+### Utilities (`src/app/globals.css`)
+
+| Utility                    | What moves                                                            | Reduced-motion still alternative               |
+| -------------------------- | --------------------------------------------------------------------- | ---------------------------------------------- |
+| `arrive`                   | Clip reveal + 8px rise, spring                                        | Simply present                                 |
+| `stagger-arrive`           | Its children `arrive` in turn (index from `:nth-child`, capped at 10) | All present at once                            |
+| `fill-in`                  | A bar scales to the value the server sent                             | Drawn at its value                             |
+| `sheen`                    | A faint gold sweep over skeleton blocks                               | Plain blocks; the adjacent words say "loading" |
+| `glow-hover`, `glow-focus` | Box-shadow / border colour only                                       | Unchanged - colour isn't motion                |
+
+Two implementation notes, each learned the hard way in P1:
+
+- **Arrivals clip; they don't fade.** Content is at full contrast
+  throughout, only unmasked - an axe run landing mid-animation measures the
+  real contrast, and nothing is ever rendered as a lower-contrast version
+  of itself. The fill is `backwards`, so nothing lingers after the
+  animation (a leftover `clip-path` would cut off the hover glow).
+- **Utility names are checked against shadcn's.** `shadcn/tailwind.css`
+  ships a text-effect `shimmer` utility and keyframes; a same-named utility
+  here silently merged with it and clipped skeleton fills to text (they
+  rendered empty). Hence `sheen`.
+
+Every utility declares its reduced-motion rule **beside** its animation,
+so the two can't drift apart. "Reduced" here means **still**, not faster.
+
+### Where it's used
+
+- **Compose / plan review (P1):** the plan arrives (`arrive` header,
+  `stagger-arrive` steps), the inventory share draws as a bar (`fill-in`),
+  each step's state is an edge of light that crossfades on toggle,
+  hover/focus glow, and a plan-shaped skeleton (`sheen`) while the planner
+  works - so loading resolves into the plan rather than swapping for it.

@@ -55,29 +55,50 @@ export function PlanStepRow({
         // controls are already reached through them (and announced as part of
         // this group).
         tabIndex={approvable.ok ? undefined : 0}
-        className={`flex flex-col gap-2 border border-border p-3 text-sm focus-visible:outline-2 focus-visible:outline-ring ${
-          approvable.ok ? "" : "bg-card"
-        } ${leftOut ? "opacity-70" : ""}`}
+        className={`glow-focus relative flex flex-col gap-3 border py-4 pr-4 pl-6 text-sm ${
+          controls && approvable.ok ? "glow-hover" : ""
+        } ${approvable.ok ? "bg-background" : "bg-card"} ${
+          leftOut ? "border-dashed border-(--border-strong)" : "border-border"
+        }`}
       >
+        {/* The row's state as an edge of light: gold will run, the
+            warning edge can't, a quiet edge left out. Crossfades when
+            the person toggles - both ends are real states. */}
+        <span
+          aria-hidden="true"
+          className={`absolute inset-y-0 left-0 w-0.75 transition-colors duration-(--duration-base) ease-(--ease-in-out) ${
+            position.kind === "will-run"
+              ? "bg-primary"
+              : leftOut
+                ? "bg-(--border-strong)"
+                : "bg-(--status-warning-border)"
+          }`}
+        />
         <span id={`${step.id}-state`} className="sr-only">
           {stateText(step, position)}
         </span>
-        <div className="flex flex-wrap items-start gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
           <span
             aria-hidden="true"
-            className="min-w-6 font-mono text-xs text-muted-foreground"
+            className={`min-w-8 text-lg leading-none font-light tabular-nums transition-colors duration-(--duration-base) ${
+              position.kind === "will-run"
+                ? "text-primary"
+                : "text-(--text-tertiary)"
+            }`}
           >
             {position.kind === "will-run" ? `#${position.nth}` : "-"}
           </span>
           <p
             id={`${step.id}-title`}
-            className="min-w-0 flex-1 break-words font-medium"
+            className="min-w-0 flex-1 text-[0.9375rem] font-medium break-words"
           >
             {step.description}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {position.kind === "will-run" && (
-              <span className="text-xs text-muted-foreground">Will run</span>
+              <span className="text-[0.6875rem] font-semibold tracking-[0.14em] text-primary uppercase">
+                Will run
+              </span>
             )}
             {leftOut && <StatusBadge status="skipped" label="Left out" />}
             {!approvable.ok && approvable.why === "ungrounded" && (
@@ -89,7 +110,7 @@ export function PlanStepRow({
           </div>
         </div>
 
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs [&>dt]:text-[0.625rem] [&>dt]:font-semibold [&>dt]:tracking-[0.14em] [&>dt]:uppercase [&>dt]:leading-[1.6]">
           <dt className="text-muted-foreground">Action</dt>
           <dd className="min-w-0 break-words font-mono">
             {step.action}
@@ -123,7 +144,7 @@ export function PlanStepRow({
         </dl>
 
         {!approvable.ok && approvable.why === "blocked" && step.blocked && (
-          <p className="break-words border-l-2 border-border pl-3 text-xs">
+          <p className="border-l-2 border-(--status-warning-border) pl-3 text-xs leading-relaxed break-words">
             <span className="font-medium">
               Blocked ({humanise(step.blocked.reason_code)}):
             </span>{" "}

@@ -37,7 +37,7 @@ export function ApprovedPlan({
   });
 
   return (
-    <div className="flex flex-col gap-4" data-testid="approved-plan">
+    <div className="flex flex-col gap-6" data-testid="approved-plan">
       <p className="text-sm text-muted-foreground">
         Approved {new Date(approvedAt).toLocaleString()}. This approval is
         permanent; the plan can no longer be edited.
@@ -56,11 +56,12 @@ export function ApprovedPlan({
 
       <InventoryContext steps={steps} inventoryElements={inventoryElements} />
 
-      <section className="flex flex-col gap-2">
-        <h2 className="font-heading text-lg font-light">
+      <section className="flex flex-col gap-3">
+        <h2 className="flex items-center gap-3 font-heading text-xl font-light">
+          <span aria-hidden="true" className="h-0.5 w-6 bg-primary" />
           Approved to run ({approved.length})
         </h2>
-        <ol className="flex flex-col gap-2">
+        <ol className="stagger-arrive flex flex-col gap-2">
           {approved.map((step, i) => (
             <PlanStepRow
               key={step.id}
@@ -72,11 +73,12 @@ export function ApprovedPlan({
       </section>
 
       {byUser.length > 0 && (
-        <section className="flex flex-col gap-2" data-testid="excluded-by-user">
-          <h2 className="font-heading text-lg font-light">
+        <section className="flex flex-col gap-3" data-testid="excluded-by-user">
+          <h2 className="flex items-center gap-3 font-heading text-xl font-light">
+            <span aria-hidden="true" className="h-0.5 w-6 bg-primary" />
             Left out by you ({byUser.length})
           </h2>
-          <ol className="flex flex-col gap-2">
+          <ol className="stagger-arrive flex flex-col gap-2">
             {byUser.map((step) => (
               <PlanStepRow
                 key={step.id}
@@ -90,13 +92,14 @@ export function ApprovedPlan({
 
       {bySystem.length > 0 && (
         <section
-          className="flex flex-col gap-2"
+          className="flex flex-col gap-3"
           data-testid="excluded-by-system"
         >
-          <h2 className="font-heading text-lg font-light">
+          <h2 className="flex items-center gap-3 font-heading text-xl font-light">
+            <span aria-hidden="true" className="h-0.5 w-6 bg-primary" />
             The system could not approve ({bySystem.length})
           </h2>
-          <ol className="flex flex-col gap-2">
+          <ol className="stagger-arrive flex flex-col gap-2">
             {bySystem.map((step) => (
               <PlanStepRow
                 key={step.id}
