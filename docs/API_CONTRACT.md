@@ -685,3 +685,44 @@ test everything," but a specific, honest reason per element.
 - **Webhooks/notifications.** SSE covers "watch a job while the tab is
   open." Anything about "notify me when a run finishes and I'm not
   looking" is a separate, unaddressed concern.
+
+### Gap: anonymous testing (recorded 2026-09-23, not proposed)
+
+The product's pitch, and the public landing page's copy ("Paste a URL and
+tell us what to check", "Your first test is free — no sign-up"), implies a
+visitor with no account can test **their own** site. This contract has no
+way to do that: every step of the pipeline — `POST /targets`, `POST
+/scans`, `POST /plans`, `POST /plans/{id}/approve`, `POST /runs`, and the
+reads that follow — is `cookieAuth`, workspace-scoped, and a plan must be
+grounded in a completed scan of a registered target. There is no endpoint
+that takes a bare URL.
+
+Recorded here as a gap, deliberately without a proposed endpoint: whether
+and how to offer it is a decision for whoever owns the backend. Whoever
+takes it on will need to settle at least:
+
+- **SSRF and abuse.** An unauthenticated endpoint that makes our engine
+  fetch an arbitrary URL is an open fetch proxy unless it is guarded. The
+  existing `blocked_by_guardrail` scan failure (private, loopback and
+  link-local addresses) is the right idea, but it currently sits behind an
+  account; anonymous access moves it to the front line, with DNS
+  rebinding, redirects to internal addresses, and non-HTTP schemes all in
+  scope.
+- **Cost and rate.** Every anonymous run spends real browser time.
+  Per-IP and global limits, a hard timebox, and a small fixed check set
+  (the landing copy already promises "read-only, hard-timeboxed") are the
+  obvious levers; none exist in the contract.
+- **Free-tier shape.** What an anonymous result is allowed to include
+  (proof, screenshots, a shareable link), how long it lives, and whether it
+  can be claimed into an account after sign-up.
+- **Honesty rules still apply.** Whatever comes back is reported as sent,
+  pass rate with coverage (`PassRateCoverage`), ungrounded work shown —
+  there is no lighter-weight "marketing result".
+
+**What the landing page does instead, today.** Its demo runs against the
+seeded Checkout target in the mock, through the real endpoints above. That
+works only because the mock does not enforce `cookieAuth`; against a real
+backend the demo would need either this gap closed or a dedicated,
+read-only demo workspace an anonymous visitor may plan and run against. The
+same holds for the proof hash it reads (`GET /proofs/{id}`, also
+session-scoped).
