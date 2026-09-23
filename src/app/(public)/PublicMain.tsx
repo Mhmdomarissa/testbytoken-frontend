@@ -27,11 +27,7 @@ export function PublicMain({ children }: { children: React.ReactNode }) {
   const ref = useFocusRegionOnChange<HTMLElement>(pathname);
 
   return (
-    <main
-      ref={ref}
-      tabIndex={-1}
-      className="focus-visible:outline-2 focus-visible:outline-ring"
-    >
+    <main ref={ref} tabIndex={-1}>
       {children}
     </main>
   );
