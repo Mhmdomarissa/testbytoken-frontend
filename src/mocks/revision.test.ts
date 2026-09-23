@@ -626,6 +626,54 @@ describe("plan runs: the numbers are OF the plan, and the exclusions travel with
     const res = await fetch(`${base}/proofs/proof_${created.id}`);
     expect(res.status).toBe(404);
   });
+
+  /**
+   * Until this test existed, an approved plan's run had never resolved to
+   * anything but "passed" anywhere - not in this suite, not in the
+   * console - so this exact path (a failed plan-run reaching the run
+   * screen's terminal-status rendering and then producing a proof) had
+   * literally never executed. Exercised here the same way B8's "every
+   * finished run gets a proof" test exercises the passing path, so a
+   * regression here is caught the same way a regression there would be.
+   */
+  it("B_landing: a 'fail-run:' plan run fails partway, honestly, and still produces a real proof", async () => {
+    mockAccount.writeActions = true;
+    const { created } = await runApproved("fail-run: buy something", [
+      "pstp_1",
+      "pstp_2",
+      "pstp_3",
+    ]);
+    const run = await finishedRun(created.id);
+    expect(run.status).toBe("failed");
+    expect(run.steps.map((s) => s.status)).toEqual([
+      "pass",
+      "fail",
+      "skipped",
+    ]);
+    const failedStep = run.steps.find((s) => s.status === "fail");
+    expect(failedStep?.message.length).toBeGreaterThan(20);
+    // Coverage is still of the PLAN (3 approved of 5 proposed), not
+    // recomputed from what actually ran - a failure doesn't change what
+    // was covered, only what passed.
+    expect(run.coverage).toEqual({
+      basis: "plan",
+      generated: 3,
+      candidate: 5,
+    });
+    expect(run.pass_rate).toBeCloseTo(1 / 3);
+    expect(run.proof_id).toBe(`proof_${run.id}`);
+
+    const res = await fetch(`${base}/proofs/${run.proof_id}`);
+    expect(res.status).toBe(200);
+    const proof = ProofSchema.parse(await res.json());
+    expect(proof.snapshot.verdict).toBe("failed");
+    expect(proof.snapshot.steps).toEqual(run.steps);
+    expect(proof.snapshot.plan!.approved_steps.map((s) => s.id)).toEqual([
+      "pstp_1",
+      "pstp_2",
+      "pstp_3",
+    ]);
+  });
 });
 
 describe("B6: a scan that needs a sign-in parks, and only a completed login session continues it", () => {

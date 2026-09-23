@@ -21,6 +21,15 @@ type PlanStep = z.infer<typeof PlanStepSchema>;
  *   - Takes PLAN_GENERATION_MS to leave `generating` (a real loading state).
  *   - An intent starting with "fail:" makes generation FAIL (`status:
  *     failed` with a message) - the planner-error state.
+ *   - An intent starting with "fail-run:" generates and approves normally,
+ *     but the RUN it produces fails partway (see `planIntendsRunFailure`
+ *     and `timelineForPlan` in lifecycle.ts) - the run-failure state. Same
+ *     family of discoverable convention as "fail:", one prefix per failure
+ *     kind, neither keyed to a fixture id: this exists because, until now,
+ *     nothing anywhere - console included - had ever driven an approved
+ *     plan's run to anything but "passed", so the failed-plan-run path
+ *     through the run screen and proof generation had literally never
+ *     executed.
  *   - Always proposes the same five steps: a navigation, a write click on a
  *     grounded element, a read click on a grounded element, a step on an
  *     AMBIGUOUS element (ungrounded), and a step that would type a password
@@ -32,6 +41,20 @@ type PlanStep = z.infer<typeof PlanStepSchema>;
  *     reachable in a browser without a second account.
  */
 export const PLAN_GENERATION_MS = 1_500;
+
+const FAIL_RUN_INTENT_PREFIX = "fail-run:";
+
+/**
+ * Whether an approved plan's run should fail partway rather than pass -
+ * the run-time sibling of the "fail:" generation-time convention above.
+ * Read by `timelineForPlan` (lifecycle.ts), not this file, since building
+ * the actual failing timeline needs the approved step ids, which only
+ * exist once the plan is approved. Kept here, next to "fail:", so the two
+ * halves of one documented convention stay in one place.
+ */
+export function planIntendsRunFailure(plan: Plan): boolean {
+  return plan.intent.startsWith(FAIL_RUN_INTENT_PREFIX);
+}
 
 function proposedSteps(intent: string): PlanStep[] {
   const elements = elementsForModule(modCheckout.id) ?? [];
