@@ -48,14 +48,15 @@ export function PlanReview({
   const canApprove = selected.length > 0 && !busy;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+    <div className="flex flex-col gap-6">
+      <div className="arrive flex flex-col gap-3">
+        <p className="flex items-center gap-3 text-[0.6875rem] font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+          <span aria-hidden="true" className="h-0.5 w-8 bg-primary" />
           Proposed - nothing has run
         </p>
         <p
           data-testid="plan-intent"
-          className="break-words font-heading text-xl font-light"
+          className="font-heading text-2xl leading-tight font-light break-words sm:text-3xl"
         >
           {intent}
         </p>
@@ -63,7 +64,12 @@ export function PlanReview({
 
       <InventoryContext steps={steps} inventoryElements={inventoryElements} />
 
-      <ol className="flex flex-col gap-2" aria-label="Proposed steps">
+      {/* The plan arriving: each proposed step in turn, as it actually
+          came back - the list is already complete; nothing is added. */}
+      <ol
+        className="stagger-arrive flex flex-col gap-2"
+        aria-label="Proposed steps"
+      >
         {review.order.map((id, i) => {
           const step = byId.get(id)!;
           const ok = approvability(step).ok;
@@ -95,8 +101,12 @@ export function PlanReview({
         data-testid="approval-summary"
         role="status"
         aria-live="polite"
-        className="flex flex-col gap-1 border border-border bg-card p-3 text-sm"
+        className="relative flex flex-col gap-1.5 border border-border bg-card py-4 pr-4 pl-6 text-sm leading-relaxed"
       >
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-0.75 bg-primary"
+        />
         <p className="font-medium">
           {summary.selected === 0
             ? "No steps selected - there is nothing to run."
@@ -127,8 +137,12 @@ export function PlanReview({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button disabled={!canApprove} onClick={() => onApprove(selected)}>
+      <div className="flex flex-wrap gap-3">
+        <Button
+          className="glow-hover glow-focus"
+          disabled={!canApprove}
+          onClick={() => onApprove(selected)}
+        >
           {busy
             ? "Working…"
             : selected.length === 0

@@ -23,6 +23,7 @@ import { ErrorState } from "@/components/state/ErrorState";
 import { ListSkeleton } from "@/components/state/ListSkeleton";
 import { ApprovedPlan } from "@/components/plan/ApprovedPlan";
 import { PlanReview } from "@/components/plan/PlanReview";
+import { PlanSkeleton } from "@/components/plan/PlanSkeleton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -156,7 +157,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
           />
         ) : (
           <form
-            className="flex max-w-2xl flex-col gap-3"
+            className="arrive flex max-w-2xl flex-col gap-4"
             onSubmit={(e) => {
               e.preventDefault();
               createPlan.mutate(
@@ -170,11 +171,12 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
               );
             }}
           >
-            <label htmlFor="intent" className="text-sm font-medium">
+            <label htmlFor="intent" className="font-heading text-xl font-light">
               What do you want to test?
             </label>
             <Textarea
               id="intent"
+              className="glow-focus text-sm leading-relaxed"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               maxLength={MAX_INTENT}
@@ -193,6 +195,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
             <div>
               <Button
                 type="submit"
+                className="glow-hover glow-focus"
                 disabled={draft.trim() === "" || createPlan.isPending}
               >
                 {createPlan.isPending
@@ -209,7 +212,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
   // A plan exists: show exactly the state the server reported.
   let body: React.ReactNode;
   if (plan.isPending) {
-    body = <ListSkeleton rows={4} />;
+    body = <PlanSkeleton rows={4} />;
   } else if (plan.isError) {
     body =
       plan.error instanceof ApiError && plan.error.status === 404 ? (
@@ -258,7 +261,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
           <p className="break-words text-sm text-muted-foreground">
             &ldquo;{p.intent}&rdquo;
           </p>
-          <ListSkeleton rows={3} />
+          <PlanSkeleton />
         </div>
       );
     } else if (status === "failed") {
@@ -305,7 +308,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
         <div className="flex flex-col gap-4">
           <p
             data-testid="plan-intent"
-            className="break-words font-heading text-xl font-light"
+            className="font-heading text-2xl leading-tight font-light break-words sm:text-3xl"
           >
             {p.intent}
           </p>
@@ -319,8 +322,12 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
             <div
               role="status"
               data-testid="run-started"
-              className="flex flex-wrap items-center gap-3 border border-border bg-card p-3 text-sm"
+              className="arrive relative flex flex-wrap items-center gap-3 border border-border bg-card py-3 pr-3 pl-6 text-sm"
             >
+              <span
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 w-0.75 bg-primary"
+              />
               <span>
                 Run started (
                 <span className="font-mono">{createRun.data.id}</span>).

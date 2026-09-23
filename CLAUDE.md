@@ -25,7 +25,11 @@ maintains - read it before assuming prior Next.js knowledge still applies.
   platform's system monospace stack, no added webfont, confirmed correct
   in the Phase A review. Don't read the absence of a third named
   typeface here as a violation when you see `font-mono` in use.
-- Motion is color transitions only. No entrance animations, no parallax.
+- Motion shows a state changing, or it doesn't exist. No decoration, no
+  parallax, no counting numbers up. Built only from the motion tokens and
+  utilities, under the honesty rules and reduced-motion contract in
+  `docs/DESIGN_SYSTEM_APP.md`, "Motion" (relaxed from "colour transitions
+  only" in Part P).
 
 ## Security
 

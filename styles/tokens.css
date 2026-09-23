@@ -212,6 +212,61 @@
    * ------------------------------------------------------------------- */
   --radius: 0px; /* zero everywhere, no exceptions */
 
-  --motion-duration: 150ms; /* color transitions only - no entrance/parallax */
+  --motion-duration: 150ms; /* colour transitions - alias of --duration-fast */
   --motion-easing: ease-out;
+
+  /* ---------------------------------------------------------------------
+   * Motion system (Part P). Motion here shows a state CHANGING - it never
+   * decorates, and it never shows a state or a number the server didn't
+   * send. The rules and the reduced-motion alternatives are in
+   * docs/DESIGN_SYSTEM_APP.md, "Motion". Use these; don't write one-off
+   * durations or curves in components.
+   * ------------------------------------------------------------------- */
+  --duration-fast: 150ms; /* colour, border, glow: hover/focus/selection */
+  --duration-base: 260ms; /* a crossfade between two real states */
+  --duration-enter: 420ms; /* something arriving: a step, a plan */
+  --duration-draw: 520ms; /* a result's mark drawing itself */
+  --duration-breathe: 2400ms; /* one cycle of the "running" state */
+
+  /* Decelerate: things settling into place. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Symmetric: crossfades and the running breath. */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* A damped spring (zeta 0.76, 2.5% overshoot), computed rather than
+     eyeballed - arrival with weight, no wobble. No JS: CSS linear(). */
+  --ease-spring: linear(
+    0,
+    0.111,
+    0.333,
+    0.561,
+    0.746,
+    0.877,
+    0.959,
+    1.003,
+    1.021,
+    1.025,
+    1.022,
+    1.016,
+    1.011,
+    1.006,
+    1.003,
+    1.001,
+    1,
+    0.999,
+    0.999,
+    0.999,
+    1
+  );
+
+  /* Delay between siblings arriving together, and the cap on how far a
+     stagger reaches (after N items, the rest arrive with the Nth). */
+  --stagger-step: 45ms;
+
+  /* Gold as light. Hover and focus read as a gold edge and a soft glow
+     rather than a colour swap. Derived from --color-gold by transparency
+     only - no new hue. Zero radius still: these are rectangular. */
+  --glow-edge: color-mix(in oklch, var(--color-gold) 55%, transparent);
+  --glow-soft: color-mix(in oklch, var(--color-gold) 28%, transparent);
+  --glow-hover: 0 0 0 1px var(--glow-edge), 0 0 22px -6px var(--glow-soft);
+  --glow-focus: 0 0 0 1px var(--color-gold), 0 0 26px -4px var(--glow-soft);
 }

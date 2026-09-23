@@ -16,11 +16,24 @@ export function InventoryContext({
 }) {
   if (inventoryElements === null) return null;
   const touched = elementsTouched(steps);
+  const share = inventoryElements > 0 ? touched / inventoryElements : 0;
   return (
-    <p data-testid="plan-inventory" className="text-sm text-muted-foreground">
-      These {steps.length} steps touch {touched} of the {inventoryElements}{" "}
-      elements in the inventory this plan was made from. Elements the plan does
-      not touch are not tested by it.
-    </p>
+    <div className="flex flex-col gap-2.5">
+      <p data-testid="plan-inventory" className="text-sm text-muted-foreground">
+        These {steps.length} steps touch {touched} of the {inventoryElements}{" "}
+        elements in the inventory this plan was made from. Elements the plan
+        does not touch are not tested by it.
+      </p>
+      {/* The same two numbers, drawn: the sentence above is what's read. */}
+      <div
+        aria-hidden="true"
+        className="h-0.5 w-full max-w-md bg-(--border-default)"
+      >
+        <div
+          className="fill-in h-full bg-primary"
+          style={{ width: `${share * 100}%` }}
+        />
+      </div>
+    </div>
   );
 }
