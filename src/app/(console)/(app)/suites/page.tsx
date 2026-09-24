@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const SuiteListSchema = z.array(SuiteSchema);
 
@@ -22,10 +23,12 @@ export default function SuitesPage() {
   const suites = useResource("/suites", SuiteListSchema);
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-muted-foreground">
-        Generated test suites, one per target.
-      </p>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Suites"
+        description="Generated test suites, one per target."
+      />
 
       {suites.status === "loading" && <ListSkeleton rows={2} />}
 

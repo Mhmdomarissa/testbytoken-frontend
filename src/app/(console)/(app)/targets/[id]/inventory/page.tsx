@@ -22,6 +22,7 @@ import { countLocatable, type Element } from "@/components/inventory/inventory";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 function message(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
@@ -132,23 +133,18 @@ function NoInventory({
 
 function Header({ name, subtitle }: { name: string; subtitle?: string }) {
   return (
-    <div className="flex flex-col gap-1">
-      <Link
-        href="/targets"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeftIcon className="size-3" aria-hidden="true" />
-        Targets
-      </Link>
-      <h1 className="truncate font-heading text-2xl font-light" title={name}>
-        {name} - element inventory
-      </h1>
-      {subtitle && (
-        <p className="truncate text-sm text-muted-foreground" title={subtitle}>
-          {subtitle}
-        </p>
-      )}
-    </div>
+    <PageHeader
+      back={{ href: "/targets", label: "Targets" }}
+      title={`${name} - element inventory`}
+      titleHint={name}
+      description={
+        subtitle && (
+          <p className="truncate" title={subtitle}>
+            {subtitle}
+          </p>
+        )
+      }
+    />
   );
 }
 

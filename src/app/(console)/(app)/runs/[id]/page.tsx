@@ -31,6 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 function message(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
@@ -151,45 +152,44 @@ function Watch({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <Link
-          href="/runs"
-          className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeftIcon className="size-3" aria-hidden="true" />
-          Runs
-        </Link>
-        <h1 className="flex flex-wrap items-center gap-3 font-heading text-2xl font-light">
-          <span className="break-all">Run</span>
-          <span
-            className="font-mono text-base text-muted-foreground"
-            data-testid="run-id"
-          >
-            {id}
-          </span>
-        </h1>
-        {server && (
-          <p className="break-words text-sm text-muted-foreground">
-            {target.data ? `${target.data.name} - ` : ""}
-            {server.plan_id !== null
-              ? `from an approved plan (${server.plan_id})`
-              : server.suite_id !== null
-                ? `from a suite (${server.suite_id})`
-                : ""}
-            {" - started "}
-            {new Date(server.started_at).toLocaleString()}
-            {server.finished_at && (
-              <span data-testid="run-duration">
-                {" - took "}
-                {formatDuration(
-                  new Date(server.finished_at).getTime() -
-                    new Date(server.started_at).getTime(),
-                )}
-              </span>
-            )}
-          </p>
-        )}
-      </div>
+      <PageHeader
+        back={{ href: "/runs", label: "Runs" }}
+        title={
+          <>
+            Run{" "}
+            <span
+              className="ml-1 font-mono text-base text-muted-foreground"
+              data-testid="run-id"
+            >
+              {id}
+            </span>
+          </>
+        }
+        titleHint={id}
+        description={
+          server && (
+            <p className="break-words">
+              {target.data ? `${target.data.name} - ` : ""}
+              {server.plan_id !== null
+                ? `from an approved plan (${server.plan_id})`
+                : server.suite_id !== null
+                  ? `from a suite (${server.suite_id})`
+                  : ""}
+              {" - started "}
+              {new Date(server.started_at).toLocaleString()}
+              {server.finished_at && (
+                <span data-testid="run-duration">
+                  {" - took "}
+                  {formatDuration(
+                    new Date(server.finished_at).getTime() -
+                      new Date(server.started_at).getTime(),
+                  )}
+                </span>
+              )}
+            </p>
+          )
+        }
+      />
 
       <div
         className="relative flex flex-wrap items-center gap-x-4 gap-y-3 border border-border bg-card py-4 pr-4 pl-6"
