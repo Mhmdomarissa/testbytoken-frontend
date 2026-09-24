@@ -740,3 +740,33 @@ backend the demo would need either this gap closed or a dedicated,
 read-only demo workspace an anonymous visitor may plan and run against. The
 same holds for the proof hash it reads (`GET /proofs/{id}`, also
 session-scoped).
+
+### Gap: proof verification (recorded 2026-09-24, not proposed)
+
+`Proof.hash` is described as a "tamper-evident hash over the canonical JSON
+of `snapshot`, e.g. sha256 hex digest", and the proof page shows it. But
+**nobody outside the backend can check it.** No endpoint, document or tool
+says which canonical-JSON form is hashed or which algorithm is used ("e.g."
+does not pin one), and the hash is not signed by any key. A hash anyone can
+recompute proves only that the bytes are the bytes, not that we produced
+them.
+
+Until that exists, the UI and the marketing copy claim only what the proof
+shows: the verdict, coverage, every step with its screenshot, and a hash of
+the record. They make no claim that it is "signed", "tamper-evident" or
+something you can "verify". The landing page was brought in line on
+2026-09-24.
+
+Whoever takes this on will need to settle at least:
+
+- **Canonical form.** The exact serialization that is hashed (for example
+  RFC 8785 JCS), published so a third party can reproduce the bytes from a
+  proof's `snapshot`.
+- **Algorithm.** Pin it in the contract (SHA-256 if so) instead of "e.g.".
+  The landing's stats band names SHA-256 today, so that must stay true.
+- **Signature.** Whether proofs are signed (and with what key, rotation and
+  public-key distribution). Only a signature makes "we produced this"
+  checkable. The word "signed" returns to the copy only when this exists.
+- **Verification surface.** A public page or a documented CLI step that
+  takes a proof and says match / no match. The landing footer's "Trace
+  verification" placeholder was removed until one exists.
