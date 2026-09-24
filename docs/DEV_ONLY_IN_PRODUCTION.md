@@ -55,3 +55,38 @@ changes when a real backend exists.
   strict CSP with no `unsafe-inline`. It needs to land with the deploy.
   Images come through `/_next/image` (`'self'`), so no third-party
   `img-src` is needed for the landing or sign-in photos.
+
+## Decisions (accepted 2026-09-24) - requirements for the deploy work
+
+The recommendations above are accepted. When the deploy work starts:
+
+1. **`NEXT_PUBLIC_API_MOCKING` is off by default.** Mocking on together with
+   a real `NEXT_PUBLIC_API_BASE_URL` **fails the build**. The two are never
+   combined.
+2. **Flag off means the mocks are not in the output at all.** The mock
+   handlers, the mock sign-in path (item 3) and the non-httpOnly cookie code
+   (item 4) are absent from the production build. A **test checks the
+   production build output** for them, so a regression fails CI instead of
+   shipping.
+3. **The "Demo - simulated data" marker is one persistent banner
+   component** on every screen, including the public proof pages (`/p/*`).
+   This is the "D2 persistent banner" from the deploy brief. The brief isn't
+   in this repo, so its exact wording and spec have to come from there.
+4. **`/dev/zod-messages`** is covered as item 6. It's already 404 in
+   production and is deleted together with the zod locale workaround.
+
+## CSP - options report first, no implementation yet
+
+Don't implement a CSP ahead of the deploy work. When deploy starts, the
+first step is a report of the options for a decision, covering at least:
+
+- **Nonce-based vs hash/static CSP.** A nonce needs a per-request value, so
+  it forces dynamic rendering. The report says what that does to the public
+  proof page's static rendering and to its `PUBLIC_ROUTE_BUDGET_BYTES` cap.
+- **The MSW service worker** (`worker-src`, for the demo deployment only).
+- **The `sandbox=""` engine-report iframe** (`frame-src` for the engine's
+  origin; the sandbox attribute itself stays as it is).
+- **The OG image route** (`/p/[token]/opengraph-image`).
+- **The Unsplash photographs**, served through `/_next/image` (`img-src
+'self'`), including the plain `<img>` on `/sign-in`, which uses the same
+  optimizer URLs.
