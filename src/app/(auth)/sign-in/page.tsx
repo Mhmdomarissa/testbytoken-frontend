@@ -1,138 +1,88 @@
-"use client";
+import { Suspense } from "react";
+import { ArrowLeftIcon } from "lucide-react";
+import { Eyebrow } from "@/components/brand/Eyebrow";
+import { SignInForm } from "./SignInForm";
 
-import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-  FieldDescription,
-} from "@/components/ui/field";
-import { Spinner } from "@/components/ui/spinner";
-import { MagicLinkResponseSchema, VerifyResponseSchema } from "@/lib/contract";
-import { setMockSessionCookie } from "@/mocks/session-cookie-workaround";
+const PHOTO = "https://images.unsplash.com/photo-1519501025264-65ba15a82390";
 
-type Step = "request" | "sent" | "verifying";
+/** Next's own image-optimizer URL (its documented default loader format), at one of its default widths. */
+const optimised = (width: number) =>
+  `/_next/image?url=${encodeURIComponent(PHOTO)}&w=${width}&q=75`;
 
+/**
+ * A server component on purpose, and deliberately without <Image> or
+ * <Link>: the landing's photograph and voice arrive with no client JS.
+ * Importing anything from next/image - even the server-side
+ * getImageProps - pulls its client module into this route's bundle
+ * (~6 KB, measured), and <Link> another ~4 KB, for a decorative photo and
+ * a link out of this route group. So: a plain <img> on the same optimizer
+ * URLs <Image> would request, and a plain link. Only the form is a client
+ * component.
+ */
 export default function SignInPage() {
   return (
-    <Suspense>
-      <SignInForm />
-    </Suspense>
-  );
-}
+    <main className="grid min-h-svh bg-background md:grid-cols-[1.1fr_1fr]">
+      {/* The landing's hero photograph and voice, so the step from the site
+          into the product doesn't feel like a different product. Wide
+          screens only; phones get the form alone. */}
+      <section
+        aria-labelledby="sign-in-promise"
+        className="relative hidden overflow-hidden border-r border-border md:block"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- see the note on SignInPage: <Image> costs ~6 KB of client JS here */}
+        <img
+          src={optimised(1200)}
+          srcSet={[828, 1200, 1920]
+            .map((w) => `${optimised(w)} ${w}w`)
+            .join(", ")}
+          sizes="55vw"
+          alt=""
+          fetchPriority="high"
+          className="absolute inset-0 size-full object-cover grayscale"
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 bg-linear-to-t from-background from-10% via-background/80 to-background/40"
+        />
+        <div className="relative flex h-full flex-col justify-end p-12 lg:p-16">
+          <Eyebrow onImage>Real browsers · Real proof</Eyebrow>
+          <p
+            id="sign-in-promise"
+            className="mt-6 max-w-md font-heading text-4xl leading-[1.1] font-light lg:text-5xl"
+          >
+            Evidence, <em className="text-primary not-italic">not opinions.</em>
+          </p>
+          <p className="mt-5 max-w-sm text-sm leading-relaxed text-muted-foreground">
+            You sign in here with a magic link. You sign in to your own
+            application in a live browser you control. We never ask for its
+            password.
+          </p>
+        </div>
+      </section>
 
-function SignInForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [step, setStep] = useState<Step>("request");
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  async function requestLink(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    try {
-      const res = await fetch("/auth/magic-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) throw new Error("Could not send the link. Try again.");
-      MagicLinkResponseSchema.parse(await res.json());
-      setStep("sent");
-    } catch {
-      setError("Could not send the link. Try again.");
-    }
-  }
-
-  // Dev convenience: there is no real inbox to click a link from, and no
-  // backend to issue a real token. The mock accepts any token
-  // unconditionally, so this stands in for "the user clicked the email
-  // link" without inventing a fake email UI.
-  async function continueDev() {
-    setStep("verifying");
-    setError(null);
-    try {
-      const res = await fetch("/auth/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: "dev" }),
-      });
-      if (!res.ok) throw new Error("Link expired or invalid.");
-      VerifyResponseSchema.parse(await res.json());
-      // See src/mocks/session-cookie-workaround.ts - the mock's own
-      // Set-Cookie header (correct, and what a real backend would rely
-      // on) is silently dropped because MSW serves this via a Service
-      // Worker, which cannot set cookies that way.
-      setMockSessionCookie();
-      router.push(searchParams.get("from") ?? "/overview");
-      router.refresh();
-    } catch {
-      setError("Link expired or invalid.");
-      setStep("sent");
-    }
-  }
-
-  return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-6">
-      <div className="w-full max-w-sm">
-        <h1 className="font-heading text-2xl font-light">Test by Token</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Sign in with a magic link. No password, ever.
-        </p>
-
-        {step === "request" && (
-          <form onSubmit={requestLink} className="mt-8">
-            <FieldGroup>
-              <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
-                <Input
-                  id="email"
-                  type="email"
-                  required
-                  autoFocus
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                />
-                {error && (
-                  <FieldDescription className="text-destructive">
-                    {error}
-                  </FieldDescription>
-                )}
-              </Field>
-              <Button type="submit" disabled={!email}>
-                Send magic link
-              </Button>
-            </FieldGroup>
-          </form>
-        )}
-
-        {(step === "sent" || step === "verifying") && (
-          <div className="mt-8 flex flex-col gap-4">
-            <p className="text-sm text-muted-foreground">
-              Check <span className="text-foreground">{email}</span> for a
-              sign-in link.
-            </p>
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button
-              variant="outline"
-              onClick={continueDev}
-              disabled={step === "verifying"}
-            >
-              {step === "verifying" ? (
-                <>
-                  <Spinner /> Verifying…
-                </>
-              ) : (
-                "Continue (dev - no backend yet)"
-              )}
-            </Button>
-          </div>
-        )}
+      <div className="flex flex-col px-6 py-8 sm:px-12">
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- see the note on SignInPage: <Link> costs ~4 KB of client JS here */}
+        <a
+          href="/"
+          className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-(--duration-fast) hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+        >
+          <ArrowLeftIcon className="size-3.5" aria-hidden="true" />
+          Back to site
+        </a>
+        <div className="my-auto w-full max-w-sm self-center py-12">
+          <p className="text-[0.5625rem] font-medium tracking-[0.26em] text-muted-foreground uppercase">
+            Testing as a Service
+          </p>
+          <h1 className="mt-2 font-heading text-4xl font-light">
+            Test by Token
+          </h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Sign in with a magic link. No password, ever.
+          </p>
+          <Suspense>
+            <SignInForm />
+          </Suspense>
+        </div>
       </div>
     </main>
   );
