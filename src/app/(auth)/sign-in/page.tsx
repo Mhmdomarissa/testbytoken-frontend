@@ -54,7 +54,7 @@ export default function SignInPage() {
           </p>
           <p className="mt-5 max-w-sm text-sm leading-relaxed text-muted-foreground">
             You sign in here with a magic link. You sign in to your own
-            application in a live browser you control - we never ask for its
+            application in a live browser you control. We never ask for its
             password.
           </p>
         </div>
