@@ -26,6 +26,7 @@ import { PlanReview } from "@/components/plan/PlanReview";
 import { PlanSkeleton } from "@/components/plan/PlanSkeleton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const MAX_INTENT = 2000;
 
@@ -122,21 +123,16 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
   }
 
   const heading = (
-    <div className="flex flex-col gap-1">
-      <Link
-        href="/targets"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeftIcon className="size-3" aria-hidden="true" />
-        Targets
-      </Link>
-      <h1 className="truncate font-heading text-2xl font-light" title={t.name}>
-        {t.name} - compose a test
-      </h1>
-      <p className="truncate text-sm text-muted-foreground" title={t.base_url}>
-        {t.base_url}
-      </p>
-    </div>
+    <PageHeader
+      back={{ href: "/targets", label: "Targets" }}
+      title={`${t.name} - compose a test`}
+      titleHint={t.name}
+      description={
+        <p className="truncate" title={t.base_url}>
+          {t.base_url}
+        </p>
+      }
+    />
   );
 
   // No plan yet: the compose form - which needs a finished scan to ground against.

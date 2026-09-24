@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { ArrowRightIcon } from "lucide-react";
-import { Eyebrow } from "@/components/brand/Eyebrow";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 /**
  * The console home: the four-step path through the product, each step
@@ -48,16 +48,11 @@ const steps: {
 export default function OverviewPage() {
   return (
     <div className="flex max-w-6xl flex-col gap-10 py-2">
-      <header className="flex max-w-2xl flex-col gap-4">
-        <Eyebrow>Your workspace</Eyebrow>
-        <h2 className="font-heading text-4xl leading-tight font-light sm:text-5xl">
-          Welcome back
-        </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
-          From a URL to a proof you can hand to anyone, in four steps. Each one
-          opens the page where that work happens.
-        </p>
-      </header>
+      <PageHeader
+        eyebrow="Your workspace"
+        title="Welcome back"
+        description="From a URL to a proof you can hand to anyone, in four steps. Each one opens the page where that work happens."
+      />
 
       <ol className="grid gap-px border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
         {steps.map((step, i) => (

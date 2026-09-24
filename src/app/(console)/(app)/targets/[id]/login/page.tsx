@@ -24,6 +24,7 @@ import { ErrorState } from "@/components/state/ErrorState";
 import { ListSkeleton } from "@/components/state/ListSkeleton";
 import { LoginPanel } from "@/components/login/LoginPanel";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 function message(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
@@ -102,21 +103,16 @@ function Login({ params }: { params: Promise<{ id: string }> }) {
   const t = target.data;
 
   const heading = (
-    <div className="flex flex-col gap-1">
-      <Link
-        href="/targets"
-        className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeftIcon className="size-3" aria-hidden="true" />
-        Targets
-      </Link>
-      <h1 className="truncate font-heading text-2xl font-light" title={t.name}>
-        {t.name} - sign in
-      </h1>
-      <p className="truncate text-sm text-muted-foreground" title={t.base_url}>
-        {t.base_url}
-      </p>
-    </div>
+    <PageHeader
+      back={{ href: "/targets", label: "Targets" }}
+      title={`${t.name} - sign in`}
+      titleHint={t.name}
+      description={
+        <p className="truncate" title={t.base_url}>
+          {t.base_url}
+        </p>
+      }
+    />
   );
 
   let body: React.ReactNode;

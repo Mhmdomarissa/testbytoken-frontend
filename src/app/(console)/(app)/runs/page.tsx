@@ -21,14 +21,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const RunListResponseSchema = paginated(RunSummarySchema);
 
 export default function RunsPage() {
   return (
-    <Suspense fallback={<ListSkeleton rows={4} />}>
-      <RunsList />
-    </Suspense>
+    <div className="flex flex-col gap-6">
+      <PageHeader eyebrow="Workspace" title="Runs" />
+      <Suspense fallback={<ListSkeleton rows={4} />}>
+        <RunsList />
+      </Suspense>
+    </div>
   );
 }
 

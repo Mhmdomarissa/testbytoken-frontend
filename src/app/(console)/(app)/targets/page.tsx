@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 type Target = Tolerated<z.infer<typeof TargetSchema>>;
 
@@ -46,18 +47,21 @@ export default function TargetsPage() {
   const [editing, setEditing] = useState<Target | null>(null);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          Applications registered for testing.
-        </p>
-        {targets.data && targets.data.length > 0 && (
-          <Button size="sm" onClick={() => setRegistering(true)}>
-            <PlusIcon />
-            Add a target
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Targets"
+        description="Applications registered for testing."
+        actions={
+          targets.data &&
+          targets.data.length > 0 && (
+            <Button size="sm" onClick={() => setRegistering(true)}>
+              <PlusIcon />
+              Add a target
+            </Button>
+          )
+        }
+      />
 
       {targets.isPending && <ListSkeleton rows={3} />}
 
