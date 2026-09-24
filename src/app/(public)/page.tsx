@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { cn } from "cn";
-import { Eyebrow } from "./_landing/Eyebrow";
+import { Eyebrow } from "@/components/brand/Eyebrow";
 import { DemoForm, DemoProvider, DemoReport } from "./_landing/demo";
 import { ghostClass } from "./_landing/styles";
 
