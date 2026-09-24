@@ -335,8 +335,8 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
                 <p className="text-sm text-muted-foreground">
                   <span className="font-mono break-all text-foreground">
                     {createRun.data.id}
-                  </span>{" "}
-                  - results appear as the engine reports them.
+                  </span>
+                  . Results appear only when the engine reports them.
                 </p>
               </div>
               <Link
