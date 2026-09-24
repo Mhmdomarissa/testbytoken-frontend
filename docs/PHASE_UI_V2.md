@@ -63,30 +63,30 @@ written rules match.
 
 ### Tokens (semantic names; implement as CSS variables under `:root` and `.dark`, shadcn convention)
 
-| token | dark | light |
-|---|---|---|
-| bg | `#0A1120` | `#F6F5F1` |
-| sidebar | `#0D1628` | `#FFFFFF` |
-| card | `#111C31` | `#FFFFFF` |
-| raised | `#16233C` | `#F2F0EA` |
-| border | `#1F2C44` | `#E6E2D8` |
-| text | `#EDF1F7` | `#0E1726` |
-| muted | `#97A3B6` | `#566173` |
-| faint | `#8290A6` | `#626C7B` |
-| gold (mark, lines) | `#D4B27A` | `#9A7434` |
-| gold-text (links) | `#D4B27A` | `#7A5A22` |
+| token                      | dark      | light     |
+| -------------------------- | --------- | --------- |
+| bg                         | `#0A1120` | `#F6F5F1` |
+| sidebar                    | `#0D1628` | `#FFFFFF` |
+| card                       | `#111C31` | `#FFFFFF` |
+| raised                     | `#16233C` | `#F2F0EA` |
+| border                     | `#1F2C44` | `#E6E2D8` |
+| text                       | `#EDF1F7` | `#0E1726` |
+| muted                      | `#97A3B6` | `#566173` |
+| faint                      | `#8290A6` | `#626C7B` |
+| gold (mark, lines)         | `#D4B27A` | `#9A7434` |
+| gold-text (links)          | `#D4B27A` | `#7A5A22` |
 | gold-fill (primary button) | `#D4B27A` | `#C9A96E` |
-| on-gold | `#0A1120` | `#0E1726` |
+| on-gold                    | `#0A1120` | `#0E1726` |
 
 Status colours are a foreground plus a tinted background. In dark the tint is
 the foreground at 13% alpha over card; in light it is a solid tint.
 
-| status | dark fg | light fg / bg |
-|---|---|---|
-| passed | `#5CC98F` | `#17784A` / `#E4F3EA` |
-| failed | `#F0747A` | `#B3262F` / `#FBE8E9` |
-| running | `#6FA8FF` | `#1F5FC4` / `#E6EEFB` |
-| skipped / cancelled | `#A3AEC0` | `#556070` / `#ECEEF2` |
+| status                           | dark fg   | light fg / bg         |
+| -------------------------------- | --------- | --------------------- |
+| passed                           | `#5CC98F` | `#17784A` / `#E4F3EA` |
+| failed                           | `#F0747A` | `#B3262F` / `#FBE8E9` |
+| running                          | `#6FA8FF` | `#1F5FC4` / `#E6EEFB` |
+| skipped / cancelled              | `#A3AEC0` | `#556070` / `#ECEEF2` |
 | warning / timed out / ungrounded | `#E7B45A` | `#8A5A00` / `#FBF0DA` |
 
 I measured these before handing them over: every text token is at least 4.5:1
