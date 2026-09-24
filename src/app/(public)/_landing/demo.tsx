@@ -703,7 +703,7 @@ function DemoRun({
           data-testid="proof-hash"
         >
           <p className="mb-2 text-[0.5625rem] font-bold tracking-[0.2em] text-muted-foreground uppercase">
-            Trace hash · tamper-evident
+            Hash of this record
           </p>
           <p className="font-mono text-xs break-all">{proof.value.hash}</p>
         </div>

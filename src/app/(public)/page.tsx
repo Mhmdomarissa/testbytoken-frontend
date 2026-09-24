@@ -153,8 +153,8 @@ function Hero() {
           </h1>
           <p className="max-w-[30rem] text-[0.9375rem] leading-[1.85] text-muted-foreground">
             Paste a URL and tell us what to check in plain English. A real
-            Chromium browser runs every step — then hands you a signed,
-            tamper-evident record you can keep.
+            Chromium browser runs every step — then hands you a record of what
+            happened that you can keep.
           </p>
         </div>
         <DemoForm />
@@ -166,7 +166,7 @@ function Hero() {
 function Stats() {
   const stats = [
     ["100%", "Real Browser Runs"],
-    ["SHA-256", "Signed Trace, Every Run"],
+    ["SHA-256", "Hash on Every Proof"],
     ["<60s", "From URL to Proof"],
     ["0", "Credentials Stored"],
   ] as const;
@@ -231,8 +231,8 @@ function About() {
           millisecond by millisecond.
         </p>
         <p className="mb-5 text-[0.9375rem] leading-[1.9] text-muted-foreground">
-          Every run produces a screenshot and a SHA-256-hashed trace. If anyone
-          alters a single step of the record, the hash breaks. That&apos;s
+          Every finished run becomes a proof: each step with its screenshot,
+          what passed, what failed, and what was never tested. That&apos;s
           evidence you can hand to a client, an auditor, or your own team.
         </p>
         <p className="mt-6">
@@ -271,7 +271,7 @@ function Services() {
       img: "1573496359142-b8d87734a5a2",
       alt: "A person in a blazer holding a closed laptop by an office window",
       title: "Auditable Proof",
-      body: "Every run ends with a full-page screenshot and a SHA-256-hashed trace of each step — a tamper-evident record that belongs to you.",
+      body: "Every finished run becomes a proof: each step with its screenshot, and a hash of the whole record. It belongs to you.",
     },
   ];
   return (
@@ -357,7 +357,7 @@ function How() {
     [
       "04",
       "Keep the proof",
-      "Verdict, timings, screenshot, and a SHA-256 trace hash. Yours to keep and verify.",
+      "Verdict, timings, screenshots, and a hash of the record. Yours to keep and share.",
     ],
   ] as const;
   return (
@@ -471,7 +471,6 @@ function Footer() {
       head: "Developers",
       items: [
         ["API docs", null],
-        ["Trace verification", null],
         ["Status", null],
       ],
     },
