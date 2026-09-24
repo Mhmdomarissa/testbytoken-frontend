@@ -155,6 +155,30 @@ included). A credential form means the product has been misread.
   reconsider whether the public page needs its own plain, non-windowed,
   server-renderable step list instead of pulling in `StepList` as-is.
 
+## Parked
+
+Built, measured, and deliberately not shipped. The work stays on its
+branch; don't revive it without clearing the condition listed.
+
+- **View transitions between screens** (branch `p3-view-transitions`,
+  parked 2026-09-23). React's `<ViewTransition update="route">` in
+  `ShellMain`/`PublicMain` crossfades route changes; reduced motion is an
+  instant swap, and focus stays on `<main>` after the transition finishes
+  (its own `e2e/view-transitions.spec.ts` passes). **Why parked:**
+  `run.spec.ts`'s cancel test, unmodified, went from 5/5 in 32.6s on
+  `main` to 4/5 in 43.8s with transitions - about 2.2s slower per flow,
+  so the run finished before it could be cancelled. The animations alone
+  account for ~0.3-0.5s per navigation, so most of that is unexplained.
+  **Working theory, unconfirmed:** React holds back later updates until a
+  running view transition finishes. If so, the screen could briefly show
+  an older state than the server has reported - which this product can't
+  afford (see "Honesty"). Route transitions are also decoration rather
+  than meaning, so they don't earn that risk. **Worth revisiting when:**
+  the 2.2s is explained by measurement (profile a live run-watch flow
+  with and without the wrapper), it's shown that no server-reported state
+  is delayed on screen during a transition, and the unmodified `run.spec`
+  cancel test passes reliably (e.g. 20/20) at `main`'s speed.
+
 ## Process
 
 - Small, reviewable commits, one concern each, and explain _why_ in the
