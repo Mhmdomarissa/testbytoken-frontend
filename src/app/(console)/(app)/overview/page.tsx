@@ -21,7 +21,7 @@ const steps: {
 }[] = [
   {
     title: "Register a target",
-    body: "Add the site you want tested and scan it. We only ever load it - we never ask for its password.",
+    body: "Add the site you want tested and scan it. We only ever load the site; we never ask for its password.",
     href: "/targets",
     cta: "Add a site",
   },
@@ -33,13 +33,13 @@ const steps: {
   },
   {
     title: "Watch it run",
-    body: "A real browser performs each approved step. Results appear as the engine reports them - never before.",
+    body: "A real browser performs each approved step. Results appear only when the engine reports them.",
     href: "/runs",
     cta: "Open the run history",
   },
   {
     title: "Share the proof",
-    body: "A finished run becomes a proof: verdict, coverage, every step, and a hash anyone can check. Share it with a public link.",
+    body: "A finished run becomes a proof: the verdict, coverage, every step with its screenshot, and a hash of the record. Share it with a public link.",
     href: "/runs",
     cta: "Find a finished run",
   },
@@ -50,7 +50,7 @@ export default function OverviewPage() {
     <div className="flex max-w-6xl flex-col gap-10 py-2">
       <PageHeader
         eyebrow="Your workspace"
-        title="Welcome back"
+        title="Welcome to Test by Token"
         description="From a URL to a proof you can hand to anyone, in four steps. Each one opens the page where that work happens."
       />
 
