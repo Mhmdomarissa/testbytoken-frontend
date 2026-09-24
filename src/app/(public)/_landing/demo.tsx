@@ -33,7 +33,7 @@ import { StepList } from "@/components/run/StepList";
 import { LiveStatus, liveState } from "@/components/run/LiveStatus";
 import { reconcileRun } from "@/components/run/reconcile";
 import { isRunOver, runStatusLabel } from "@/components/run/runStatus";
-import { Eyebrow } from "./Eyebrow";
+import { Eyebrow } from "@/components/brand/Eyebrow";
 import { usePolled } from "./usePolled";
 import { ghostClass } from "./styles";
 
