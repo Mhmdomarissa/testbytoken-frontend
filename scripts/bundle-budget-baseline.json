@@ -4,11 +4,11 @@
   "/overview": 413498,
   "/runs": 418371,
   "/runs/[id]": 438754,
-  "/sign-in": 283810,
+  "/sign-in": 283672,
   "/style-guide": 393690,
   "/suites": 416308,
   "/targets": 441813,
-  "/targets/[id]/compose": 429432,
+  "/targets/[id]/compose": 429637,
   "/targets/[id]/inventory": 429204,
   "/targets/[id]/login": 426597,
   "/usage": 415401

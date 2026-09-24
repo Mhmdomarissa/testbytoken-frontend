@@ -3,7 +3,8 @@
 import { Suspense, use, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeftIcon, ScanSearchIcon } from "lucide-react";
+import { ArrowLeftIcon, ArrowRightIcon, ScanSearchIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useTarget } from "@/lib/api/queries/targets";
 import {
   useApprovePlan,
@@ -318,21 +319,35 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
             <div
               role="status"
               data-testid="run-started"
-              className="arrive relative flex flex-wrap items-center gap-3 border border-border bg-card py-3 pr-3 pl-6 text-sm"
+              className="arrive relative flex flex-col gap-5 border border-border bg-card py-6 pr-6 pl-8 sm:flex-row sm:items-center sm:justify-between"
             >
               <span
                 aria-hidden="true"
                 className="absolute inset-y-0 left-0 w-0.75 bg-primary"
               />
-              <span>
-                Run started (
-                <span className="font-mono">{createRun.data.id}</span>).
-              </span>
+              {/* The payoff of the whole compose flow, so it reads as the
+                  primary moment - but it says only what the server said
+                  (a run was created, with this id), never how it's going. */}
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <p className="font-heading text-2xl leading-tight font-light">
+                  Run started
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-mono break-all text-foreground">
+                    {createRun.data.id}
+                  </span>
+                  . Results appear only when the engine reports them.
+                </p>
+              </div>
               <Link
                 href={`/runs/${createRun.data.id}`}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
+                className={cn(
+                  buttonVariants({ size: "lg" }),
+                  "shrink-0 self-start px-5 sm:self-auto",
+                )}
               >
                 Watch this run
+                <ArrowRightIcon aria-hidden="true" />
               </Link>
             </div>
           )}
