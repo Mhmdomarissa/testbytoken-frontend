@@ -32,6 +32,8 @@ export const queryKeys = {
   plans: {
     detail: (id: string) => ["plans", id] as const,
   },
+  overview: (params: Record<string, string | undefined>) =>
+    ["overview", params] as const,
   proofs: {
     detail: (id: string) => ["proofs", id] as const,
     public: (token: string) => ["proofs", "public", token] as const,
