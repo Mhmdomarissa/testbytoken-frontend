@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useResource } from "@/hooks/useResource";
+import { usePolledResource } from "@/hooks/usePolledResource";
 import { WorkspaceSchema } from "@/lib/contract";
 import { enumLabel } from "@/lib/api/tolerant";
 import { DEMO_WORKSPACE_ID } from "@/lib/workspace";
@@ -37,35 +37,20 @@ function useNow(everyMs: number) {
  * is exactly what the workspace endpoint said, plus WHEN we heard it: the
  * time is our own - the moment our request came back - not a server field
  * (the contract has no "last check"; logged in API_CONTRACT.md). When the
- * request fails it says so, with the last time we did hear, and never
- * leaves a stale "ready" on screen.
+ * latest request fails it says so, with the last time we did hear, and
+ * never leaves a stale "ready" on screen.
  *
- * Today the workspace is fetched once when the console mounts - there is
- * no poll yet (that is a behaviour change, proposed separately), so "ago"
- * keeps growing until the page reloads, which is the truth about how
- * fresh this is.
+ * Polled (usePolledResource): every 30 s while the tab is visible, paused
+ * while it is hidden and re-checked the moment it is visible again, backing
+ * off to 60 s and then 120 s after failures.
  */
 export function EngineStatusCard() {
-  const workspace = useResource(
+  const workspace = usePolledResource(
     `/workspaces/${DEMO_WORKSPACE_ID}`,
     WorkspaceSchema,
   );
-  const [heardAt, setHeardAt] = useState<number | null>(null);
   const now = useNow(5_000);
-
-  // Stamp the moment each successful response lands. `data` is a new
-  // object per response, so this runs once per response, not per render.
-  const data = workspace.status === "success" ? workspace.data : null;
-  useEffect(() => {
-    if (!data) return;
-    let live = true;
-    queueMicrotask(() => {
-      if (live) setHeardAt(Date.now());
-    });
-    return () => {
-      live = false;
-    };
-  }, [data]);
+  const heardAt = workspace.lastSuccessAt;
 
   let dot: string;
   let label: string;
