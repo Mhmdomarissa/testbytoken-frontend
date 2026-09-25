@@ -11,20 +11,54 @@ maintains - read it before assuming prior Next.js knowledge still applies.
 
 ## Design
 
-- Border radius is **0 everywhere**. No exceptions, including shadcn
-  defaults - override the theme, don't add a rounded corner "just this
-  once."
-- The palette is fixed (`styles/tokens.css`). **Never introduce a new hue.**
-  If a new UI state needs a color, derive it in OKLCH from the existing
-  gold/blue anchors.
-- **No grey tokens.** Text hierarchy on dark grounds comes from
-  `rgba(248, 244, 238, α)` at varying opacity, not a grey scale.
-- Fonts: Cormorant Garamond for headings, Montserrat for UI/body. Nothing
-  else, ever — this governs _display and body type_. It does not cover
-  code-like content (locators, ids, hashes, step output): that's the
-  platform's system monospace stack, no added webfont, confirmed correct
-  in the Phase A review. Don't read the absence of a third named
-  typeface here as a violation when you see `font-mono` in use.
+UI v2 (`docs/PHASE_UI_V2.md`, owner decision, 2026-09-24) replaced the
+original design rules. **Reversed, by name** - don't restore any of these:
+
+- ~~Dark only, no light mode~~ → **light and dark themes.** The system
+  setting by default; the console's toggle overrides it and is remembered;
+  no flash on load. The landing, the proof page and sign-in follow the
+  system through CSS only - no theming JavaScript on public routes.
+- ~~Border radius 0 everywhere~~ → **6 px controls** (buttons, inputs,
+  chips), **10 px inner panels**, **14 px cards**. Fully round only for
+  counts and avatars.
+- ~~The palette is fixed; never introduce a new hue~~ → the palette is the
+  **semantic token set** in `styles/tokens.css` (surfaces, lines, ink,
+  gold, status). New hex values arrive only by changing a token there,
+  measured in both themes by `src/lib/color/contrast.test.ts`.
+- ~~No grey tokens; text hierarchy from warm-white at varying opacity~~ →
+  solid tokens `--ink`, `--ink-muted`, `--ink-faint` (and the neutral
+  status grey), each measured on every surface in both themes.
+- ~~Cormorant Garamond for headings~~ → Cormorant for **page titles and
+  empty-state titles only**. Section headings, labels and every number are
+  Montserrat, and numbers are always `tabular-nums`.
+
+The rules now:
+
+- **Every colour is a token.** Components use tokens, never raw hex. The one
+  exception is the OG image (satori can't read CSS variables):
+  `og-palette.ts`, kept equal to the tokens by `og-palette.test.ts`.
+- **Gold is reserved** for the brand mark, the primary action, focus and the
+  active nav item. It is never a status colour. Gold as text uses
+  `--gold-text` (`text-gold-text`), never the button fill.
+- **Form controls** (inputs, selects, checkboxes) are outlined with
+  `--line-input` (≥3:1 on every surface). `--line` is for dividers and card
+  edges only.
+- **Status chips.** Quiet by default: the status tint as ground, the status
+  colour on the icon only, the label in normal text. **One filled chip per
+  page**, for that page's own verdict. The unrecognised chip stays a dashed
+  outline carrying the raw value.
+- **Status colour is never the only channel.** Every status has its own icon
+  silhouette and its own label (asserted). Only pass vs fail are guaranteed
+  apart in lightness (≥1.5:1 in both themes); other pairs may sit close.
+  Any colour-only mark (bars, edges, charts) gets a 2 px gap in the surface
+  colour between segments, direct count labels or a legend with counts,
+  and a text equivalent.
+- Fonts: Cormorant Garamond and Montserrat. Nothing else, ever — this
+  governs _display and body type_. It does not cover code-like content
+  (locators, ids, hashes, step output): that's the platform's system
+  monospace stack, no added webfont, confirmed correct in the Phase A
+  review. Don't read the absence of a third named typeface here as a
+  violation when you see `font-mono` in use.
 - Motion shows a state changing, or it doesn't exist. No decoration, no
   parallax, no counting numbers up. Built only from the motion tokens and
   utilities, under the honesty rules and reduced-motion contract in
@@ -201,8 +235,9 @@ branch; don't revive it without clearing the condition listed.
 - A change would weaken any rule above.
 - You find yourself wanting to proxy API calls through a Next route
   handler for anything beyond the three listed above.
-- A shadcn component fights zero-radius theming hard enough that "fixing"
-  it means a workaround rather than a real theme override.
+- A shadcn component fights the token theme (radius, colours, either
+  theme) hard enough that "fixing" it means a workaround rather than a
+  real theme override.
 - The API contract is growing endpoints that look expensive for a small
   backend team to implement - cheaper beats more elegant here.
 - You're building a product screen before Phase A's foundation work
