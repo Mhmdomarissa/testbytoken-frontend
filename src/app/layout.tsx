@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Montserrat } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { DEMO_MODE, DemoBanner } from "@/components/layout/DemoBanner";
 
 // Heading typeface. Weight 300 only - see docs/DESIGN_SYSTEM_APP.md.
 const cormorantGaramond = Cormorant_Garamond({
@@ -35,13 +36,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       // React hydrates; this silences the expected attribute mismatch, and
       // only for this one element.
       suppressHydrationWarning
+      data-demo={DEMO_MODE ? "" : undefined}
       className={cn(
         "h-full antialiased",
         cormorantGaramond.variable,
         montserrat.variable,
       )}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <DemoBanner />
+        {children}
+      </body>
     </html>
   );
 }

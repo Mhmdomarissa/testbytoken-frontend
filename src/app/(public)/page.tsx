@@ -73,7 +73,7 @@ function Nav() {
   return (
     <nav
       aria-label="Site"
-      className="sticky top-0 z-20 border-b border-border bg-background"
+      className="sticky top-(--demo-banner-h) z-20 border-b border-border bg-background"
     >
       <div
         className={cn(
