@@ -165,6 +165,27 @@ always present and its _colour_ goes transparent in the theme it isn't for:
 light gets soft shadows, dark gets a 1 px inner highlight plus a deep, low
 shadow.
 
+### The shell (V1)
+
+- **Inset layout.** shadcn's `inset` sidebar variant: the sidebar sits on
+  `--surface-sidebar` as a frame, and the page is a panel inside it
+  (`--surface-page`, 14 px radius, `--elevation-raised`, a `--line` edge).
+  In the light theme the sidebar (`#ffffff`) and page (`#f6f5f1`) tokens are
+  only 1.08:1 apart; the panel edge and elevation are what make the sidebar
+  read as its own surface.
+- **Dialogs, menus and popovers sit on `--surface-card`**, lifted by
+  elevation, not on `--surface-raised`: their hover and selected rows use
+  the raised colour, which was invisible on a raised ground (found in the
+  target picker's preselected row).
+- **Active nav item:** `--gold-text` on the raised row, icon in `--gold`
+  (5.56:1 light, 7.80:1 dark).
+- **Collapsed rail:** 68 px (a 50 px icon column plus the inset variant's
+  16 px padding and 2 px edge). Every item keeps its accessible name and
+  gets a tooltip.
+- **Demo banner:** `--status-warning-tint` ground, `--ink` text (15.89 /
+  11.67), amber icon (5.24 / 6.98). Its height is `--demo-banner-h` (0 when
+  off), and the fixed sidebar and the landing's sticky nav start below it.
+
 ### The OG image
 
 satori can't read CSS variables, so `p/[token]/og-palette.ts` holds each

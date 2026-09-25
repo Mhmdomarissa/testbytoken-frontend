@@ -770,3 +770,27 @@ Whoever takes this on will need to settle at least:
 - **Verification surface.** A public page or a documented CLI step that
   takes a proof and says match / no match. The landing footer's "Trace
   verification" placeholder was removed until one exists.
+
+### Gaps: the UI v2 console shell (recorded 2026-09-25, additive)
+
+The V1 shell (`docs/PHASE_UI_V2.md`) asks for three things the contract
+doesn't provide. Each is left **out** of the UI rather than invented, and
+each would be an additive change:
+
+- **A proofs list.** There is `GET /proofs/{id}` and `GET /p/{token}`, but no
+  way to list a workspace's proofs. Without it there is no "Proofs" nav item
+  or page. Smallest shape: `GET /proofs?cursor=`, paginated like runs,
+  returning a new summary rather than full `Proof`s (which carry the whole
+  snapshot): `id`, `run_id`, `created_at`, `share` and the snapshot's
+  `verdict`.
+- **Nav counts** ("Targets 3", "Runs 1 live"). Nothing returns counts, and
+  deriving them from a paginated list would be wrong whenever the list is
+  partial. Could ride on the V2 `/overview` summary rather than a new
+  endpoint.
+- **A workspace name.** `Workspace` has `id`, `status`, `error` and
+  timestamps, but no `name`, so the sidebar shows none. Additive field:
+  `name: string`.
+
+Also noted, not a gap: the sidebar's "Checked 12 s ago" is the time **this
+client** last received `GET /workspaces/{id}`, not a server field, and it is
+labelled as such.
