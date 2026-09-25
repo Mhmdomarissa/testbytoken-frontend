@@ -84,8 +84,11 @@
   --foreground: var(--ink);
   --card: var(--surface-card);
   --card-foreground: var(--ink);
-  /* Dialogs, menus and popovers sit one step up. */
-  --popover: var(--surface-raised);
+  /* Dialogs, menus and popovers are card-surface panels lifted by
+     --elevation-raised, not the raised colour: their hover and selected
+     rows use --accent / --muted (the raised colour), which would be
+     invisible on a raised ground. */
+  --popover: var(--surface-card);
   --popover-foreground: var(--ink);
 
   /* Gold is reserved: primary action, focus, active nav, the mark. */

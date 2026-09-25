@@ -11,7 +11,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { navItems } from "./nav-items";
+import { accountNavItems, navItems } from "./nav-items";
 
 export function CommandPalette({
   open,
@@ -55,6 +55,14 @@ export function CommandPalette({
           <CommandEmpty>No matches.</CommandEmpty>
           <CommandGroup heading="Navigate">
             {navItems.map((item) => (
+              <CommandItem key={item.href} onSelect={() => go(item.href)}>
+                <item.icon />
+                {item.title}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+          <CommandGroup heading="Account">
+            {accountNavItems.map((item) => (
               <CommandItem key={item.href} onSelect={() => go(item.href)}>
                 <item.icon />
                 {item.title}

@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useEntityCrumb } from "@/components/shell/Breadcrumbs";
 
 function message(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
@@ -74,6 +75,8 @@ function Watch({ params }: { params: Promise<{ id: string }> }) {
   const run = useRun(id); // GET /runs/{id}: the authority
   const events = useJobEvents(id); // GET /jobs/{id}/events: delivery of changes
   const target = useTarget(run.data?.target_id);
+  // The run is the entity; its id is what the page names it by.
+  useEntityCrumb(id);
   const cancel = useCancelRun(id);
   const proof = useProof(run.data?.proof_id ?? undefined);
   const now = useNow();

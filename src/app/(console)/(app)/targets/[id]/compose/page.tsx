@@ -28,6 +28,7 @@ import { PlanSkeleton } from "@/components/plan/PlanSkeleton";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useEntityCrumb } from "@/components/shell/Breadcrumbs";
 
 const MAX_INTENT = 2000;
 
@@ -65,6 +66,7 @@ function Compose({ params }: { params: Promise<{ id: string }> }) {
   const searchParams = useSearchParams();
   const planId = searchParams.get("plan");
   const target = useTarget(id);
+  useEntityCrumb(target.data?.name);
   const plan = usePlan(planId ?? undefined);
   // How big the inventory was that the plan was grounded against - null until known.
   const scan = useScan(plan.data?.scan_id);

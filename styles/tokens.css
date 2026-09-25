@@ -24,6 +24,15 @@
   color-scheme: dark;
 }
 
+/* Height of the demo banner (components/layout/DemoBanner.tsx) - 0 unless
+   the build turns demo mode on; fixed and sticky layout offsets by it. */
+:root {
+  --demo-banner-h: 0px;
+}
+:root[data-demo] {
+  --demo-banner-h: 2.25rem;
+}
+
 :root {
   /* ---------------------------------------------------------------------
    * Surfaces - four steps, not one navy (page, sidebar, card, raised).
