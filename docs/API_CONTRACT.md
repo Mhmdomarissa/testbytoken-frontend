@@ -522,7 +522,8 @@ In descending order, so an implementer can plan:
 ## Endpoints
 
 Every operation from `docs/PHASE_A.md`'s list is implemented, plus the
-B0.5 additions above — 39 operations across 12 resource groups, all present
+B0.5 additions above and the UI v2 `/overview` — 40 operations across 13
+resource groups, all present
 in `openapi.json`. Marked
 **essential** (blocks a usable v1) or **nice-to-have** (v1 works without
 it, or a manual workaround exists) — pushback on any of these is exactly
@@ -653,6 +654,54 @@ run's stream go on to report `passed`
 | ------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /usage`        | essential    | Test-token cost is called out as central to the value prop — customers need to see what they're spending, not just be billed for it silently. |
 | `GET /usage/budget` | nice-to-have | A hardcoded plan limit works for v1; a dedicated budget/alert-threshold endpoint can wait.                                                    |
+
+### overview — REQUIRED (UI v2 V2, added 2026-09-25, additive)
+
+| Endpoint        |          | Why                                                                                                                                     |
+| --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /overview` | required | The console's landing page. Without it the dashboard would have to add up paginated lists, which is wrong whenever the list is partial. |
+
+**For the backend: every field is a count or a lookup of data you already
+store (runs, targets and their latest scan, proofs and their share, sign-in
+sessions). No new tracking is needed.** It is additive: nothing existing
+changes shape.
+
+`GET /overview?range=7d|14d|30d&tz=<IANA zone>` (defaults `7d`, `UTC`;
+an unknown `range` or `tz` is a `400`). What each field means, precisely,
+because the UI renders it verbatim and never recomputes it:
+
+- **`range`** echoes `from`/`to` (calendar dates in `tz`, `to` = today) and
+  `tz`.
+- **`runs_by_day`** — exactly one entry per day from `from` to `to`, zero
+  days included, oldest first. Only **terminal** runs, bucketed by the day
+  they **finished** in `tz`. `passed`/`failed`/`timed_out`/`cancelled` count
+  those statuses; `other` counts any terminal status not in that list (a
+  future one), so nothing is silently dropped. Queued and running runs
+  are not counted.
+- **`latest_suite_run`** — the most recently **started** run that came from
+  a suite, whatever its status (so it is often still running), or `null`
+  if there has never been one. `status`, `pass_rate` and `coverage` are
+  that run's own values, with the same rules as `Run` (`pass_rate` null
+  until terminal). `coverage` is the existing `Coverage` object, not a new
+  shape, so the pass rate and its coverage go through the same component
+  as everywhere else. `steps` counts the run's steps by status; `total` is
+  all of them, and may exceed the three named counts.
+- **`targets`** — `total`; `scanned` = latest scan `completed`;
+  `needs_attention` = latest scan `failed` or `parked`.
+- **`proofs`** — `live` = shared, enabled, not expired; `revoked` = share
+  disabled. A proof never shared is in neither.
+- **`attention`** — `items` is the 5 most recent (by `occurred_at`) of:
+  runs that ended `failed` or `timed_out` in range (`ref_id` = run), targets
+  whose **latest** scan failed (`ref_id` = scan), and sign-in sessions that
+  `expired` in range (`ref_id` = session). `total` counts all of them, not
+  just the 5. `kind` is extensible. `reason` is one line of text and may
+  carry content from the tested site; the UI renders it as text.
+- **`generated_at`** — when the numbers were computed; shown as "as of".
+
+The mock (`src/mocks/overview.ts`) computes all of this from the same
+fixtures the run, target and proof endpoints serve, and
+`src/mocks/overview.test.ts` checks it against those endpoints over HTTP.
+That test is a working spec for what the numbers must agree with.
 
 ## The two non-negotiable shapes
 
@@ -785,8 +834,8 @@ each would be an additive change:
   `verdict`.
 - **Nav counts** ("Targets 3", "Runs 1 live"). Nothing returns counts, and
   deriving them from a paginated list would be wrong whenever the list is
-  partial. Could ride on the V2 `/overview` summary rather than a new
-  endpoint.
+  partial. Could ride on `GET /overview` (see Endpoints, V2), which already
+  returns `targets.total`, rather than a new endpoint.
 - **A workspace name.** `Workspace` has `id`, `status`, `error` and
   timestamps, but no `name`, so the sidebar shows none. Additive field:
   `name: string`.
