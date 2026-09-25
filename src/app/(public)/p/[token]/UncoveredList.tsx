@@ -47,7 +47,7 @@ export function UncoveredList({
             {uncovered.map((u, i) => (
               <li
                 key={i}
-                className="border-l-2 border-(--status-warning-chip-fill) pl-3 text-sm"
+                className="border-l-2 border-(--status-warning-fg) pl-3 text-sm"
               >
                 <p className="break-words font-medium">
                   {u.label === "" ? (

@@ -4,12 +4,27 @@
 @import "shadcn/tailwind.css";
 
 /*
- * One theme, always dark - this brand has no light mode. shadcn's generated
- * scaffold ships a :root (light) / .dark (dark) pair; that split is deleted
- * below in favor of a single :root mapped directly onto styles/tokens.css.
- * See docs/DESIGN_SYSTEM_APP.md for the reasoning and every contrast ratio
- * behind these choices (gold-on-dark for primary text, etc).
+ * Two themes (UI v2, docs/PHASE_UI_V2.md section 1). Every token in
+ * styles/tokens.css is a light-dark() pair, so shadcn's variables below are
+ * declared once and follow `color-scheme`: the system by default, the
+ * `.light` / `.dark` class on <html> when the console's theme toggle
+ * overrides it.
+ *
+ * `dark:` utilities must match the same two triggers - the explicit class,
+ * or the system preference when no `.light` override is set - or a
+ * component would style for one theme while its tokens resolve to the
+ * other.
  */
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not(.light), :root:not(.light) *) {
+      @slot;
+    }
+  }
+}
 
 @theme inline {
   --color-background: var(--background);
@@ -43,64 +58,71 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  /* Gold as TEXT (links, labels): the measured --gold-text, never the
+     button fill (--primary), which is under 4.5:1 on the light page. */
+  --color-gold-text: var(--gold-text);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* shadcn's radius scale mapped onto UI v2's three radii. shadcn uses
+     rounded-lg for controls AND panels, so controls are moved to
+     rounded-md in their own components; lg is the panel radius. */
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-panel);
+  --radius-xl: var(--radius-card);
+  --radius-2xl: var(--radius-card);
+  --radius-3xl: var(--radius-card);
+  --radius-4xl: var(--radius-card);
+  --shadow-card: var(--elevation-card);
+  --shadow-raised: var(--elevation-raised);
 }
 
 :root {
-  /* --radius comes from styles/tokens.css (0px) - not redeclared here. */
-  --background: var(--color-blue-deep);
-  --foreground: var(--text-primary);
-  --card: var(--color-blue-mid);
-  --card-foreground: var(--text-primary);
-  --popover: var(--color-blue-mid);
-  --popover-foreground: var(--text-primary);
+  --background: var(--surface-page);
+  --foreground: var(--ink);
+  --card: var(--surface-card);
+  --card-foreground: var(--ink);
+  /* Dialogs, menus and popovers sit one step up. */
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--ink);
 
-  /* Gold is the single accent - primary buttons/CTAs. Dark text on gold
-     measures 8.10:1; warm-white on gold measures 2.04:1 (fails), so the
-     foreground here is intentionally dark, not our usual light text. */
-  --primary: var(--color-gold);
-  --primary-foreground: var(--color-blue-deep);
+  /* Gold is reserved: primary action, focus, active nav, the mark. */
+  --primary: var(--gold-fill);
+  --primary-foreground: var(--on-gold);
 
-  --secondary: var(--color-blue-light);
-  --secondary-foreground: var(--text-primary);
-  --muted: var(--color-blue-mid);
-  --muted-foreground: var(--text-secondary);
-  --accent: var(--color-blue-light);
-  --accent-foreground: var(--text-primary);
+  --secondary: var(--surface-raised);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-raised);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--surface-raised);
+  --accent-foreground: var(--ink);
 
-  /* Same dark-on-status-color logic as primary: warm-white on the derived
-     fail red measures 3.20:1 (fails AA text); blue-deep measures 5.18:1. */
-  --destructive: var(--status-fail-fg);
-  --destructive-foreground: var(--color-blue-deep);
+  /* Error text and destructive outlines. A filled destructive control
+     uses the fail status colour with its own measured label ink. */
+  --destructive: var(--danger-text);
+  --destructive-foreground: var(--status-on);
 
-  --border: var(--border-default);
-  --input: var(--border-strong);
-  --ring: var(--color-gold);
+  --border: var(--line);
+  --input: var(--line-input);
+  --ring: var(--gold);
 
-  --chart-1: var(--color-blue-bright);
-  --chart-2: var(--color-gold);
+  /* No charts yet; mapped so shadcn's chart primitives stay on-palette. */
+  --chart-1: var(--status-running-fg);
+  --chart-2: var(--gold);
   --chart-3: var(--status-pass-fg);
-  --chart-4: var(--status-running-fg);
+  --chart-4: var(--status-fail-fg);
   --chart-5: var(--status-warning-fg);
 
-  --sidebar: var(--color-blue-deep);
-  --sidebar-foreground: var(--text-primary);
-  --sidebar-primary: var(--color-gold);
-  --sidebar-primary-foreground: var(--color-blue-deep);
-  --sidebar-accent: var(--color-blue-light);
-  --sidebar-accent-foreground: var(--text-primary);
-  --sidebar-border: var(--border-default);
-  --sidebar-ring: var(--color-gold);
+  --sidebar: var(--surface-sidebar);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--gold-fill);
+  --sidebar-primary-foreground: var(--on-gold);
+  --sidebar-accent: var(--surface-raised);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--gold);
 }
 
 @layer base {
@@ -229,7 +251,7 @@
   background-image: linear-gradient(
     100deg,
     transparent 30%,
-    color-mix(in oklch, var(--color-gold) 9%, transparent) 50%,
+    color-mix(in oklch, var(--gold) 9%, transparent) 50%,
     transparent 70%
   );
   background-size: 200% 100%;
@@ -254,10 +276,11 @@
 }
 
 /* Keeps the solid 2px gold outline (the measured, guaranteed focus
-   indicator - gold on blue-deep is ~8:1) and adds the glow around it. */
+   indicator - >=3:1 on every surface in both themes, asserted) and adds
+   the glow around it. */
 @utility glow-focus {
   &:focus-visible {
-    outline: 2px solid var(--color-gold);
+    outline: 2px solid var(--gold);
     outline-offset: 2px;
     box-shadow: var(--glow-focus);
   }
@@ -308,14 +331,14 @@
   100% {
     background-color: color-mix(
       in oklch,
-      var(--status-running-bg) 30%,
+      var(--status-running-tint) 30%,
       transparent
     );
   }
   50% {
     background-color: color-mix(
       in oklch,
-      var(--status-running-bg) 85%,
+      var(--status-running-tint) 85%,
       transparent
     );
   }
@@ -342,7 +365,7 @@
       animation: none;
       background-color: color-mix(
         in oklch,
-        var(--status-running-bg) 60%,
+        var(--status-running-tint) 60%,
         transparent
       );
     }

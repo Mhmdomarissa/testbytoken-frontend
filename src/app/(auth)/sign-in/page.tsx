@@ -50,7 +50,8 @@ export default function SignInPage() {
             id="sign-in-promise"
             className="mt-6 max-w-md font-heading text-4xl leading-[1.1] font-light lg:text-5xl"
           >
-            Evidence, <em className="text-primary not-italic">not opinions.</em>
+            Evidence,{" "}
+            <em className="text-gold-text not-italic">not opinions.</em>
           </p>
           <p className="mt-5 max-w-sm text-sm leading-relaxed text-muted-foreground">
             You sign in here with a magic link. You sign in to your own

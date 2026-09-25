@@ -152,6 +152,7 @@ export function ProofView({ token }: { token: string }) {
           >
             <StatusBadge
               status={toBadgeStatus(verdict)}
+              variant="filled"
               label={runStatusLabel(verdict)}
             />
           </span>

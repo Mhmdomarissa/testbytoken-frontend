@@ -78,7 +78,7 @@ export default function OverviewPage() {
                 {step.cta}
                 <ArrowRightIcon
                   aria-hidden="true"
-                  className="size-3.5 text-primary"
+                  className="size-3.5 text-(--gold)"
                 />
               </span>
             </Link>

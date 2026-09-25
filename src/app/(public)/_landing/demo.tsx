@@ -312,13 +312,13 @@ export function DemoForm() {
               onChange={(e) => d.setDraft(e.target.value)}
               maxLength={MAX_INTENT - prefix.prefix.length}
               placeholder="e.g. test all the buttons and make sure all the links work"
-              className="h-11 w-full border border-input bg-card px-4 text-sm text-foreground transition-colors duration-150 placeholder:text-[var(--text-tertiary)] focus-visible:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="h-11 w-full border border-input bg-card px-4 text-sm text-foreground transition-colors duration-150 placeholder:text-[var(--ink-faint)] focus-visible:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             />
           </div>
           <button
             type="submit"
             disabled={!ready || d.draft.trim() === "" || d.busy}
-            className="min-h-12 w-full bg-primary px-6 text-xs font-extrabold tracking-[0.16em] text-primary-foreground uppercase transition-colors duration-150 hover:bg-[color-mix(in_oklch,var(--color-gold),var(--color-warm-white)_18%)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-12 w-full bg-primary px-6 text-xs font-extrabold tracking-[0.16em] text-primary-foreground uppercase transition-colors duration-150 hover:bg-[color-mix(in_oklch,var(--gold),var(--ink)_18%)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             {d.busy && !inFlight ? "Asking the planner…" : "Propose a plan"}
           </button>
@@ -600,6 +600,7 @@ function DemoRun({
             >
               <StatusBadge
                 status={toBadgeStatus(status)}
+                variant="filled"
                 label={runStatusLabel(status)}
               />
             </span>

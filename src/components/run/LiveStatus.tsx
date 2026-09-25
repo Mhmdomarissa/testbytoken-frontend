@@ -98,7 +98,7 @@ export function LiveStatus({
       data-state={live.state}
       role={alarming ? "alert" : "status"}
       className={`flex flex-col gap-1 border px-4 py-3 text-sm transition-colors duration-(--duration-base) ${
-        alarming ? "border-(--status-warning-chip-fill)" : "border-border"
+        alarming ? "border-(--status-warning-fg)" : "border-border"
       }`}
     >
       <p className="flex items-center gap-2.5">
@@ -108,10 +108,10 @@ export function LiveStatus({
           aria-hidden="true"
           className={`size-2 shrink-0 ${
             alarming
-              ? "bg-(--status-warning-chip-fill)"
+              ? "bg-(--status-warning-fg)"
               : live.state === "live" || live.state === "connecting"
-                ? "breathe-dot bg-(--status-running-chip-fill)"
-                : "bg-(--border-strong)"
+                ? "breathe-dot bg-(--status-running-fg)"
+                : "bg-(--line-input)"
           }`}
         />
         {live.text}

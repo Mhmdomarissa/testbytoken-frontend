@@ -13,17 +13,17 @@ export function PlanSkeleton({ rows = 3 }: { rows?: number }) {
           key={i}
           className="relative flex flex-col gap-3 border border-border py-4 pr-4 pl-6"
         >
-          <span className="absolute inset-y-0 left-0 w-0.75 bg-(--border-strong)" />
+          <span className="absolute inset-y-0 left-0 w-0.75 bg-(--line-input)" />
           <div className="flex items-center gap-3">
-            <div className="sheen h-4 w-6 bg-(--border-default)" />
+            <div className="sheen h-4 w-6 bg-(--line)" />
             <div
-              className="sheen h-4 bg-(--border-default)"
+              className="sheen h-4 bg-(--line)"
               style={{ width: `${48 - i * 9}%` }}
             />
           </div>
           <div className="flex flex-col gap-2">
-            <div className="sheen h-2.5 w-2/5 bg-(--border-default)" />
-            <div className="sheen h-2.5 w-3/5 bg-(--border-default)" />
+            <div className="sheen h-2.5 w-2/5 bg-(--line)" />
+            <div className="sheen h-2.5 w-3/5 bg-(--line)" />
           </div>
         </div>
       ))}

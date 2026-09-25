@@ -25,10 +25,7 @@ export function InventoryContext({
         does not touch are not tested by it.
       </p>
       {/* The same two numbers, drawn: the sentence above is what's read. */}
-      <div
-        aria-hidden="true"
-        className="h-0.5 w-full max-w-md bg-(--border-default)"
-      >
+      <div aria-hidden="true" className="h-0.5 w-full max-w-md bg-(--line)">
         <div
           className="fill-in h-full bg-primary"
           style={{ width: `${share * 100}%` }}

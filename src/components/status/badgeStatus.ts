@@ -23,7 +23,7 @@ const BADGE_STATUS = new Map<string, Status>([
   // run
   ["passed", "pass"],
   ["failed", "fail"],
-  ["cancelled", "skipped"],
+  ["cancelled", "cancelled"],
   ["timed_out", "timed_out"],
   // scan / job
   ["crawling", "running"],

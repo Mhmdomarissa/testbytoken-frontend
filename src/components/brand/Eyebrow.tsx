@@ -34,7 +34,7 @@ export function Eyebrow({
       <span
         className={cn(
           "text-[0.6875rem] font-bold tracking-[0.24em] uppercase",
-          onImage ? "text-primary" : "text-foreground",
+          onImage ? "text-gold-text" : "text-foreground",
         )}
       >
         {children}

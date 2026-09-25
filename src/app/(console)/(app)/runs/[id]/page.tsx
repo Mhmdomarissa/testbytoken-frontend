@@ -213,6 +213,7 @@ function Watch({ params }: { params: Promise<{ id: string }> }) {
           >
             <StatusBadge
               status={toBadgeStatus(status)}
+              variant="filled"
               label={runStatusLabel(status)}
             />
           </span>
@@ -437,9 +438,9 @@ function BackToRuns() {
 
 /** The summary edge's colour: the chip fill of the status the server reported, or a neutral edge when there's none yet or it's unrecognised. Presentational only. */
 function statusEdge(status: string | UnrecognisedValue | null): string {
-  if (status === null) return "var(--border-strong)";
+  if (status === null) return "var(--line-input)";
   const badge = toBadgeStatus(status);
   return badge instanceof UnrecognisedValue
-    ? "var(--border-strong)"
+    ? "var(--line-input)"
     : `var(--status-${badge.replace(/_/g, "-")}-chip-fill)`;
 }

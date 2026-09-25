@@ -2,148 +2,118 @@
  * Design tokens. Single source of truth - components reference these
  * custom properties, never literal colors, sizes, or font names.
  *
- * Full derivation and every measured contrast ratio: docs/DESIGN_SYSTEM_APP.md
+ * UI v2 (docs/PHASE_UI_V2.md, section 1): two themes. Every colour is
+ * declared ONCE as light-dark(<light>, <dark>). Which half applies is
+ * decided by `color-scheme` (below): the system setting by default,
+ * overridden by a `.light` / `.dark` class on <html> (next-themes, console
+ * only). The public pages set no class, so they follow the system with no
+ * JavaScript at all.
+ *
+ * Every pair that carries meaning is measured in both themes by
+ * src/lib/color/contrast.test.ts, which parses this file - so the numbers
+ * in docs/DESIGN_SYSTEM_APP.md can't drift from what ships.
  */
 
 :root {
+  color-scheme: light dark;
+}
+:root.light {
+  color-scheme: light;
+}
+:root.dark {
+  color-scheme: dark;
+}
+
+:root {
   /* ---------------------------------------------------------------------
-   * Brand anchors (fixed - do not add new hues; derive from these instead)
+   * Surfaces - four steps, not one navy (page, sidebar, card, raised).
    * ------------------------------------------------------------------- */
-  --color-blue-deep: #0a1628; /* app background, nav, primary ground */
-  --color-blue-mid: #0d2244; /* raised surfaces, panels, section alternation */
-  --color-blue-light: #1a3a6b; /* hover states */
-  --color-blue-bright: #1e4d8c; /* emphasis bands, selected states */
-  --color-gold: #c9a96e; /* the single accent - CTAs, links, labels, dividers */
-  --color-warm-white: #f8f4ee; /* primary text on dark */
-  --color-muted: #8a9ab5; /* secondary text (legacy marketing-site token) */
-  --color-footer-deep: #060e1b; /* deepest ground */
+  --surface-page: light-dark(#f6f5f1, #0a1120);
+  --surface-sidebar: light-dark(#ffffff, #0d1628);
+  --surface-card: light-dark(#ffffff, #111c31);
+  --surface-raised: light-dark(#f2f0ea, #16233c);
+
+  /* Lines. `--line` is for dividers and card edges only - it does NOT
+     reach 3:1 and must never be a form control's only boundary. Inputs,
+     selects and checkboxes use `--line-input` (>=3:1 on every surface,
+     WCAG 1.4.11). */
+  --line: light-dark(#e6e2d8, #1f2c44);
+  --line-input: light-dark(#848a93, #616d83);
 
   /* ---------------------------------------------------------------------
-   * Text hierarchy - opacity on warm-white, never a grey scale.
-   * Measured against both --color-blue-deep and --color-blue-mid:
-   *   primary   (1.00): 16.55:1 / 14.42:1
-   *   secondary (0.72):  8.92:1 /  8.05:1
-   *   tertiary  (0.50):  4.89:1 /  4.60:1  <- AA floor for real text
-   *   disabled  (0.32):  2.73:1 /  2.68:1  <- sub-AA, decorative/disabled only
+   * Text - normal, muted, faint. All >=4.5:1 on page, card and raised in
+   * both themes (asserted).
    * ------------------------------------------------------------------- */
-  --text-primary: rgb(248 244 238 / 1);
-  --text-secondary: rgb(248 244 238 / 0.72);
-  --text-tertiary: rgb(248 244 238 / 0.5);
-  --text-disabled: rgb(248 244 238 / 0.32);
-
-  /* Same opacity-on-warm-white approach, extended to UI borders/dividers -
-     no grey tokens here either. */
-  --border-default: rgb(248 244 238 / 0.14);
-  --border-strong: rgb(248 244 238 / 0.24);
+  --ink: light-dark(#0e1726, #edf1f7);
+  --ink-muted: light-dark(#566173, #97a3b6);
+  --ink-faint: light-dark(#626c7b, #8290a6);
 
   /* ---------------------------------------------------------------------
-   * Semantic status scale - derived in OKLCH from the gold/blue anchors,
-   * not from an unrelated color wheel. Every foreground below is AA
-   * (>=4.5:1) against both --color-blue-deep and --color-blue-mid; every
-   * border is AA non-text (>=3:1) against both. See DESIGN_SYSTEM_APP.md
-   * for the OKLCH coordinates and how each was searched.
+   * Gold - reserved for the brand mark, the primary action, focus and the
+   * active nav item. Never a status colour.
+   * ------------------------------------------------------------------- */
+  --gold: light-dark(#9a7434, #d4b27a); /* mark, lines, focus ring */
+  --gold-text: light-dark(#7a5a22, #d4b27a); /* links */
+  --gold-fill: light-dark(#c9a96e, #d4b27a); /* primary button */
+  --on-gold: light-dark(#0e1726, #0a1120);
+
+  /* ---------------------------------------------------------------------
+   * Status. A chip is: the status TINT as ground, the status FG on the
+   * icon only (non-text, >=3:1 on its tint and on card/raised), and the
+   * label in the normal --ink (>=4.5:1). A FILLED chip (the page's single
+   * verdict) is FG as ground with the --status-on label (>=4.5:1).
    *
-   * Foreground lightness is deliberately spread across all SEVEN statuses
-   * (not just pass/fail) - the first derivation minimized each
-   * independently to its own AA floor and they converged to within 0.03
-   * of each other, making every pair ~1.0:1 against each other (a WCAG
-   * 1.4.1 failure caught in the Phase A review: colorblind and greyscale
-   * viewers could not tell pass from fail). A follow-up review pass found
-   * that fixing pass/fail alone wasn't enough - several *other* pairs
-   * (warning/running, pass/running, queued/skipped) were still only
-   * ~1.05-1.17:1. Every status is now placed on a lightness ladder
-   * spaced so each step is an EQUAL contrast RATIO, not an equal
-   * lightness difference (WCAG contrast is (L+0.05)/(L'+0.05) - a fixed
-   * lightness gap produces a smaller ratio higher up the scale, so equal
-   * lightness steps do not give equal, or even monotonic, contrast
-   * steps). fail and pass anchor the two ends (fail is at its AA floor
-   * against --color-blue-mid; pass was deliberately kept out of pastel
-   * territory - see DESIGN_SYSTEM_APP.md). With those two ends fixed,
-   * ~1.11-1.12:1 is the mathematical ceiling for the worst-case adjacent
-   * pair across seven statuses - color is still only a secondary
-   * channel: every place a status renders, it must also carry a
-   * distinct-silhouette icon and a text label (StatusBadge component).
-   * See DESIGN_SYSTEM_APP.md for the full ladder, every pairwise ratio,
-   * and color-vision-deficiency simulation (corrected to the Machado,
-   * Oliveira & Fluck 2009 model - see that doc for why the originally
-   * reported numbers were wrong).
+   * Colour is never the only channel: every status also has its own icon
+   * silhouette and its own label (StatusBadge, asserted). Lightness is
+   * only guaranteed apart for pass vs fail (>=1.5:1 in both themes);
+   * other pairs may sit close.
+   *
+   * Dark tints are the FG at 13% over --surface-card, precomputed so the
+   * tests can read a plain hex.
    * ------------------------------------------------------------------- */
-  --status-warning-fg: var(
-    --color-gold
-  ); /* gold itself, unchanged: already sits at the right ladder rung */
-  --status-warning-bg: #3a2b0d;
-  --status-warning-border: #85682d;
+  --status-pass-fg: light-dark(#0b6139, #72dba3);
+  --status-pass-tint: light-dark(#e4f3ea, #1e3540);
+  --status-fail-fg: light-dark(#cc3740, #e05a61);
+  --status-fail-tint: light-dark(#fbe8e9, #2c2437);
+  --status-running-fg: light-dark(#1f5fc4, #6fa8ff);
+  --status-running-tint: light-dark(#e6eefb, #1d2e4c);
+  /* queued, skipped and cancelled share the neutral grey; each keeps its
+     own icon and label. */
+  --status-cancelled-fg: light-dark(#556070, #a3aec0);
+  --status-cancelled-tint: light-dark(#eceef2, #242f44);
+  --status-queued-fg: light-dark(#556070, #a3aec0);
+  --status-queued-tint: light-dark(#eceef2, #242f44);
+  --status-skipped-fg: light-dark(#556070, #a3aec0);
+  --status-skipped-tint: light-dark(#eceef2, #242f44);
+  /* warning and timed out share the amber; timed out keeps its own clock
+     icon and label, so it never reads as `fail`. */
+  --status-warning-fg: light-dark(#8a5a00, #e7b45a);
+  --status-warning-tint: light-dark(#fbf0da, #2d3036);
+  --status-timed-out-fg: light-dark(#8a5a00, #e7b45a);
+  --status-timed-out-tint: light-dark(#fbf0da, #2d3036);
+  /* Label ink on a FILLED (verdict) chip. */
+  --status-on: light-dark(#ffffff, #0a1120);
 
-  --status-fail-fg: #db6368; /* ladder position 1/7 (darkest) - at its AA floor */
-  --status-fail-bg: #472021;
-  --status-fail-border: #b04c50;
-
-  /* Distinct from `fail`: a failure has a specific reason from a specific
-     step; a timeout is the engine going silent, with none. Own hue
-     (amber, between fail's red and warning's gold - not a new anchor,
-     derived the same way fail/pass/running were), own ladder rung, own
-     icon+label (StatusBadge) - not just `fail` with a different label. */
-  --status-timed-out-fg: #d57a49; /* ladder position 2/7 */
-  --status-timed-out-bg: #432515;
-  --status-timed-out-border: #a25a31;
-
-  --status-pass-fg: #83d494; /* ladder position 7/7 (lightest) - deliberately kept out of pastel territory */
-  --status-pass-bg: #1a3520;
-  --status-pass-border: #387949;
-
-  --status-running-fg: #4ec5ee; /* ladder position 6/7 */
-  --status-running-bg: #0a3341;
-  --status-running-border: #007695;
-
-  --status-queued-fg: #ab9785; /* ladder position 3/7 */
-  --status-queued-bg: #362c22;
-  --status-queued-border: #796a5b;
-
-  --status-skipped-fg: #a1a3b5; /* ladder position 4/7 */
-  --status-skipped-bg: #2c2d37;
-  --status-skipped-border: #6a6b7a;
+  /* Error TEXT (form errors, error states). Not --status-fail-fg: that is
+     tuned for icons at 3:1 and measures under 4.5:1 as text on raised.
+     These are the brief's original failed values, which clear 4.5:1 as
+     text on page, card and raised in both themes (asserted). */
+  --danger-text: light-dark(#b3262f, #f0747a);
 
   /* ---------------------------------------------------------------------
-   * Status chip fills (Phase B, B2) - the seven `-fg` colors above render
-   * as normal-weight TEXT on the page background, which is why their
-   * lightness had to stay inside a narrow band: WCAG normal-text contrast
-   * (>=4.5:1) against a near-black ground only leaves so much room, and
-   * with seven statuses sharing it, the worst adjacent pair tops out
-   * around ~1.11-1.12:1 (see the Isoluminance section above and
-   * docs/DESIGN_SYSTEM_APP.md) - real, but not by much.
-   *
-   * A FILLED chip changes the constraint entirely: the fill only needs
-   * 3:1 against the page (AA non-text, WCAG 1.4.11) - not 4.5:1 - and the
-   * label/icon drawn ON the fill only need 4.5:1 against THAT fill, not
-   * against the page. Fixing the label color to --color-blue-deep (an
-   * existing anchor, not a new "ink" hue) and solving for lightness
-   * against blue-deep instead of against warm-white on a dark page pushes
-   * the usable range from ~[0.25, 0.54] up to ~[0.235, 0.91] - roughly
-   * 3x wider. Same equal-CONTRAST-RATIO ladder method as the `-fg` scale
-   * (WCAG contrast is (L+0.05)/(L'+0.05); equal RATIO steps, not equal
-   * lightness steps - see above), same hues per status for continuity,
-   * chroma re-solved to fit the new lightness (some reduced to stay in
-   * sRGB gamut at the lighter end - `pass` and `running` most visibly).
-   * Result: every pairwise fill-to-fill contrast is ~1.20-1.24:1 - the
-   * common ratio itself, since equal-ratio spacing makes every adjacent
-   * pair equal by construction - versus the old scale's ~1.11-1.12:1.
-   * Measured, reproducible, and asserted in
-   * src/components/status/StatusBadge.test.tsx, not just claimed here.
-   *
-   * StatusBadge renders status chips using ONLY this fill + blue-deep for
-   * both label and icon - the `-fg`/`-bg`/`-border` triad above remains
-   * for its other, pre-existing consumers (globals.css's --destructive
-   * and --chart-* tokens, OfflineBanner's inline warning banner), which
-   * render as text-on-page, not a filled chip, and still need the
-   * original narrower-but-still-AA-safe scale.
+   * Elevation - light uses soft shadows; dark uses a 1px inner highlight
+   * plus a deep, low shadow.
    * ------------------------------------------------------------------- */
-  --status-fail-chip-fill: #d75f64;
-  --status-timed-out-chip-fill: #d87e4c;
-  --status-queued-chip-fill: #b6a28f;
-  --status-skipped-chip-fill: #b4b6c9;
-  --status-warning-chip-fill: #e6c58a;
-  --status-running-chip-fill: #afe7fe;
-  --status-pass-chip-fill: #d7ffdd;
+  /* light-dark() takes colours only, so each shadow layer is always
+     present and its COLOUR goes transparent in the theme it isn't for. */
+  --elevation-card:
+    0 1px 2px light-dark(rgb(14 23 38 / 0.06), transparent),
+    0 8px 24px -12px light-dark(transparent, rgb(0 0 0 / 0.55)),
+    inset 0 1px 0 light-dark(transparent, rgb(237 241 247 / 0.04));
+  --elevation-raised:
+    0 4px 16px -4px light-dark(rgb(14 23 38 / 0.12), transparent),
+    0 12px 32px -12px light-dark(transparent, rgb(0 0 0 / 0.65)),
+    inset 0 1px 0 light-dark(transparent, rgb(237 241 247 / 0.06));
 
   /* ---------------------------------------------------------------------
    * Typography
@@ -210,7 +180,13 @@
   /* ---------------------------------------------------------------------
    * Shape and motion
    * ------------------------------------------------------------------- */
-  --radius: 0px; /* zero everywhere, no exceptions */
+  /* UI v2 radius: 6px controls (buttons, inputs, chips), 10px inner
+     panels, 14px cards. Fully round only for counts and avatars
+     (rounded-full). globals.css maps shadcn's scale onto these. */
+  --radius-control: 6px;
+  --radius-panel: 10px;
+  --radius-card: 14px;
+  --radius: var(--radius-card);
 
   --motion-duration: 150ms; /* colour transitions - alias of --duration-fast */
   --motion-easing: ease-out;
@@ -263,10 +239,9 @@
   --stagger-step: 45ms;
 
   /* Gold as light. Hover and focus read as a gold edge and a soft glow
-     rather than a colour swap. Derived from --color-gold by transparency
-     only - no new hue. Zero radius still: these are rectangular. */
-  --glow-edge: color-mix(in oklch, var(--color-gold) 55%, transparent);
-  --glow-soft: color-mix(in oklch, var(--color-gold) 28%, transparent);
+     rather than a colour swap. Derived from --gold by transparency only. */
+  --glow-edge: color-mix(in oklch, var(--gold) 55%, transparent);
+  --glow-soft: color-mix(in oklch, var(--gold) 28%, transparent);
   --glow-hover: 0 0 0 1px var(--glow-edge), 0 0 22px -6px var(--glow-soft);
-  --glow-focus: 0 0 0 1px var(--color-gold), 0 0 26px -4px var(--glow-soft);
+  --glow-focus: 0 0 0 1px var(--gold), 0 0 26px -4px var(--glow-soft);
 }

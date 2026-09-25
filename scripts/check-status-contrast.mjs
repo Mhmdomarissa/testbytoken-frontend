@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Reproduces every contrast/CVD number in docs/DESIGN_SYSTEM_APP.md's
- * "Isoluminance" section, from the actual committed styles/tokens.css -
- * not hardcoded values. Run this after any status-color token edit to
- * re-check the numbers before updating the doc. (The pass/fail-vs-1.8:1
- * regression guard itself lives in src/lib/color/contrast.test.ts and
- * runs in CI; this script is the fuller report for a human, not a gate.)
+ * Reproduces every status-colour and CVD number in docs/DESIGN_SYSTEM_APP.md
+ * ("Status colours - UI v2"), in BOTH themes, from the committed
+ * styles/tokens.css - not hardcoded values. Run it after any status token
+ * edit, before updating the doc. The gates themselves (4.5:1 labels, 3:1
+ * icons, pass vs fail >= 1.5:1) live in src/lib/color/contrast.test.ts and
+ * run in CI; this is the fuller report for a human.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -13,16 +13,15 @@ import path from "node:path";
 const tokensPath = path.join(import.meta.dirname, "..", "styles", "tokens.css");
 const css = readFileSync(tokensPath, "utf8");
 
-function tokenHex(name) {
-  const match = css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`));
-  if (match) return match[1];
-  // `--status-warning-fg: var(--color-gold);` - warning deliberately
-  // stays the literal accent color rather than its own derived hex.
-  const varMatch = css.match(
-    new RegExp(`--${name}:\\s*var\\(\\s*--([\\w-]+)\\s*\\)`),
+/** `--name: light-dark(#light, #dark)` -> the hex for one theme. */
+function token(name, theme) {
+  const m = css.match(
+    new RegExp(
+      `--${name}:\\s*light-dark\\(\\s*(#[0-9a-fA-F]{6})\\s*,\\s*(#[0-9a-fA-F]{6})\\s*\\)`,
+    ),
   );
-  if (varMatch) return tokenHex(varMatch[1]);
-  throw new Error(`Token --${name} not found`);
+  if (!m) throw new Error(`--${name} is not a light-dark(#hex, #hex) pair`);
+  return theme === "light" ? m[1] : m[2];
 }
 
 function hexToRgb(hex) {
@@ -98,89 +97,66 @@ function simulateCVD(hex, type) {
   return rgbToHex(m.map(([a, b2, c]) => linearToSrgb(a * r + b2 * g + c * b)));
 }
 
-const BLUE_DEEP = tokenHex("color-blue-deep");
-const BLUE_MID = tokenHex("color-blue-mid");
 const STATUSES = [
+  "pass",
   "fail",
-  "timed_out",
+  "running",
   "queued",
   "skipped",
+  "cancelled",
   "warning",
-  "running",
-  "pass",
+  "timed-out",
 ];
-const fg = Object.fromEntries(
-  STATUSES.map((s) => [s, tokenHex(`status-${s.replace(/_/g, "-")}-fg`)]),
-);
-
-console.log("--- foreground vs grounds ---");
-for (const s of STATUSES) {
-  console.log(
-    `${s.padEnd(10)} ${fg[s]}   vs blue-deep=${contrastRatio(fg[s], BLUE_DEEP).toFixed(2)}  vs blue-mid=${contrastRatio(fg[s], BLUE_MID).toFixed(2)}`,
-  );
-}
-
-console.log("\n--- pairwise contrast (normal vision) ---");
-for (let i = 0; i < STATUSES.length; i++) {
-  for (let j = i + 1; j < STATUSES.length; j++) {
-    const [a, b] = [STATUSES[i], STATUSES[j]];
-    console.log(`${a} vs ${b}: ${contrastRatio(fg[a], fg[b]).toFixed(2)}`);
-  }
-}
-
-console.log("\n--- pass vs fail under CVD simulation ---");
-for (const type of Object.keys(CVD_MATRICES)) {
-  const passCvd = simulateCVD(fg.pass, type);
-  const failCvd = simulateCVD(fg.fail, type);
-  console.log(
-    `${type.padEnd(14)} pass->${passCvd}  fail->${failCvd}  contrast=${contrastRatio(passCvd, failCvd).toFixed(2)}`,
-  );
-}
-
-// ---------------------------------------------------------------------
-// Phase B, B2: the same CVD check for the FILLED CHIPS StatusBadge now
-// renders (pass/fail and running/fail are the pairs that carry meaning;
-// the full matrix is in docs/DESIGN_SYSTEM_APP.md's "Status chips").
-// Contrast is computed between the two simulated FILL colors - what a
-// dichromat sees of the chips - not against the page.
-// ---------------------------------------------------------------------
-const chipFill = Object.fromEntries(
-  STATUSES.map((s) => [
-    s,
-    tokenHex(`status-${s.replace(/_/g, "-")}-chip-fill`),
-  ]),
-);
+// The pairs a reader actually has to tell apart at a glance.
 const MEANINGFUL_PAIRS = [
   ["pass", "fail"],
   ["running", "fail"],
-  ["pass", "timed_out"],
+  ["pass", "timed-out"],
   ["warning", "fail"],
 ];
 
-console.log("\n--- chip fills: meaningful pairs, normal vision + CVD ---");
-for (const [a, b] of MEANINGFUL_PAIRS) {
-  const row = [
-    `${a} vs ${b}`.padEnd(22),
-    `normal=${contrastRatio(chipFill[a], chipFill[b]).toFixed(2)}`,
-  ];
-  for (const type of Object.keys(CVD_MATRICES)) {
-    row.push(
-      `${type}=${contrastRatio(simulateCVD(chipFill[a], type), simulateCVD(chipFill[b], type)).toFixed(2)}`,
-    );
-  }
-  console.log(row.join("  "));
-}
+for (const theme of ["light", "dark"]) {
+  const fg = (s) => token(`status-${s}-fg`, theme);
+  const tint = (s) => token(`status-${s}-tint`, theme);
+  const card = token("surface-card", theme);
+  const raised = token("surface-raised", theme);
+  const ink = token("ink", theme);
+  const on = token("status-on", theme);
 
-console.log("\n--- old foreground scheme, same pairs (for comparison) ---");
-for (const [a, b] of MEANINGFUL_PAIRS) {
-  const row = [
-    `${a} vs ${b}`.padEnd(22),
-    `normal=${contrastRatio(fg[a], fg[b]).toFixed(2)}`,
-  ];
-  for (const type of Object.keys(CVD_MATRICES)) {
-    row.push(
-      `${type}=${contrastRatio(simulateCVD(fg[a], type), simulateCVD(fg[b], type)).toFixed(2)}`,
+  console.log(`\n=============== ${theme.toUpperCase()} ===============`);
+  console.log(
+    "--- per status: icon (3:1), label on tint (4.5:1), filled label (4.5:1) ---",
+  );
+  for (const s of STATUSES) {
+    console.log(
+      `${s.padEnd(10)} ${fg(s)} / ${tint(s)}  icon:tint=${contrastRatio(fg(s), tint(s)).toFixed(2)} icon:card=${contrastRatio(fg(s), card).toFixed(2)} icon:raised=${contrastRatio(fg(s), raised).toFixed(2)}  label:tint=${contrastRatio(ink, tint(s)).toFixed(2)}  filled=${contrastRatio(on, fg(s)).toFixed(2)}`,
     );
   }
-  console.log(row.join("  "));
+
+  console.log(
+    "\n--- pairwise lightness between status colours (normal vision) ---",
+  );
+  for (let i = 0; i < STATUSES.length; i++) {
+    for (let j = i + 1; j < STATUSES.length; j++) {
+      const [a, b] = [STATUSES[i], STATUSES[j]];
+      if (fg(a) === fg(b)) continue; // shared colour by design (icon + label differ)
+      console.log(`${a} vs ${b}: ${contrastRatio(fg(a), fg(b)).toFixed(2)}`);
+    }
+  }
+
+  console.log(
+    "\n--- meaningful pairs under CVD (Machado 2009, 100% severity) ---",
+  );
+  for (const [a, b] of MEANINGFUL_PAIRS) {
+    const row = [
+      `${a} vs ${b}`.padEnd(22),
+      `normal=${contrastRatio(fg(a), fg(b)).toFixed(2)}`,
+    ];
+    for (const type of Object.keys(CVD_MATRICES)) {
+      row.push(
+        `${type}=${contrastRatio(simulateCVD(fg(a), type), simulateCVD(fg(b), type)).toFixed(2)}`,
+      );
+    }
+    console.log(row.join("  "));
+  }
 }
