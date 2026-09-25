@@ -84,50 +84,67 @@ card/raised), the **label in `--ink`** (≥4.5:1 on the tint). One **filled**
 chip per page for that page's own verdict: the status colour as ground,
 `--status-on` as label (≥4.5:1). Every status has a unique icon and a unique
 label, including `cancelled`, which now has its own stop icon instead of
-borrowing `skipped`'s. `queued`, `skipped` and `cancelled` share the neutral
-grey; `warning` and `timed_out` share the amber.
+borrowing `skipped`'s. `queued`, `skipped` and `cancelled` are the neutral
+grey and `warning` and `timed_out` the amber, except in dark, where
+`cancelled` and `timed_out` are a step darker to keep their distance from
+pass (below).
 
-| Status (light / dark)                            | icon on tint | icon on card | icon on raised | label on tint | filled label |
-| ------------------------------------------------ | ------------ | ------------ | -------------- | ------------- | ------------ |
-| pass `#0b6139` / `#72dba3`                       | 6.58 / 7.55  | 7.55 / 10.03 | 6.62 / 9.24    | 15.66 / 11.31 | 7.55 / 11.11 |
-| fail `#cc3740` / `#e05a61`                       | 4.26 / 4.10  | 5.01 / 4.70  | 4.40 / 4.33    | 15.24 / 13.10 | 5.01 / 5.21  |
-| running `#1f5fc4` / `#6fa8ff`                    | 5.15 / 5.64  | 6.01 / 7.07  | 5.28 / 6.51    | 15.38 / 11.97 | 6.01 / 7.83  |
-| queued, skipped, cancelled `#556070` / `#a3aec0` | 5.49 / 5.99  | 6.38 / 7.59  | 5.60 / 7.00    | 15.46 / 11.84 | 6.38 / 8.41  |
-| warning, timed out `#8a5a00` / `#e7b45a`         | 5.24 / 6.98  | 5.93 / 8.97  | 5.20 / 8.27    | 15.89 / 11.67 | 5.93 / 9.94  |
+| Status (light / dark)                 | icon on tint | icon on card  | icon on raised | label on tint | filled label  |
+| ------------------------------------- | ------------ | ------------- | -------------- | ------------- | ------------- |
+| pass `#084428` / `#72dba3`            | 9.80 / 7.55  | 11.24 / 10.03 | 9.87 / 9.24    | 15.66 / 11.31 | 11.24 / 11.11 |
+| fail `#cc3740` / `#e05a61`            | 4.26 / 4.10  | 5.01 / 4.70   | 4.40 / 4.33    | 15.24 / 13.10 | 5.01 / 5.21   |
+| running `#1f5fc4` / `#6fa8ff`         | 5.15 / 5.64  | 6.01 / 7.07   | 5.28 / 6.51    | 15.38 / 11.97 | 6.01 / 7.83   |
+| queued, skipped `#556070` / `#a3aec0` | 5.49 / 5.99  | 6.38 / 7.59   | 5.60 / 7.00    | 15.46 / 11.84 | 6.38 / 8.41   |
+| cancelled `#556070` / `#919bab`       | 5.49 / 4.92  | 6.38 / 6.06   | 5.60 / 5.58    | 15.46 / 12.19 | 6.38 / 6.72   |
+| warning `#8a5a00` / `#e7b45a`         | 5.24 / 6.98  | 5.93 / 8.97   | 5.20 / 8.27    | 15.89 / 11.67 | 5.93 / 9.94   |
+| timed out `#8a5a00` / `#b68e47`       | 5.24 / 4.70  | 5.93 / 5.63   | 5.20 / 5.19    | 15.89 / 12.54 | 5.93 / 6.24   |
 
-**Lightness between statuses.** The guarantee was narrowed, not dropped:
-pass vs fail ≥1.5:1 in both themes (measured **1.50** light — exactly
-1.5047 — and **2.13** dark). Other pairs may sit close; the closest are
-running vs warning 1.01 (light) and running vs queued 1.07 (dark). They are
-told apart by icon and label, which is now the asserted guarantee.
+**Lightness between statuses.** The guarantee was narrowed to where a
+glance must not mislead, then widened by the owner on review (2026-09-25):
+**pass vs every non-passing terminal verdict (fail, timed out, cancelled)
+differs by ≥1.5:1 in both themes, in normal vision and under simulated
+protanopia, deuteranopia and tritanopia** — asserted in
+`contrast.test.ts`. Other pairs may sit close (the closest: running vs
+warning 1.01 in light, running vs queued 1.07 in dark); they are told apart
+by icon and label, which is the asserted guarantee for them.
+
+What it took, from the brief's starting values:
+
+- **Light pass** `#0b6139` → **`#084428`** (owner-approved): protanopia pass
+  vs fail went from 1.05 to 1.58.
+- **Dark timed out** `#e7b45a` (shared with warning) → **`#b68e47`**, a
+  darker amber of its own: deuteranopia pass vs timed out went from 1.01 to
+  1.62. Warning keeps `#e7b45a`.
+- **Dark cancelled** `#a3aec0` (shared with queued/skipped) → **`#919bab`**:
+  pass vs cancelled went from 1.27–1.38 to ≥1.59 in every column.
+- Each was the smallest step along its own hue (an RGB scale, searched in
+  1% steps) that clears the floor with a little margin while keeping every
+  icon, label and filled-chip check above.
 
 ### Colour-vision deficiency (Machado, Oliveira & Fluck 2009, 100% severity)
 
-Contrast between the two simulated status colours - what a dichromat sees of
-two icons side by side.
+Contrast between the two simulated status colours, as a dichromat sees two
+icons side by side. The first three rows are the asserted floor.
 
 | Pair (light theme) | Normal | Protanopia | Deuteranopia | Tritanopia |
 | ------------------ | ------ | ---------- | ------------ | ---------- |
-| pass vs fail       | 1.50   | **1.05**   | 1.86         | 1.51       |
+| pass vs fail       | 2.24   | 1.58       | 2.72         | 2.26       |
+| pass vs timed out  | 1.90   | 1.63       | 2.09         | 1.88       |
+| pass vs cancelled  | 1.76   | 1.74       | 1.79         | 1.76       |
 | running vs fail    | 1.20   | 1.29       | 1.49         | 1.05       |
-| pass vs timed out  | 1.27   | 1.08       | 1.43         | 1.25       |
 | warning vs fail    | 1.18   | 1.03       | 1.30         | 1.21       |
 
 | Pair (dark theme) | Normal | Protanopia | Deuteranopia | Tritanopia |
 | ----------------- | ------ | ---------- | ------------ | ---------- |
 | pass vs fail      | 2.13   | 2.90       | 1.78         | 2.12       |
+| pass vs timed out | 1.78   | 2.06       | 1.62         | 1.79       |
+| pass vs cancelled | 1.65   | 1.72       | 1.59         | 1.64       |
 | running vs fail   | 1.50   | 2.08       | 1.24         | 1.55       |
-| pass vs timed out | 1.12   | 1.29       | **1.01**     | 1.13       |
 | warning vs fail   | 1.91   | 2.24       | 1.75         | 1.89       |
 
-**Stated plainly:** in the light theme, pass and fail are close to identical
-for a protanope (1.05:1), and in dark, pass and timed out for a deuteranope
-(1.01:1). Nothing breaks, because the icon and label always travel with the
-colour, but colour alone does not separate them for those viewers. A
-light-theme pair that does, found by search and **not applied** (it's the
-owner's call): keep fail `#cc3740`, darken pass to `#084428` → normal 2.24,
-protanopia 1.58, deuteranopia 2.72, tritanopia 2.26, and every icon, label
-and filled-chip check still passes.
+The last two rows in each table are outside the floor and recorded for
+completeness: a running step and a warning are never a verdict a person
+could mistake for a pass, and they carry their own icons and labels.
 
 ### Radius
 

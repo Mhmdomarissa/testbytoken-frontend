@@ -1,5 +1,7 @@
 "use client";
 
+import { GLOBAL_ERROR_PALETTE as C } from "./global-error-palette";
+
 /**
  * Catches a crash in the root layout itself - the one place ErrorState's
  * usual chrome (sidebar, fonts, tokens) can't be assumed to have rendered,
@@ -17,8 +19,8 @@ export default function GlobalError({
     <html lang="en">
       <body
         style={{
-          background: "#0a1120",
-          color: "#edf1f7",
+          background: C.page,
+          color: C.ink,
           fontFamily: "sans-serif",
         }}
       >
@@ -29,9 +31,9 @@ export default function GlobalError({
             onClick={reset}
             style={{
               marginTop: "1rem",
-              border: "1px solid #edf1f7",
+              border: `1px solid ${C.ink}`,
               background: "transparent",
-              color: "#edf1f7",
+              color: C.ink,
               padding: "0.5rem 1rem",
               cursor: "pointer",
             }}

@@ -34,9 +34,15 @@ original design rules. **Reversed, by name** - don't restore any of these:
 
 The rules now:
 
-- **Every colour is a token.** Components use tokens, never raw hex. The one
-  exception is the OG image (satori can't read CSS variables):
-  `og-palette.ts`, kept equal to the tokens by `og-palette.test.ts`.
+- **Every colour is a token.** Components use tokens, never raw hex. Two
+  sanctioned exceptions, each a palette file whose constants a test keeps
+  equal to the tokens' values:
+  - the OG image (satori can't read CSS variables): `og-palette.ts`,
+    tested by `og-palette.test.ts`;
+  - `global-error.tsx`, which renders its own `<html>` when the root layout
+    has crashed, so the stylesheet can't be assumed: `global-error-palette.ts`,
+    tested by `global-error-palette.test.ts` (which also fails if
+    `global-error.tsx` contains a literal hex).
 - **Gold is reserved** for the brand mark, the primary action, focus and the
   active nav item. It is never a status colour. Gold as text uses
   `--gold-text` (`text-gold-text`), never the button fill.
@@ -48,11 +54,14 @@ The rules now:
   page**, for that page's own verdict. The unrecognised chip stays a dashed
   outline carrying the raw value.
 - **Status colour is never the only channel.** Every status has its own icon
-  silhouette and its own label (asserted). Only pass vs fail are guaranteed
-  apart in lightness (≥1.5:1 in both themes); other pairs may sit close.
-  Any colour-only mark (bars, edges, charts) gets a 2 px gap in the surface
-  colour between segments, direct count labels or a legend with counts,
-  and a text equivalent.
+  silhouette and its own label (asserted). Lightness is guaranteed only
+  where a glance must not mislead: **pass vs every non-passing terminal
+  verdict (fail, timed out, cancelled) differs by ≥1.5:1** in both themes,
+  in normal vision and under simulated protanopia, deuteranopia and
+  tritanopia (asserted). Other pairs may sit close. Any colour-only mark
+  (bars, edges, charts) gets a 2 px gap in the surface colour between
+  segments, direct count labels or a legend with counts, and a text
+  equivalent.
 - Fonts: Cormorant Garamond and Montserrat. Nothing else, ever — this
   governs _display and body type_. It does not cover code-like content
   (locators, ids, hashes, step output): that's the platform's system
