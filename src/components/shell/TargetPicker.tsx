@@ -163,33 +163,30 @@ function PickerBody({ onDone }: { onDone: () => void }) {
                 disabled={!r.ready}
                 onSelect={() => r.ready && go(t.id)}
                 data-testid={`pick-${t.id}`}
-                // Disabled targets stay fully legible: the reason IS the
-                // content, so it must meet contrast like any other text.
-                className="items-start py-2 data-[disabled=true]:opacity-100"
+                // Disabled: reduced emphasis, not faded. cmdk already marks
+                // the option aria-disabled (announced as unavailable, with
+                // the reason as part of its name), skips it in arrow-key
+                // navigation and ignores pointer hover, so it never takes
+                // the highlight and Enter can't pick it. Every part of the
+                // row goes to --ink-muted, which still clears 4.5:1 on the
+                // dialog's card surface (6.26 light / 6.67 dark) - opacity
+                // would have taken it under.
+                className="items-start py-2 data-[disabled=true]:cursor-not-allowed data-[disabled=true]:text-(--ink-muted) data-[disabled=true]:opacity-100 data-[disabled=true]:[&_svg]:text-(--ink-muted)"
               >
                 <GlobeIcon aria-hidden="true" className="mt-0.5" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span
-                    className={
-                      r.ready
-                        ? "truncate font-medium"
-                        : "truncate font-medium text-(--ink-muted)"
-                    }
-                    title={t.name}
-                  >
+                  <span className="truncate font-medium" title={t.name}>
                     {t.name}
                   </span>
                   <span
-                    className="truncate font-mono text-xs text-muted-foreground"
+                    className="truncate font-mono text-xs text-(--ink-muted)"
                     title={t.base_url}
                   >
                     {t.base_url}
                   </span>
                 </span>
                 {!r.ready && (
-                  <span className="shrink-0 self-center text-xs text-muted-foreground">
-                    {r.why}
-                  </span>
+                  <span className="shrink-0 self-center text-xs">{r.why}</span>
                 )}
               </CommandItem>
             );

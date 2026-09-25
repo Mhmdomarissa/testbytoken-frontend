@@ -66,22 +66,46 @@ test("breadcrumbs: the section links back, the current crumb is not a link", asy
 test("New test: every target is listed; only a scanned one can be chosen, and Enter goes to compose", async ({
   page,
 }) => {
+  await page.emulateMedia({ colorScheme: "light" });
   await page.goto("/overview");
   await page.getByRole("button", { name: "New test" }).click();
   const dialog = page.getByRole("dialog", { name: "New test" });
   await expect(dialog).toBeVisible();
 
-  // Unscanned and failed targets are listed, disabled, with their reason.
-  await expect(
-    dialog.getByRole("option", { name: /Freshly added target.*Never scanned/ }),
-  ).toHaveAttribute("aria-disabled", "true");
-  await expect(
-    dialog.getByRole("option", { name: /Legacy admin.*Last scan failed/ }),
-  ).toHaveAttribute("aria-disabled", "true");
+  // Unscanned and failed targets are listed, announced as unavailable,
+  // with the reason as part of what a screen reader reads out.
+  const fresh = dialog.getByRole("option", {
+    name: /Freshly added target.*Never scanned/,
+  });
+  const legacy = dialog.getByRole("option", {
+    name: /Legacy admin.*Last scan failed/,
+  });
+  for (const option of [fresh, legacy]) {
+    await expect(option).toHaveAttribute("aria-disabled", "true");
+    // Reduced emphasis: muted text (--ink-muted, light), not faded out.
+    await expect(option).toHaveCSS("color", "rgb(86, 97, 115)");
+    await expect(option).toHaveCSS("opacity", "1");
+  }
 
   // Exactly one ready target: preselected, but the picker still asks.
   const checkout = dialog.getByRole("option", { name: /^Checkout/ });
   await expect(checkout).toHaveAttribute("aria-selected", "true");
+
+  // Disabled targets never take the highlight: arrows skip them, and
+  // hovering one leaves the selection where it was.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(checkout).toHaveAttribute("aria-selected", "true");
+  await fresh.hover({ force: true });
+  await expect(fresh).not.toHaveAttribute("aria-selected", "true");
+  await expect(checkout).toHaveAttribute("aria-selected", "true");
+
+  // Choosing one does nothing: the dialog stays, the page doesn't move.
+  await fresh.click({ force: true });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveURL(/\/overview$/);
+
+  // Enter goes where the selection is - the ready target.
   await page.keyboard.press("Enter");
   await page.waitForURL(/\/targets\/tgt_checkout\/compose$/);
 });
