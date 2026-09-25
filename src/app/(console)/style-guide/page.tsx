@@ -82,7 +82,7 @@ export default function ThemePreviewPage() {
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-12">
       <header className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase text-(--text-tertiary) tracking-[0.2em]">
+        <p className="text-xs font-semibold uppercase text-(--ink-faint) tracking-[0.2em]">
           A4 &mdash; theme proof, not a product screen
         </p>
         <h1 className="font-heading text-3xl font-light tracking-tight">

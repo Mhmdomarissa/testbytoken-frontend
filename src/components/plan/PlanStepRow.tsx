@@ -58,7 +58,7 @@ export function PlanStepRow({
         className={`glow-focus relative flex flex-col gap-3 border py-4 pr-4 pl-6 text-sm ${
           controls && approvable.ok ? "glow-hover" : ""
         } ${approvable.ok ? "bg-background" : "bg-card"} ${
-          leftOut ? "border-dashed border-(--border-strong)" : "border-border"
+          leftOut ? "border-dashed border-(--line-input)" : "border-border"
         }`}
       >
         {/* The row's state as an edge of light: gold will run, the
@@ -70,8 +70,8 @@ export function PlanStepRow({
             position.kind === "will-run"
               ? "bg-primary"
               : leftOut
-                ? "bg-(--border-strong)"
-                : "bg-(--status-warning-border)"
+                ? "bg-(--line-input)"
+                : "bg-(--status-warning-fg)"
           }`}
         />
         <span id={`${step.id}-state`} className="sr-only">
@@ -82,8 +82,8 @@ export function PlanStepRow({
             aria-hidden="true"
             className={`min-w-8 text-lg leading-none font-light tabular-nums transition-colors duration-(--duration-base) ${
               position.kind === "will-run"
-                ? "text-primary"
-                : "text-(--text-tertiary)"
+                ? "text-gold-text"
+                : "text-(--ink-faint)"
             }`}
           >
             {position.kind === "will-run" ? `#${position.nth}` : "-"}
@@ -96,7 +96,7 @@ export function PlanStepRow({
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {position.kind === "will-run" && (
-              <span className="text-[0.6875rem] font-semibold tracking-[0.14em] text-primary uppercase">
+              <span className="text-[0.6875rem] font-semibold tracking-[0.14em] text-gold-text uppercase">
                 Will run
               </span>
             )}
@@ -144,7 +144,7 @@ export function PlanStepRow({
         </dl>
 
         {!approvable.ok && approvable.why === "blocked" && step.blocked && (
-          <p className="border-l-2 border-(--status-warning-border) pl-3 text-xs leading-relaxed break-words">
+          <p className="border-l-2 border-(--status-warning-fg) pl-3 text-xs leading-relaxed break-words">
             <span className="font-medium">
               Blocked ({humanise(step.blocked.reason_code)}):
             </span>{" "}

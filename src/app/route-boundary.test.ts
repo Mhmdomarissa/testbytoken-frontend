@@ -56,8 +56,10 @@ const CONSOLE_ONLY = [
  * a real dependency the shipped page carries.
  */
 export const PUBLIC_TIER: Tier = {
-  forbiddenPaths: [...CONSOLE_ONLY, "mocks"],
-  forbiddenPackages: ["@tanstack/react-query", "msw"],
+  forbiddenPaths: [...CONSOLE_ONLY, "mocks", "components/theme"],
+  // next-themes: public and pre-auth pages follow the system theme through
+  // CSS alone (UI v2) - no theming JavaScript, enforced here, not trusted.
+  forbiddenPackages: ["@tanstack/react-query", "msw", "next-themes"],
   leaves: ["mocks/MockingProvider.tsx"],
 };
 
@@ -69,8 +71,10 @@ export const PUBLIC_TIER: Tier = {
  * through them unnoticed.
  */
 export const AUTH_TIER: Tier = {
-  forbiddenPaths: [...CONSOLE_ONLY, "mocks"],
-  forbiddenPackages: ["@tanstack/react-query", "msw"],
+  forbiddenPaths: [...CONSOLE_ONLY, "mocks", "components/theme"],
+  // next-themes: public and pre-auth pages follow the system theme through
+  // CSS alone (UI v2) - no theming JavaScript, enforced here, not trusted.
+  forbiddenPackages: ["@tanstack/react-query", "msw", "next-themes"],
   leaves: ["mocks/MockingProvider.tsx", "mocks/session-cookie-workaround.ts"],
 };
 

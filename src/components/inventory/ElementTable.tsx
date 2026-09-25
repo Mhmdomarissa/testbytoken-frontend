@@ -92,7 +92,7 @@ function ElementRow({ element }: { element: Element }) {
       data-locatable={notUnique ? "no" : "yes"}
       className={
         notUnique
-          ? "shadow-[inset_4px_0_0_var(--status-warning-chip-fill)]"
+          ? "shadow-[inset_4px_0_0_var(--status-warning-fg)]"
           : undefined
       }
     >

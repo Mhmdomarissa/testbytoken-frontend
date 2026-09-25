@@ -6,6 +6,7 @@ import {
   ClockAlertIcon,
   CircleHelpIcon,
   CircleSlashIcon,
+  CircleStopIcon,
   TriangleAlertIcon,
   type LucideIcon,
 } from "lucide-react";
@@ -22,18 +23,27 @@ import { UnrecognisedValue, truncateRaw } from "@/lib/api/tolerant";
  * icon, and a text label. Never render a status as a color swatch alone;
  * use this component instead of a one-off styled span.
  *
- * Renders as a FILLED chip (Phase B, B2), not colored text on the page
- * background: the label/icon are always --color-blue-deep, drawn on top
- * of a per-status fill (styles/tokens.css's `--status-*-chip-fill`).
- * This is a real accessibility change, not a restyle - a filled chip's
- * fill only needs 3:1 against the page (AA non-text) and the label only
- * needs 4.5:1 against ITS OWN fill, not against the page, which is a
- * much wider constraint than the old text-on-page approach and is what
- * let the seven statuses spread further apart (see tokens.css's comment
- * on `--status-*-chip-fill` for the exact numbers).
+ * UI v2 (section 1.3) - the chip goes quiet. Its anatomy is what carries
+ * the accessibility, and it is asserted in StatusBadge.test.tsx and
+ * src/lib/color/contrast.test.ts against the committed tokens:
+ *   - ground: the status TINT;
+ *   - icon: the status colour - non-text, so >=3:1 on its tint and on
+ *     card/raised, which is what frees the hues;
+ *   - label: the normal text colour, >=4.5:1 on every tint.
+ * One FILLED chip per page, for that page's own verdict: the status colour
+ * as ground and --status-on as label ink (>=4.5:1). Every status keeps a
+ * unique icon silhouette and a unique label; only pass vs fail are
+ * guaranteed apart in lightness (>=1.5:1, both themes).
  */
 export type Status =
-  "pass" | "fail" | "running" | "skipped" | "warning" | "queued" | "timed_out";
+  | "pass"
+  | "fail"
+  | "running"
+  | "skipped"
+  | "cancelled"
+  | "warning"
+  | "queued"
+  | "timed_out";
 
 const STATUS_META: Record<
   Status,
@@ -44,6 +54,9 @@ const STATUS_META: Record<
   running: { label: "Running", icon: LoaderCircleIcon, spin: true },
   queued: { label: "Queued", icon: ClockIcon },
   skipped: { label: "Skipped", icon: CircleSlashIcon },
+  // Its own status (UI v2): shares the neutral grey with skipped and
+  // queued, but never their icon - a stopped run is not a skipped step.
+  cancelled: { label: "Cancelled", icon: CircleStopIcon },
   warning: { label: "Warning", icon: TriangleAlertIcon },
   // Distinct from `fail`: own icon (a clock, not an octagon - it reads as
   // "ran out of time", not "assertion failed"), own color rung, own
@@ -55,11 +68,19 @@ const STATUS_META: Record<
 export function StatusBadge({
   status,
   label,
+  variant = "quiet",
   className,
 }: {
   status: Status | UnrecognisedValue;
   /** Override the default label, e.g. a Run's "passed"/"failed" wording. Ignored for an unrecognised status - the raw value is the only honest label there. */
   label?: string;
+  /**
+   * "quiet" (default): the status tint as ground, the status colour on the
+   * icon only, the label in the normal text colour. "filled": the page's
+   * ONE verdict (a run's own result, a proof's) - the status colour as
+   * ground with the measured on-status label ink. UI v2, section 1.3.
+   */
+  variant?: "quiet" | "filled";
   className?: string;
 }) {
   // Phase B §1.1 / docs/PHASE_B0_5.md A1: a status this client doesn't
@@ -76,22 +97,30 @@ export function StatusBadge({
   const Icon = meta.icon;
   // `status` values are snake_case (matching the contract's enum, e.g.
   // `timed_out`); the CSS custom properties they key into use hyphens
-  // (`--status-timed-out-chip-fill`). Without this,
-  // `var(--status-timed_out-chip-fill)` resolves to nothing - not a
+  // (`--status-timed-out-fg`). Without this,
+  // `var(--status-timed_out-tint)` resolves to nothing - not a
   // visible error, just a badge that silently renders with an inherited
   // (default) fill instead of its own, which is worse than a build error
   // for exactly the WCAG 1.4.1 reason this component exists.
   const cssName = status.replace(/_/g, "-");
+  const filled = variant === "filled";
   return (
     <span
+      data-variant={variant}
       className={cn(
-        "inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-(--color-blue-deep)",
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wide",
         className,
       )}
-      style={{ backgroundColor: `var(--status-${cssName}-chip-fill)` }}
+      style={{
+        backgroundColor: filled
+          ? `var(--status-${cssName}-fg)`
+          : `var(--status-${cssName}-tint)`,
+        color: filled ? "var(--status-on)" : "var(--ink)",
+      }}
     >
       <Icon
-        className={cn("size-3", meta.spin && "animate-spin")}
+        className={cn("size-3.5 shrink-0", meta.spin && "animate-spin")}
+        style={filled ? undefined : { color: `var(--status-${cssName}-fg)` }}
         aria-hidden="true"
       />
       {label ?? meta.label}
@@ -120,7 +149,7 @@ function UnrecognisedChip({
       title={`Unrecognised status: ${raw}`}
       data-unrecognised-status=""
       className={cn(
-        "inline-flex max-w-64 items-center gap-1 border border-dashed border-(--text-primary) px-1.5 py-0.5 text-xs font-medium uppercase tracking-wide text-(--text-primary)",
+        "inline-flex max-w-64 items-center gap-1.5 rounded-md border border-dashed border-(--ink) px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-(--ink)",
         className,
       )}
     >

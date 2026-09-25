@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { OG_PALETTE } from "./og-palette";
 import { findProofByShareToken } from "@/mocks/handlers/proofs";
 
 /**
@@ -23,20 +24,13 @@ export const alt = "Test by Token — auditable proof";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-// Hex values below are copied from styles/tokens.css - satori (what
-// ImageResponse renders with) has no var()/custom-property support, so
-// they can't be referenced live; keep these in sync by hand if the
-// palette changes.
-const BLUE_DEEP = "#0a1628";
-const BLUE_MID = "#0d2244";
-const GOLD = "#c9a96e";
-const CREAM = "#f8f4ee";
-const VERDICT_COLOR: Record<string, string> = {
-  passed: "#83d494",
-  failed: "#db6368",
-  cancelled: "#a1a3b5",
-  timed_out: "#d57a49",
-};
+// satori can't read CSS custom properties; the palette is kept in step
+// with styles/tokens.css by og-palette.test.ts.
+const BLUE_DEEP = OG_PALETTE.page;
+const BLUE_MID = OG_PALETTE.card;
+const GOLD = OG_PALETTE.gold;
+const CREAM = OG_PALETTE.ink;
+const VERDICT_COLOR = OG_PALETTE.verdict;
 const VERDICT_LABEL: Record<string, string> = {
   passed: "Passed",
   failed: "Failed",

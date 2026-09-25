@@ -53,15 +53,13 @@ export function StepRow({
       // row is recycled on scroll), breathes while `running`, and its
       // mark draws when it becomes pass or fail. See globals.css.
       className={`draw-result flex flex-col border-b border-border px-4 text-sm ${
-        running
-          ? "breathe shadow-[inset_4px_0_0_var(--status-running-chip-fill)]"
-          : ""
+        running ? "breathe shadow-[inset_4px_0_0_var(--status-running-fg)]" : ""
       } ${compact ? "gap-1 overflow-hidden py-2" : "arrive gap-1.5 py-3"}`}
     >
       <div className="flex min-w-0 items-center gap-2.5">
         <span
           aria-hidden="true"
-          className="w-8 shrink-0 text-sm font-light text-(--text-tertiary) tabular-nums"
+          className="w-8 shrink-0 text-sm font-light text-(--ink-faint) tabular-nums"
         >
           {step.index + 1}
         </span>

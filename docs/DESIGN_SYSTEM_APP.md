@@ -5,7 +5,180 @@ carried over from the marketing site's design language, what didn't and why,
 and exactly how every derived color was produced, so nobody has to
 re-derive or guess at it later.
 
-## What carried over unchanged
+## UI v2 — two themes (current; supersedes the sections marked "history")
+
+`docs/PHASE_UI_V2.md` §1, owner decision 2026-09-24. `CLAUDE.md` lists every
+reversed rule by name. Everything below is measured against the committed
+`styles/tokens.css` by `src/lib/color/contrast.test.ts` (the gates, in CI) and
+`npm run check:status-contrast` (the full report, both themes, Machado 2009
+CVD).
+
+### How the two themes are wired
+
+- **One declaration per colour.** Every colour token is
+  `light-dark(<light>, <dark>)`. Which half applies is `color-scheme`:
+  `light dark` on `:root` (follow the system), forced by a `.light` or `.dark`
+  class on `<html>`. Supported in Safari 17.5+, Chrome 123+ and Firefox 120+.
+- **Console:** `next-themes` (class strategy, default `system`, remembered in
+  `localStorage` as `tbt-theme`), provider in `(console)/layout.tsx` only,
+  outermost, so its no-flash script is in the server HTML. Chosen over a
+  cookie: a cookie would have to be read in the root layout, the only place
+  that renders `<html>`, which would make every route dynamic. The script's
+  content is fixed, so the deploy's CSP can allow it by hash or nonce.
+  `disableTransitionOnChange` is deliberately off (it injects a `<style>`,
+  which a strict CSP would block).
+- **Public routes** (landing, proof, sign-in): no provider, no theming JS.
+  They follow the system through `color-scheme` alone. The landing is pinned
+  dark (`color-scheme: dark` on its wrapper) until V7 designs its light
+  version, because its photographs sit under dark washes.
+- **Caveat, accepted:** a person who chose a theme in the console and then
+  follows a link to a proof page _in the same tab_ keeps their choice there
+  (the class is still on `<html>`). A fresh load follows the system.
+- **`dark:` utilities** match both triggers (`.dark`, or the system when no
+  `.light` override is set) via `@custom-variant dark` in `globals.css`.
+  shadcn's own `dark:` classes (43, in button, input, textarea, select,
+  input-group, badge, tabs, field, dropdown-menu, avatar) were inactive
+  before V0 because nothing ever set `.dark`. V0 reviewed each and kept
+  them: they are shadcn's dark variants (a soft input fill, destructive
+  washes), and axe passes on every page in both themes with them on.
+
+### Tokens
+
+| Token                       | Light                 | Dark                  | Use                                                        |
+| --------------------------- | --------------------- | --------------------- | ---------------------------------------------------------- |
+| `--surface-page`            | `#f6f5f1`             | `#0a1120`             | page                                                       |
+| `--surface-sidebar`         | `#ffffff`             | `#0d1628`             | sidebar                                                    |
+| `--surface-card`            | `#ffffff`             | `#111c31`             | cards                                                      |
+| `--surface-raised`          | `#f2f0ea`             | `#16233c`             | dialogs, menus, popovers, secondary fills                  |
+| `--line`                    | `#e6e2d8`             | `#1f2c44`             | dividers and card edges only (under 3:1 on purpose)        |
+| `--line-input`              | `#848a93`             | `#616d83`             | form-control outlines, ≥3:1 on every surface (WCAG 1.4.11) |
+| `--ink`                     | `#0e1726`             | `#edf1f7`             | text                                                       |
+| `--ink-muted`               | `#566173`             | `#97a3b6`             | secondary text                                             |
+| `--ink-faint`               | `#626c7b`             | `#8290a6`             | tertiary text, still ≥4.5:1                                |
+| `--gold`                    | `#9a7434`             | `#d4b27a`             | mark, lines, focus ring                                    |
+| `--gold-text`               | `#7a5a22`             | `#d4b27a`             | gold as text (`text-gold-text`)                            |
+| `--gold-fill` / `--on-gold` | `#c9a96e` / `#0e1726` | `#d4b27a` / `#0a1120` | primary button and its label                               |
+| `--danger-text`             | `#b3262f`             | `#f0747a`             | error text (see below)                                     |
+| `--status-on`               | `#ffffff`             | `#0a1120`             | label on a filled verdict chip                             |
+
+`--line-input` and `--danger-text` are not in the brief's table. The brief's
+`border` measures 1.19–1.35:1 against the surfaces, which is fine for a
+divider but fails 1.4.11 as a form control's only boundary; `--line-input`
+was derived along the same hue until it cleared 3:1 everywhere, and was
+approved. `--danger-text` exists because the fail _icon_ colour is tuned for
+3:1 and measures 4.33 (dark) and 4.40 (light) as text on `raised`; error
+_text_ uses the brief's original failed values, which clear 4.5:1 on every
+surface.
+
+Measured text contrast, lowest per token across page, card and raised: ink
+13.83 (dark) / 15.76 (light); ink-muted 6.14 / 5.50; ink-faint 4.84 / 4.66;
+gold-text 7.80 / 5.56; on-gold on gold-fill 9.38 / 8.03. Focus ring (`--gold`)
+lowest 3.74 (light, on raised). `--line-input` lowest 3.00 (dark, on raised) /
+3.05 (light, on raised).
+
+### Status chips
+
+Anatomy (asserted in `StatusBadge.test.tsx`): the status **tint** as ground,
+the status **colour on the icon only** (non-text, ≥3:1 on its tint and on
+card/raised), the **label in `--ink`** (≥4.5:1 on the tint). One **filled**
+chip per page for that page's own verdict: the status colour as ground,
+`--status-on` as label (≥4.5:1). Every status has a unique icon and a unique
+label, including `cancelled`, which now has its own stop icon instead of
+borrowing `skipped`'s. `queued`, `skipped` and `cancelled` are the neutral
+grey and `warning` and `timed_out` the amber, except in dark, where
+`cancelled` and `timed_out` are a step darker to keep their distance from
+pass (below).
+
+| Status (light / dark)                 | icon on tint | icon on card  | icon on raised | label on tint | filled label  |
+| ------------------------------------- | ------------ | ------------- | -------------- | ------------- | ------------- |
+| pass `#084428` / `#72dba3`            | 9.80 / 7.55  | 11.24 / 10.03 | 9.87 / 9.24    | 15.66 / 11.31 | 11.24 / 11.11 |
+| fail `#cc3740` / `#e05a61`            | 4.26 / 4.10  | 5.01 / 4.70   | 4.40 / 4.33    | 15.24 / 13.10 | 5.01 / 5.21   |
+| running `#1f5fc4` / `#6fa8ff`         | 5.15 / 5.64  | 6.01 / 7.07   | 5.28 / 6.51    | 15.38 / 11.97 | 6.01 / 7.83   |
+| queued, skipped `#556070` / `#a3aec0` | 5.49 / 5.99  | 6.38 / 7.59   | 5.60 / 7.00    | 15.46 / 11.84 | 6.38 / 8.41   |
+| cancelled `#556070` / `#919bab`       | 5.49 / 4.92  | 6.38 / 6.06   | 5.60 / 5.58    | 15.46 / 12.19 | 6.38 / 6.72   |
+| warning `#8a5a00` / `#e7b45a`         | 5.24 / 6.98  | 5.93 / 8.97   | 5.20 / 8.27    | 15.89 / 11.67 | 5.93 / 9.94   |
+| timed out `#8a5a00` / `#b68e47`       | 5.24 / 4.70  | 5.93 / 5.63   | 5.20 / 5.19    | 15.89 / 12.54 | 5.93 / 6.24   |
+
+**Lightness between statuses.** The guarantee was narrowed to where a
+glance must not mislead, then widened by the owner on review (2026-09-25):
+**pass vs every non-passing terminal verdict (fail, timed out, cancelled)
+differs by ≥1.5:1 in both themes, in normal vision and under simulated
+protanopia, deuteranopia and tritanopia** — asserted in
+`contrast.test.ts`. Other pairs may sit close (the closest: running vs
+warning 1.01 in light, running vs queued 1.07 in dark); they are told apart
+by icon and label, which is the asserted guarantee for them.
+
+What it took, from the brief's starting values:
+
+- **Light pass** `#0b6139` → **`#084428`** (owner-approved): protanopia pass
+  vs fail went from 1.05 to 1.58.
+- **Dark timed out** `#e7b45a` (shared with warning) → **`#b68e47`**, a
+  darker amber of its own: deuteranopia pass vs timed out went from 1.01 to
+  1.62. Warning keeps `#e7b45a`.
+- **Dark cancelled** `#a3aec0` (shared with queued/skipped) → **`#919bab`**:
+  pass vs cancelled went from 1.27–1.38 to ≥1.59 in every column.
+- Each was the smallest step along its own hue (an RGB scale, searched in
+  1% steps) that clears the floor with a little margin while keeping every
+  icon, label and filled-chip check above.
+
+### Colour-vision deficiency (Machado, Oliveira & Fluck 2009, 100% severity)
+
+Contrast between the two simulated status colours, as a dichromat sees two
+icons side by side. The first three rows are the asserted floor.
+
+| Pair (light theme) | Normal | Protanopia | Deuteranopia | Tritanopia |
+| ------------------ | ------ | ---------- | ------------ | ---------- |
+| pass vs fail       | 2.24   | 1.58       | 2.72         | 2.26       |
+| pass vs timed out  | 1.90   | 1.63       | 2.09         | 1.88       |
+| pass vs cancelled  | 1.76   | 1.74       | 1.79         | 1.76       |
+| running vs fail    | 1.20   | 1.29       | 1.49         | 1.05       |
+| warning vs fail    | 1.18   | 1.03       | 1.30         | 1.21       |
+
+| Pair (dark theme) | Normal | Protanopia | Deuteranopia | Tritanopia |
+| ----------------- | ------ | ---------- | ------------ | ---------- |
+| pass vs fail      | 2.13   | 2.90       | 1.78         | 2.12       |
+| pass vs timed out | 1.78   | 2.06       | 1.62         | 1.79       |
+| pass vs cancelled | 1.65   | 1.72       | 1.59         | 1.64       |
+| running vs fail   | 1.50   | 2.08       | 1.24         | 1.55       |
+| warning vs fail   | 1.91   | 2.24       | 1.75         | 1.89       |
+
+The last two rows in each table are outside the floor and recorded for
+completeness: a running step and a warning are never a verdict a person
+could mistake for a pass, and they carry their own icons and labels.
+
+### Radius
+
+`--radius-control` 6 px, `--radius-panel` 10 px, `--radius-card` 14 px in
+`styles/tokens.css`. shadcn's scale maps onto them in `globals.css`
+(`sm`/`md` → control, `lg` → panel, `xl` and up → card). shadcn uses
+`rounded-lg` for controls _and_ panels, so the controls (button, input,
+textarea, select trigger, input group, badge) were moved to `rounded-md` in
+their own components. Fully round (`rounded-full`) stays for counts and
+avatars. Ad-hoc panels in the app's own screens pick up card/panel radius
+and elevation as each area is redone (V1 onward).
+
+### Elevation
+
+`--elevation-card` / `--elevation-raised` (Tailwind `shadow-card`,
+`shadow-raised`). `light-dark()` takes colours only, so each shadow layer is
+always present and its _colour_ goes transparent in the theme it isn't for:
+light gets soft shadows, dark gets a 1 px inner highlight plus a deep, low
+shadow.
+
+### The OG image
+
+satori can't read CSS variables, so `p/[token]/og-palette.ts` holds each
+token's dark value as hex, the one sanctioned raw-hex exception.
+`og-palette.test.ts` parses `styles/tokens.css` and fails on any drift.
+
+---
+
+_Everything from here to "Motion" is the pre-v2 design system, kept as
+history: the single dark palette, the status ladder and chip-fill
+derivations, and the zero-radius rule. The numbers in it describe tokens
+that no longer exist._
+
+## What carried over unchanged (history, pre-v2)
 
 - The eight brand anchors: `blue-deep`, `blue-mid`, `blue-light`,
   `blue-bright`, `gold`, `warm-white`, `muted`, `footer-deep`. Same hex
@@ -431,7 +604,7 @@ borders/dividers didn't exist yet because A3 only defined _status_ borders.
 Same opacity-on-warm-white method as the text hierarchy, extended to
 borders, so "no grey tokens" holds here too.
 
-**One theme, not two.** shadcn scaffolds a light `:root` + dark `.dark`
+**One theme, not two (history — reversed by UI v2).** shadcn scaffolds a light `:root` + dark `.dark`
 pair by default. This product has no light mode — the entire palette in
 the brief is a single dark identity — so the light block and the
 `.dark` class selector are deleted outright rather than populated; every
@@ -448,7 +621,7 @@ number in a row turned out wrong, the Phase A review replaced the fixed
 budget with a per-route ratchet — see README's "Bundle budget" section and
 `scripts/check-bundle-budget.mjs`.
 
-## Radius
+## Radius (history, pre-v2 — see "UI v2 — two themes")
 
 `--radius: 0px`, set once in `styles/tokens.css` and never redeclared
 elsewhere (shadcn's `init` scaffolds its own `--radius: 0.625rem` in

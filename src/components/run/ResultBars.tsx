@@ -31,7 +31,7 @@ export function ResultBars({
 function Bar({ value, className }: { value: number; className: string }) {
   const clamped = Math.min(1, Math.max(0, value));
   return (
-    <div className="h-1 bg-(--border-default)">
+    <div className="h-1 bg-(--line)">
       <div
         className={`fill-in h-full ${className}`}
         style={{ width: `${clamped * 100}%` }}

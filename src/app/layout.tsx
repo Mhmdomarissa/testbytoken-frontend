@@ -31,6 +31,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      // The console's theme script sets `.light` / `.dark` on <html> before
+      // React hydrates; this silences the expected attribute mismatch, and
+      // only for this one element.
+      suppressHydrationWarning
       className={cn(
         "h-full antialiased",
         cormorantGaramond.variable,
