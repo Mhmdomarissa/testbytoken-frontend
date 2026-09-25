@@ -31,7 +31,7 @@ const container = "mx-auto w-full max-w-[1280px] px-4 sm:px-8 lg:px-[60px]";
 const label =
   "text-[0.625rem] font-bold tracking-[0.2em] text-muted-foreground uppercase";
 const goldButton =
-  "inline-flex min-h-12 items-center justify-center bg-primary px-12 text-xs font-extrabold tracking-[0.16em] text-primary-foreground uppercase transition-colors duration-150 hover:bg-[color-mix(in_oklch,var(--color-gold),var(--color-warm-white)_18%)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+  "inline-flex min-h-12 items-center justify-center bg-primary px-12 text-xs font-extrabold tracking-[0.16em] text-primary-foreground uppercase transition-colors duration-150 hover:bg-[color-mix(in_oklch,var(--gold),var(--ink)_18%)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 const underlineLink =
   "inline-flex items-center gap-3 border-b-2 border-primary pb-1 text-[0.6875rem] font-extrabold tracking-[0.2em] text-foreground uppercase transition-colors duration-150 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring";
 // Every photograph is greyscale under a blue-deep wash, so none of them
@@ -40,7 +40,14 @@ const photo = "object-cover grayscale";
 
 export default function LandingPage() {
   return (
-    <div className="bg-background text-foreground">
+    // Pinned to the dark theme until UI v2 V7 designs the landing's light
+    // version: its photographs sit under dark washes built for a dark
+    // ground. `color-scheme: dark` makes every light-dark() token inside
+    // resolve to its dark value - CSS only, no JavaScript.
+    <div
+      data-landing
+      className="bg-background text-foreground [color-scheme:dark]"
+    >
       <Nav />
       <DemoProvider>
         <Hero />
@@ -476,7 +483,7 @@ function Footer() {
     },
   ];
   return (
-    <footer className="border-t border-border bg-[var(--color-footer-deep)] px-4 pt-16 pb-11 sm:px-8 md:pt-[72px] lg:px-[60px]">
+    <footer className="border-t border-border bg-[var(--surface-page)] px-4 pt-16 pb-11 sm:px-8 md:pt-[72px] lg:px-[60px]">
       <div className="mx-auto mb-14 grid max-w-[1280px] gap-12 sm:grid-cols-2 lg:grid-cols-[2.2fr_1fr_1fr_1fr] lg:gap-14">
         <div>
           <p className="inline-block border-b-2 border-primary pb-0.5 font-heading text-xl font-light">
@@ -511,7 +518,7 @@ function Footer() {
               {col.items.map(([text, href]) => (
                 <li key={text} className="text-[0.8125rem]">
                   {href === null ? (
-                    <span className="text-[var(--text-tertiary)]">{text}</span>
+                    <span className="text-[var(--ink-faint)]">{text}</span>
                   ) : (
                     <FooterLink href={href}>{text}</FooterLink>
                   )}
@@ -523,7 +530,7 @@ function Footer() {
       </div>
       <div className="mx-auto flex max-w-[1280px] flex-col gap-4 border-t border-border pt-7 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <p>© 2026 {BRAND}. All rights reserved.</p>
-        <p className="flex gap-7 text-[var(--text-tertiary)]">
+        <p className="flex gap-7 text-[var(--ink-faint)]">
           <span>Privacy Policy</span>
           <span>Terms</span>
         </p>
