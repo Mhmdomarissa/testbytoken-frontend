@@ -108,10 +108,13 @@ const STATUSES = [
   "timed-out",
 ];
 // The pairs a reader actually has to tell apart at a glance.
+// The first three are the asserted floor (>=1.5:1 in every column, both
+// themes): pass vs every non-passing terminal verdict.
 const MEANINGFUL_PAIRS = [
   ["pass", "fail"],
-  ["running", "fail"],
   ["pass", "timed-out"],
+  ["pass", "cancelled"],
+  ["running", "fail"],
   ["warning", "fail"],
 ];
 

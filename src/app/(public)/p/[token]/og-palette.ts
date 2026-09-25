@@ -15,8 +15,8 @@ export const OG_PALETTE = {
   verdict: {
     passed: "#72dba3", // --status-pass-fg (dark)
     failed: "#e05a61", // --status-fail-fg (dark)
-    cancelled: "#a3aec0", // --status-cancelled-fg (dark)
-    timed_out: "#e7b45a", // --status-timed-out-fg (dark)
+    cancelled: "#919bab", // --status-cancelled-fg (dark)
+    timed_out: "#b68e47", // --status-timed-out-fg (dark)
   } as Record<string, string>,
 };
 

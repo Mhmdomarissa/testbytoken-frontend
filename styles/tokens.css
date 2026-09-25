@@ -65,32 +65,36 @@
    *
    * Colour is never the only channel: every status also has its own icon
    * silhouette and its own label (StatusBadge, asserted). Lightness is
-   * only guaranteed apart for pass vs fail (>=1.5:1 in both themes);
-   * other pairs may sit close.
+   * guaranteed apart only where a glance must not mislead: PASS vs every
+   * non-passing terminal verdict (fail, timed out, cancelled) differs by
+   * >=1.5:1 in both themes, in normal vision AND simulated protanopia,
+   * deuteranopia and tritanopia (asserted). Other pairs may sit close.
    *
    * Dark tints are the FG at 13% over --surface-card, precomputed so the
    * tests can read a plain hex.
    * ------------------------------------------------------------------- */
-  --status-pass-fg: light-dark(#0b6139, #72dba3);
+  --status-pass-fg: light-dark(#084428, #72dba3);
   --status-pass-tint: light-dark(#e4f3ea, #1e3540);
   --status-fail-fg: light-dark(#cc3740, #e05a61);
   --status-fail-tint: light-dark(#fbe8e9, #2c2437);
   --status-running-fg: light-dark(#1f5fc4, #6fa8ff);
   --status-running-tint: light-dark(#e6eefb, #1d2e4c);
-  /* queued, skipped and cancelled share the neutral grey; each keeps its
-     own icon and label. */
-  --status-cancelled-fg: light-dark(#556070, #a3aec0);
-  --status-cancelled-tint: light-dark(#eceef2, #242f44);
+  /* The neutral grey, each status with its own icon and label. Dark
+     cancelled is a step darker than queued/skipped: at #a3aec0 it sat
+     within 1.27:1 of pass under deuteranopia. */
+  --status-cancelled-fg: light-dark(#556070, #919bab);
+  --status-cancelled-tint: light-dark(#eceef2, #222d41);
   --status-queued-fg: light-dark(#556070, #a3aec0);
   --status-queued-tint: light-dark(#eceef2, #242f44);
   --status-skipped-fg: light-dark(#556070, #a3aec0);
   --status-skipped-tint: light-dark(#eceef2, #242f44);
-  /* warning and timed out share the amber; timed out keeps its own clock
-     icon and label, so it never reads as `fail`. */
+  /* The amber, each with its own icon and label. Dark timed out is a
+     darker amber than warning: at warning's #e7b45a it sat at 1.01:1 from
+     pass under deuteranopia. */
   --status-warning-fg: light-dark(#8a5a00, #e7b45a);
   --status-warning-tint: light-dark(#fbf0da, #2d3036);
-  --status-timed-out-fg: light-dark(#8a5a00, #e7b45a);
-  --status-timed-out-tint: light-dark(#fbf0da, #2d3036);
+  --status-timed-out-fg: light-dark(#8a5a00, #b68e47);
+  --status-timed-out-tint: light-dark(#fbf0da, #262b34);
   /* Label ink on a FILLED (verdict) chip. */
   --status-on: light-dark(#ffffff, #0a1120);
 

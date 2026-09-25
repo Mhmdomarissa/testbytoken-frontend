@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { contrastRatio } from "./contrast";
+import { CVD_TYPES, simulateCvd } from "./cvd";
 
 /**
  * Every colour pair that carries meaning, measured in BOTH themes against
@@ -15,7 +16,10 @@ import { contrastRatio } from "./contrast";
  *   - a status's colour sits on its ICON only (non-text, 3:1), the label
  *     is normal text (4.5:1 on the tint), and every status has its own
  *     icon silhouette and label (asserted in StatusBadge.test.tsx);
- *   - pass vs fail keep a lightness floor of 1.5:1 in both themes;
+ *   - pass vs every non-passing terminal verdict (fail, timed out,
+ *     cancelled) keeps a lightness floor of 1.5:1 in both themes, in
+ *     normal vision and under simulated protanopia, deuteranopia and
+ *     tritanopia;
  *   - other pairs may sit close - they are told apart by icon and label.
  * Numbers and colour-vision-deficiency simulations: docs/DESIGN_SYSTEM_APP.md.
  */
@@ -127,14 +131,27 @@ describe.each(THEMES)("%s theme", (theme) => {
     });
   });
 
-  it("pass and fail differ in lightness by at least 1.5:1", () => {
-    expect(
-      contrastRatio(
-        token("status-pass-fg", theme),
-        token("status-fail-fg", theme),
-      ),
-    ).toBeGreaterThanOrEqual(1.5);
-  });
+  // A glance must never mistake a pass for a non-passing verdict - for
+  // anyone. Normal vision and simulated protanopia, deuteranopia and
+  // tritanopia (Machado 2009). Other pairs may sit close; they are told
+  // apart by icon and label (StatusBadge.test.tsx).
+  describe.each(["fail", "timed-out", "cancelled"])(
+    "pass vs %s differs in lightness by at least 1.5:1",
+    (other) => {
+      const pass = () => token("status-pass-fg", theme);
+      const them = () => token(`status-${other}-fg`, theme);
+
+      it("in normal vision", () => {
+        expect(contrastRatio(pass(), them())).toBeGreaterThanOrEqual(1.5);
+      });
+
+      it.each(CVD_TYPES)("under %s", (type) => {
+        expect(
+          contrastRatio(simulateCvd(pass(), type), simulateCvd(them(), type)),
+        ).toBeGreaterThanOrEqual(1.5);
+      });
+    },
+  );
 
   it("the warning colour works as TEXT on its own tint (the offline banner)", () => {
     expect(
