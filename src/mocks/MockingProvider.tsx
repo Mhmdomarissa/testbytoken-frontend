@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
  *
  * This used to fire-and-forget `worker.start()` from an effect and render
  * children immediately. That raced any component that fetches on mount
- * (e.g. WorkspaceStatusPill): on a fresh load, the first fetch could reach
+ * (e.g. the sidebar's engine status card): on a fresh load, the first fetch could reach
  * the real network before the service worker had registered, get a real
  * 404 from the Next dev server, and - since useResource only fetches once
  * per mount, not on an interval - stay wrong until the user manually hit

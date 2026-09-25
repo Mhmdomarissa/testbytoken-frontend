@@ -25,6 +25,7 @@ import { ListSkeleton } from "@/components/state/ListSkeleton";
 import { LoginPanel } from "@/components/login/LoginPanel";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useEntityCrumb } from "@/components/shell/Breadcrumbs";
 
 function message(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
@@ -61,6 +62,7 @@ function Login({ params }: { params: Promise<{ id: string }> }) {
   const sessionId = searchParams.get("session");
   const scanId = searchParams.get("scan");
   const target = useTarget(id);
+  useEntityCrumb(target.data?.name);
   const session = useLoginSession(sessionId ?? undefined);
   const now = useNow();
 

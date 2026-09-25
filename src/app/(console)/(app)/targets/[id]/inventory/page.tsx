@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { useEntityCrumb } from "@/components/shell/Breadcrumbs";
 
 function message(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong.";
@@ -35,6 +36,7 @@ export default function InventoryPage({
 }) {
   const { id } = use(params);
   const target = useTarget(id);
+  useEntityCrumb(target.data?.name);
 
   if (target.isPending) return <ListSkeleton rows={4} />;
   if (target.isError) {
