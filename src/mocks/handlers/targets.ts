@@ -11,7 +11,7 @@ import { resolveScan } from "../lifecycle";
  * a second ago, and a stale `null` here would tell a screen "never scanned"
  * about a target that is mid-crawl.
  */
-function withLastScan(target: z.infer<typeof TargetSchema>) {
+export function withLastScan(target: z.infer<typeof TargetSchema>) {
   const latest = [...scanStore.values()]
     .filter((s) => s.target_id === target.id)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];

@@ -2263,6 +2263,329 @@
           "tokens_remaining",
           "alert_threshold_percent"
         ]
+      },
+      "Overview": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date (YYYY-MM-DD) in the response's `range.tz`.",
+                "example": "2026-09-25"
+              },
+              "to": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date (YYYY-MM-DD) in the response's `range.tz`.",
+                "example": "2026-09-25"
+              },
+              "tz": {
+                "type": "string",
+                "description": "The IANA zone days are bucketed in.",
+                "example": "Europe/Istanbul"
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "tz"
+            ]
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          },
+          "runs_by_day": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OverviewRunsByDay"
+            },
+            "description": "Terminal runs only - queued and running are not counted - bucketed by the day each FINISHED, in `range.tz`. Exactly one entry per day from `range.from` to `range.to`, zero days included, oldest first."
+          },
+          "latest_suite_run": {
+            "$ref": "#/components/schemas/OverviewLatestSuiteRun"
+          },
+          "targets": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "scanned": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Targets whose latest scan completed."
+              },
+              "needs_attention": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Targets whose latest scan failed or is waiting for a sign-in."
+              }
+            },
+            "required": [
+              "total",
+              "scanned",
+              "needs_attention"
+            ]
+          },
+          "proofs": {
+            "type": "object",
+            "properties": {
+              "live": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Proofs shared, enabled and not expired."
+              },
+              "revoked": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Proofs whose share was revoked (disabled)."
+              }
+            },
+            "required": [
+              "live",
+              "revoked"
+            ]
+          },
+          "attention": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/OverviewAttentionItem"
+                },
+                "maxItems": 5,
+                "description": "Most recent first, at most 5."
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ]
+          }
+        },
+        "required": [
+          "range",
+          "generated_at",
+          "runs_by_day",
+          "latest_suite_run",
+          "targets",
+          "proofs",
+          "attention"
+        ]
+      },
+      "OverviewRunsByDay": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date (YYYY-MM-DD) in the response's `range.tz`.",
+            "example": "2026-09-25"
+          },
+          "passed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "timed_out": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "other": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Terminal runs whose status is none of the four above (e.g. a status added after this client). Never dropped; the UI shows them as unrecognised."
+          }
+        },
+        "required": [
+          "date",
+          "passed",
+          "failed",
+          "timed_out",
+          "cancelled",
+          "other"
+        ]
+      },
+      "OverviewLatestSuiteRun": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "suite_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "passed",
+              "failed",
+              "cancelled",
+              "timed_out"
+            ],
+            "description": "Overall run status - the run-shaped subset of the JobStatus vocabulary. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Extensible: new members MAY be added; clients MUST tolerate unknown members.",
+            "x-extensible-enum": true
+          },
+          "pass_rate": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Same rule as `Run.pass_rate`: null unless `status` is terminal, and a client MUST NOT render it for a status it does not recognise as terminal."
+          },
+          "coverage": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Coverage"
+              },
+              {
+                "description": "The run's own coverage, the same object as `Run.coverage` - so the pass rate and its coverage render together through the same component everywhere."
+              }
+            ]
+          },
+          "steps": {
+            "$ref": "#/components/schemas/OverviewStepCounts"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "run_id",
+          "suite_id",
+          "target_id",
+          "target_name",
+          "status",
+          "pass_rate",
+          "coverage",
+          "steps",
+          "finished_at"
+        ],
+        "description": "The most recently STARTED suite run (any status), or null if there has never been one."
+      },
+      "OverviewStepCounts": {
+        "type": "object",
+        "properties": {
+          "passed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "failed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "skipped": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Every step of the run. May exceed passed + failed + skipped (warnings, steps still running); the UI shows the difference as other."
+          }
+        },
+        "required": [
+          "passed",
+          "failed",
+          "skipped",
+          "total"
+        ]
+      },
+      "OverviewAttentionItem": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "run_failed",
+              "run_timed_out",
+              "scan_failed",
+              "login_expired"
+            ],
+            "description": "What needs attention. `run_failed` / `run_timed_out`: a run that ended so, in range (`ref_id` is the run). `scan_failed`: a target whose latest scan failed (`ref_id` is the scan). `login_expired`: a sign-in session that expired before it completed, in range (`ref_id` is the session). Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "x-extensible-enum": true
+          },
+          "ref_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Opaque resource id. Recommended (not enforced) convention: a short type prefix plus a random suffix, e.g. `run_8f2a1c9d` - self-describing in logs, cheap for the engine to generate.",
+            "example": "run_8f2a1c9d"
+          },
+          "target_name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Server-provided one-line reason. Untrusted - it can carry text from the tested site; render as text."
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 UTC timestamp.",
+            "example": "2026-09-16T14:32:00Z"
+          }
+        },
+        "required": [
+          "kind",
+          "ref_id",
+          "target_id",
+          "target_name",
+          "reason",
+          "occurred_at"
+        ]
       }
     },
     "parameters": {}
@@ -3957,6 +4280,72 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UsageBudget"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/overview": {
+      "get": {
+        "tags": [
+          "overview"
+        ],
+        "summary": "The console dashboard's numbers, computed server-side",
+        "description": "REQUIRED (UI v2 V2), additive. Every field is a count or a lookup of stored data. The dashboard renders only this - it never aggregates a paginated list.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "14d",
+                "30d"
+              ],
+              "default": "7d",
+              "description": "How many days back, including today. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+              "x-extensible-enum": true
+            },
+            "required": false,
+            "description": "How many days back, including today. Extensible: new members MAY be added without a version bump. Clients MUST tolerate unknown members - render them as unrecognised, never drop the record or fail the response.",
+            "name": "range",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "default": "UTC",
+              "description": "IANA zone for day buckets. Default UTC."
+            },
+            "required": false,
+            "description": "IANA zone for day buckets. Default UTC.",
+            "name": "tz",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The overview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Overview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown `range` or `tz`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

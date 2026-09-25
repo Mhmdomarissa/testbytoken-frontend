@@ -46,7 +46,7 @@ test("sign-in through a completed scan, cold, with no console or page errors alo
   // The app home renders real content on the FIRST paint, not a
   // permanently-stuck skeleton or an error that only clears on reload.
   await expect(
-    page.getByRole("heading", { name: "Welcome to Test by Token" }),
+    page.getByRole("heading", { name: "Overview", level: 1 }),
   ).toBeVisible();
 
   await page.getByRole("link", { name: "Targets" }).click();
