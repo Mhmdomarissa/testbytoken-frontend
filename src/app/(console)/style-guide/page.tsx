@@ -1,5 +1,7 @@
 "use client";
 
+import { notFound } from "next/navigation";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -40,6 +42,11 @@ import { StatusBadge, type Status } from "@/components/status/StatusBadge";
 import { PassRateCoverage } from "@/components/status/PassRateCoverage";
 import { ResultReason } from "@/components/status/ResultReason";
 
+// Mock-backed build? Written out here, not imported: Next inlines
+// process.env.NEXT_PUBLIC_* only at the use site, and only then can the
+// build drop the mock-only code below (docs/DEPLOYMENT.md).
+const MOCKING = process.env.NEXT_PUBLIC_API_MOCKING === "on";
+
 const environmentItems = [
   { label: "Select environment", value: null },
   { label: "Development", value: "dev" },
@@ -79,6 +86,9 @@ const runRows = [
 ];
 
 export default function ThemePreviewPage() {
+  // An internal reference, not a product page: mock-backed builds only
+  // (docs/DEV_ONLY_IN_PRODUCTION.md, item 5).
+  if (!MOCKING) notFound();
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-10 px-6 py-12">
       <header className="flex flex-col gap-2">

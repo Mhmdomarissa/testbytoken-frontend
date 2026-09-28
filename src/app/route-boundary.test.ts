@@ -50,10 +50,11 @@ const CONSOLE_ONLY = [
  * in the page's own tab to resolve at all - found by loading the actual
  * share flow in a real browser and watching the fetch fall through to
  * Next's own router instead of the mock, because nothing on this page had
- * started a client for the service worker to hand the request to. In
- * production this component is a no-op (its own top-of-file comment: it
- * gates on `NODE_ENV === "development"`), so this is a dev-only leaf, not
- * a real dependency the shipped page carries.
+ * started a client for the service worker to hand the request to. In a
+ * real build (NEXT_PUBLIC_API_MOCKING off) this component is a no-op and
+ * its mock import is removed from the output (docs/DEPLOYMENT.md;
+ * scripts/check-mocks-in-build.mjs proves it), so this is a mock-only
+ * leaf, not a real dependency a real build's page carries.
  */
 export const PUBLIC_TIER: Tier = {
   forbiddenPaths: [...CONSOLE_ONLY, "mocks", "components/theme"],
@@ -65,8 +66,9 @@ export const PUBLIC_TIER: Tier = {
 
 /**
  * A pre-auth page (sign-in): still none of the console, but it talks to the
- * mock backend directly in development, so it may use the mock gate and the
- * mock-only session-cookie workaround - as leaves, so what THEY import (the
+ * mock backend directly in mock-backed builds, so it may use the mock gate
+ * and the mock-only session-cookie workaround (dynamically imported behind
+ * the flag, so absent from a real build) - as leaves, so what THEY import (the
  * MSW worker, handlers) is not walked and the Query client can't ride in
  * through them unnoticed.
  */

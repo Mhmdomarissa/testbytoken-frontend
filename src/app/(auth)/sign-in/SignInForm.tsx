@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { MagicLinkResponseSchema, VerifyResponseSchema } from "@/lib/contract";
-import { setMockSessionCookie } from "@/mocks/session-cookie-workaround";
+
+// Mock-backed build? Written out here, not imported: Next inlines
+// process.env.NEXT_PUBLIC_* only at the use site, and only then can the
+// build drop the mock-only code below (docs/DEPLOYMENT.md).
+const MOCKING = process.env.NEXT_PUBLIC_API_MOCKING === "on";
 
 type Step = "request" | "sent" | "verifying";
 
@@ -44,11 +48,15 @@ export function SignInForm() {
     }
   }
 
-  // Dev convenience: there is no real inbox to click a link from, and no
-  // backend to issue a real token. The mock accepts any token
-  // unconditionally, so this stands in for "the user clicked the email
-  // link" without inventing a fake email UI.
-  async function continueDev() {
+  // Mock-backed builds only (docs/DEV_ONLY_IN_PRODUCTION.md, item 3): there
+  // is no real inbox to click a link from, and no backend to issue a real
+  // token. The mock accepts any token unconditionally, so this stands in
+  // for "the user clicked the email link" without inventing a fake email
+  // UI. With mocking off the button isn't rendered and this function, the
+  // literal token and the cookie workaround are all dead code, removed
+  // from the build (scripts/check-mocks-in-build.mjs checks the output).
+  async function continueToDemo() {
+    if (!MOCKING) return;
     setStep("verifying");
     setError(null);
     try {
@@ -63,7 +71,13 @@ export function SignInForm() {
       // Set-Cookie header (correct, and what a real backend would rely
       // on) is silently dropped because MSW serves this via a Service
       // Worker, which cannot set cookies that way.
-      setMockSessionCookie();
+      // The condition is repeated inline (not MOCKING) so the build can see
+      // this import is dead with mocking off and emit no chunk for it.
+      if (process.env.NEXT_PUBLIC_API_MOCKING === "on") {
+        const { setMockSessionCookie } =
+          await import("@/mocks/session-cookie-workaround");
+        setMockSessionCookie();
+      }
       router.push(searchParams.get("from") ?? "/overview");
       router.refresh();
     } catch {
@@ -108,19 +122,21 @@ export function SignInForm() {
             link.
           </p>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button
-            variant="outline"
-            onClick={continueDev}
-            disabled={step === "verifying"}
-          >
-            {step === "verifying" ? (
-              <>
-                <Spinner /> Verifying…
-              </>
-            ) : (
-              "Continue (dev - no backend yet)"
-            )}
-          </Button>
+          {MOCKING && (
+            <Button
+              variant="outline"
+              onClick={continueToDemo}
+              disabled={step === "verifying"}
+            >
+              {step === "verifying" ? (
+                <>
+                  <Spinner /> Verifying…
+                </>
+              ) : (
+                "Continue to the demo"
+              )}
+            </Button>
+          )}
         </div>
       )}
     </>

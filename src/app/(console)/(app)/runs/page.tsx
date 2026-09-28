@@ -23,6 +23,11 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/layout/PageHeader";
 
+// Mock-backed build? Written out here, not imported: Next inlines
+// process.env.NEXT_PUBLIC_* only at the use site, and only then can the
+// build drop the mock-only code below (docs/DEPLOYMENT.md).
+const MOCKING = process.env.NEXT_PUBLIC_API_MOCKING === "on";
+
 const RunListResponseSchema = paginated(RunSummarySchema);
 
 export default function RunsPage() {
@@ -55,21 +60,32 @@ function RunsList() {
             </>
           ) : (
             <>
-              All runs.{" "}
-              <Link href="/runs?target_id=tgt_empty" className="underline">
-                View a target with none
-              </Link>
+              All runs.
+              {/* Demo/test controls, not product actions: they drive the
+                  mock's fixture target and its simulated failure, so they
+                  exist only in mock-backed builds
+                  (docs/DEV_ONLY_IN_PRODUCTION.md, items 1-2). */}
+              {MOCKING && (
+                <>
+                  {" "}
+                  <Link href="/runs?target_id=tgt_empty" className="underline">
+                    View a target with none
+                  </Link>
+                </>
+              )}
             </>
           )}
         </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          render={<Link href="/runs?simulate_error=true" />}
-          nativeButton={false}
-        >
-          Simulate error
-        </Button>
+        {MOCKING && (
+          <Button
+            variant="ghost"
+            size="sm"
+            render={<Link href="/runs?simulate_error=true" />}
+            nativeButton={false}
+          >
+            Simulate error
+          </Button>
+        )}
       </div>
 
       {runs.status === "loading" && <ListSkeleton rows={4} />}
