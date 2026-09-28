@@ -143,7 +143,7 @@ function RunsKpi({ data }: { data: Overview }) {
   return (
     <Card title="Runs in range" testId="kpi-runs">
       <p className="text-3xl font-semibold tabular-nums">{total}</p>
-      <StackedBar segments={segments} label="finished runs" />
+      <StackedBar segments={segments} total={total} label="finished runs" />
       <Link href="/runs" className={quietLink}>
         Open run history{" "}
         <ArrowRightIcon className="size-3.5" aria-hidden="true" />
@@ -154,13 +154,29 @@ function RunsKpi({ data }: { data: Overview }) {
 
 function LatestSuiteRunKpi({ data }: { data: Overview }) {
   const run = data.latest_suite_run;
+  const inProgress = data.suite_runs_in_progress;
+  // In-progress suite runs are counted and linked, never shown as "the
+  // latest": a running run has no verdict yet.
+  const inProgressLink =
+    inProgress > 0 ? (
+      <Link
+        href="/runs"
+        className={quietLink}
+        data-testid="suite-runs-in-progress"
+      >
+        <span className="tabular-nums">{inProgress}</span> suite{" "}
+        {inProgress === 1 ? "run" : "runs"} in progress{" "}
+        <ArrowRightIcon className="size-3.5" aria-hidden="true" />
+      </Link>
+    ) : null;
   if (!run) {
     return (
       <Card title="Latest suite run" testId="kpi-latest">
         <p className="text-sm text-(--ink-muted)">
-          No suite has run yet. A suite is generated the first time a target is
-          scanned.
+          No suite run has finished yet. A suite is generated the first time a
+          target is scanned.
         </p>
+        {inProgressLink}
       </Card>
     );
   }
@@ -205,10 +221,9 @@ function LatestSuiteRunKpi({ data }: { data: Overview }) {
         {run.run_id}
       </Link>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {/* The dashboard's one verdict: filled. */}
+        {/* Quiet: the overview has no verdict of its own to fill. */}
         <StatusBadge
           status={toBadgeStatus(run.status)}
-          variant="filled"
           label={runStatusLabel(run.status)}
         />
         <span className="truncate text-sm" title={run.target_name}>
@@ -222,7 +237,15 @@ function LatestSuiteRunKpi({ data }: { data: Overview }) {
         pendingText="Pass rate is reported when the run finishes."
         className="text-sm"
       />
-      <StackedBar segments={segments} label={`steps of ${run.steps.total}`} />
+      <StackedBar
+        segments={segments}
+        total={run.steps.total}
+        label={run.steps.total === 1 ? "step" : "steps"}
+      />
+      <p className="text-xs text-(--ink-muted)">
+        Finished {formatDateTime(run.finished_at)}
+      </p>
+      {inProgressLink}
     </Card>
   );
 }
