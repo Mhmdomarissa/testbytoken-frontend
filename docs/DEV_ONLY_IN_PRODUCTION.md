@@ -68,7 +68,8 @@ The recommendations above are accepted. When the deploy work starts:
    (item 4) are absent from the production build. A **test checks the
    production build output** for them, so a regression fails CI instead of
    shipping.
-3. **The "Demo - simulated data" marker is one persistent banner
+3. **Superseded 2026-09-28 (owner): the banner was removed from every
+   screen after the demo went live.** Originally: **the "Demo - simulated data" marker is one persistent banner
    component** on every screen, including the public proof pages (`/p/*`).
    This is the "D2 persistent banner" from the deploy brief. The brief isn't
    in this repo, so its exact wording and spec have to come from there.
