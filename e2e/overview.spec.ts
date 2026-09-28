@@ -91,7 +91,7 @@ test("a workspace with no targets gets the getting-started checklist, from serve
   );
 });
 
-test("the latest suite run links to that run, and its verdict is the page's one filled chip", async ({
+test("the latest suite run is a FINISHED run with its verdict and pass rate beside coverage; live ones are only counted", async ({
   page,
 }) => {
   await page.goto("/overview");
@@ -99,6 +99,56 @@ test("the latest suite run links to that run, and its verdict is the page's one 
   const link = card.getByRole("link").first();
   const href = await link.getAttribute("href");
   expect(href).toMatch(/^\/runs\/run_/);
-  await expect(page.locator('[data-variant="filled"]')).toHaveCount(1);
-  await expect(card.locator('[data-variant="filled"]')).toHaveCount(1);
+  // A finished run: a pass rate WITH its coverage, never the pending text.
+  await expect(card).toContainText(/\d+% pass/);
+  await expect(card).toContainText(/\d+ of \d+ elements covered/);
+  await expect(card).not.toContainText("reported when the run finishes");
+  await expect(card).toContainText(/Finished /);
+  // The fixtures' live suite runs are counted and linked, not shown.
+  const live = card.getByTestId("suite-runs-in-progress");
+  await expect(live).toContainText(/\d+ suite runs? in progress/);
+  await expect(live).toHaveAttribute("href", "/runs");
+});
+
+test("the overview has no verdict of its own: every chip on it is quiet", async ({
+  page,
+}) => {
+  await page.goto("/overview");
+  await expect(page.getByTestId("kpi-latest")).toBeVisible();
+  await expect(page.getByTestId("recent-runs").locator("table")).toBeVisible();
+  await expect(page.locator('[data-variant="filled"]')).toHaveCount(0);
+});
+
+test.describe("on a 390px phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("recent runs stack, and a finished run's pass rate and coverage are on screen", async ({
+    page,
+  }) => {
+    await page.goto("/overview");
+    const stacked = page.getByTestId("recent-runs-stacked");
+    await expect(stacked).toBeVisible();
+    // The wide table isn't what's showing at this width.
+    await expect(page.getByTestId("recent-runs").locator("table")).toBeHidden();
+
+    const finished = stacked
+      .locator("li")
+      .filter({ has: page.getByRole("link", { name: "run_fail_1" }) });
+    const passCoverage = finished.getByText(/\d+% pass/);
+    await expect(passCoverage).toBeVisible();
+    await expect(finished.getByText(/elements covered/)).toBeVisible();
+    // Visible means inside the screen's width, not rendered off to the side.
+    const box = (await passCoverage.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    // The status chip isn't clipped either: wholly inside the screen's width.
+    const chip = (await finished.getByText("Failed").boundingBox())!;
+    expect(chip.x).toBeGreaterThanOrEqual(0);
+    expect(chip.x + chip.width).toBeLessThanOrEqual(390);
+    // And the page itself doesn't scroll sideways.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
 });
