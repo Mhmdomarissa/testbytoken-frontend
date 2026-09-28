@@ -99,6 +99,15 @@ Then:
   - Server-rendered, with no client JavaScript, so it costs the proof page's
     budget as little as possible. Report its byte cost on `/p/[token]`.
   - It must meet the measured-contrast rules like any other text.
+
+> **Owner decision (2026-09-28): the demo banner is removed.** After the demo
+> went live, the owner asked for the persistent "Demo · simulated data"
+> banner to be taken off every screen. It is gone from the code. What still
+> marks the demo as a demo: the landing demo's own "Demonstration ·
+> simulated results" labels, fictional fixture names, and (D2) `robots.txt`
+> plus `noindex`. The "nobody must mistake this for a working product" goal
+> above now rests on those alone.
+
 - **`robots.txt` disallowing everything, plus `noindex` headers.** A demo of a
   testing product ranking in search results is its own small disaster.
 - **Vercel deployment protection on the console routes.** The whole point of the
