@@ -11,8 +11,11 @@ import { useOverview, type OverviewRange } from "@/lib/api/queries/overview";
 
 const RANGES: OverviewRange[] = ["7d", "14d", "30d"];
 /**
- * 30 days by default: the demo's finished-run fixtures are dated early in
- * the month, so a 7-day window opens empty. The switch and the URL change it.
+ * 30 days by default. Chosen when the demo's fixtures had fixed dates and a
+ * 7-day window opened empty; they're relative now, so that reason is gone -
+ * whether to return to the contract's 7-day default is an open product
+ * decision, kept out of the relative-dates change. The switch and the URL
+ * change it.
  */
 const DEFAULT_RANGE: OverviewRange = "30d";
 
