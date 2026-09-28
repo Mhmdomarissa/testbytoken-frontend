@@ -136,29 +136,33 @@ export function RunsChart({
         <span className="text-(--ink-muted)">{tzCaption}</span>
       </figcaption>
 
-      <table className="sr-only">
-        <caption>Finished runs per day by verdict. {tzCaption}.</caption>
-        <thead>
-          <tr>
-            <th scope="col">Day</th>
-            {shown.map((v) => (
-              <th key={v.key} scope="col">
-                {v.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {days.map((d) => (
-            <tr key={d.date}>
-              <th scope="row">{formatDay(d.date, true)}</th>
+      {/* sr-only on a wrapper, not the table: a table ignores width: 1px
+          and sized to its content, it widened the phone page by 206px. */}
+      <div className="sr-only">
+        <table>
+          <caption>Finished runs per day by verdict. {tzCaption}.</caption>
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
               {shown.map((v) => (
-                <td key={v.key}>{d[v.key]}</td>
+                <th key={v.key} scope="col">
+                  {v.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {days.map((d) => (
+              <tr key={d.date}>
+                <th scope="row">{formatDay(d.date, true)}</th>
+                {shown.map((v) => (
+                  <td key={v.key}>{d[v.key]}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </figure>
   );
 }
