@@ -50,10 +50,13 @@ export const OverviewLatestSuiteRunSchema = z
     suite_id: IdSchema,
     target_id: IdSchema,
     target_name: z.string(),
-    status: RunStatusSchema,
-    pass_rate: z.number().min(0).max(1).nullable().openapi({
+    status: RunStatusSchema.openapi({
       description:
-        "Same rule as `Run.pass_rate`: null unless `status` is terminal, and a client MUST NOT render it for a status it does not recognise as terminal.",
+        "The run's verdict - always a terminal status (this is a FINISHED run). A client MUST NOT render the pass rate for a status it does not recognise as terminal.",
+    }),
+    pass_rate: z.number().min(0).max(1).openapi({
+      description:
+        "The run's own `pass_rate`; non-null because the run has finished.",
     }),
     coverage: CoverageSchema.openapi({
       description:
@@ -66,11 +69,11 @@ export const OverviewLatestSuiteRunSchema = z
         skipped: CountSchema,
         total: CountSchema.openapi({
           description:
-            "Every step of the run. May exceed passed + failed + skipped (warnings, steps still running); the UI shows the difference as other.",
+            "Every step of the run (it has finished, so this is final). May exceed passed + failed + skipped (e.g. warnings); the UI shows the difference as other.",
         }),
       })
       .openapi("OverviewStepCounts"),
-    finished_at: TimestampSchema.nullable(),
+    finished_at: TimestampSchema,
   })
   .openapi("OverviewLatestSuiteRun");
 
@@ -96,7 +99,11 @@ export const OverviewSchema = z
     }),
     latest_suite_run: OverviewLatestSuiteRunSchema.nullable().openapi({
       description:
-        "The most recently STARTED suite run (any status), or null if there has never been one.",
+        "The most recently FINISHED suite run (any terminal status: passed, failed, cancelled, timed_out), or null if no suite run has ever finished. Runs still in progress are counted in `suite_runs_in_progress`, never shown here.",
+    }),
+    suite_runs_in_progress: CountSchema.openapi({
+      description:
+        "Suite runs currently queued or running. The UI links them to the runs list.",
     }),
     targets: z.object({
       total: CountSchema,

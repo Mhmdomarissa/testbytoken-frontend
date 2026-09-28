@@ -97,17 +97,25 @@ describe("/overview reconciles with the run, target and proof pages", () => {
     expect(overview.proofs).toEqual({ live, revoked });
   });
 
-  it("latest_suite_run is the run /runs/{id} shows - same status, pass rate, coverage and step counts", async () => {
+  it("latest_suite_run is the most recently FINISHED suite run, as /runs/{id} shows it", async () => {
     const [overview, runs] = await Promise.all([
       get("/overview?range=30d", OverviewSchema),
       allRuns(),
     ]);
-    const latest = runs
-      .filter((r) => r.suite_id !== null)
+    const suiteRuns = runs.filter((r) => r.suite_id !== null);
+    const inProgress = (s: string) => s === "queued" || s === "running";
+    const latest = suiteRuns
+      .filter((r) => r.finished_at !== null && !inProgress(r.status))
       .sort(
         (a, b) =>
-          b.started_at.localeCompare(a.started_at) || b.id.localeCompare(a.id),
+          b.finished_at!.localeCompare(a.finished_at!) ||
+          b.id.localeCompare(a.id),
       )[0]!;
+    expect(overview.suite_runs_in_progress).toBe(
+      suiteRuns.filter((r) => inProgress(r.status)).length,
+    );
+    // The fixtures have live suite runs - the card must not show one of them.
+    expect(overview.suite_runs_in_progress).toBeGreaterThan(0);
     const card = overview.latest_suite_run!;
     expect(card.run_id).toBe(latest.id);
 

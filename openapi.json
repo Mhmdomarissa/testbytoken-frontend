@@ -2310,6 +2310,11 @@
           "latest_suite_run": {
             "$ref": "#/components/schemas/OverviewLatestSuiteRun"
           },
+          "suite_runs_in_progress": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Suite runs currently queued or running. The UI links them to the runs list."
+          },
           "targets": {
             "type": "object",
             "properties": {
@@ -2380,6 +2385,7 @@
           "generated_at",
           "runs_by_day",
           "latest_suite_run",
+          "suite_runs_in_progress",
           "targets",
           "proofs",
           "attention"
@@ -2462,17 +2468,14 @@
               "cancelled",
               "timed_out"
             ],
-            "description": "Overall run status - the run-shaped subset of the JobStatus vocabulary. `timed_out` is distinct from `failed`: a failure has a specific reason from a specific step; a timeout is the absence of information (the engine stopped responding) and carries no such reason. Extensible: new members MAY be added; clients MUST tolerate unknown members.",
+            "description": "The run's verdict - always a terminal status (this is a FINISHED run). A client MUST NOT render the pass rate for a status it does not recognise as terminal.",
             "x-extensible-enum": true
           },
           "pass_rate": {
-            "type": [
-              "number",
-              "null"
-            ],
+            "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "description": "Same rule as `Run.pass_rate`: null unless `status` is terminal, and a client MUST NOT render it for a status it does not recognise as terminal."
+            "description": "The run's own `pass_rate`; non-null because the run has finished."
           },
           "coverage": {
             "allOf": [
@@ -2488,10 +2491,7 @@
             "$ref": "#/components/schemas/OverviewStepCounts"
           },
           "finished_at": {
-            "type": [
-              "string",
-              "null"
-            ],
+            "type": "string",
             "format": "date-time",
             "description": "ISO 8601 UTC timestamp.",
             "example": "2026-09-16T14:32:00Z"
@@ -2508,7 +2508,7 @@
           "steps",
           "finished_at"
         ],
-        "description": "The most recently STARTED suite run (any status), or null if there has never been one."
+        "description": "The most recently FINISHED suite run (any terminal status: passed, failed, cancelled, timed_out), or null if no suite run has ever finished. Runs still in progress are counted in `suite_runs_in_progress`, never shown here."
       },
       "OverviewStepCounts": {
         "type": "object",
@@ -2528,7 +2528,7 @@
           "total": {
             "type": "integer",
             "minimum": 0,
-            "description": "Every step of the run. May exceed passed + failed + skipped (warnings, steps still running); the UI shows the difference as other."
+            "description": "Every step of the run (it has finished, so this is final). May exceed passed + failed + skipped (e.g. warnings); the UI shows the difference as other."
           }
         },
         "required": [

@@ -15,6 +15,7 @@ export type Range = keyof typeof RANGE_DAYS;
 
 const KNOWN_TERMINAL = ["passed", "failed", "timed_out", "cancelled"] as const;
 const TERMINAL = new Set<string>(KNOWN_TERMINAL);
+const IN_PROGRESS = new Set<string>(["queued", "running"]);
 
 /** Throws on an unknown IANA zone (the handler turns that into a 400). */
 export function dayFormatter(tz: string) {
@@ -76,13 +77,24 @@ export function computeOverview(now: Date, range: Range, tz: string): Overview {
     else bucket.other += 1;
   }
 
-  // Latest suite run: the most recently STARTED run that came from a suite.
-  const latest = runs
-    .filter((r) => r.suite_id !== null)
+  // Latest suite run: the most recently FINISHED run that came from a
+  // suite (any terminal status). In-progress suite runs are only counted.
+  const suiteRuns = runs.filter((r) => r.suite_id !== null);
+  const latest = suiteRuns
+    .filter(
+      (r) =>
+        r.finished_at !== null &&
+        r.pass_rate !== null &&
+        !IN_PROGRESS.has(r.status),
+    )
     .sort(
       (a, b) =>
-        b.started_at.localeCompare(a.started_at) || b.id.localeCompare(a.id),
+        b.finished_at!.localeCompare(a.finished_at!) ||
+        b.id.localeCompare(a.id),
     )[0];
+  const suiteRunsInProgress = suiteRuns.filter((r) =>
+    IN_PROGRESS.has(r.status),
+  ).length;
 
   // Proofs: live = shared, enabled, not expired; revoked = share disabled.
   let live = 0;
@@ -148,7 +160,6 @@ export function computeOverview(now: Date, range: Range, tz: string): Overview {
           target_id: latest.target_id,
           target_name: targetName(latest.target_id),
           status: latest.status,
-          pass_rate: latest.pass_rate,
           coverage: latest.coverage,
           steps: {
             passed: latest.steps.filter((s) => s.status === "pass").length,
@@ -156,9 +167,11 @@ export function computeOverview(now: Date, range: Range, tz: string): Overview {
             skipped: latest.steps.filter((s) => s.status === "skipped").length,
             total: latest.steps.length,
           },
-          finished_at: latest.finished_at,
+          pass_rate: latest.pass_rate!,
+          finished_at: latest.finished_at!,
         }
       : null,
+    suite_runs_in_progress: suiteRunsInProgress,
     targets: {
       total: targets.length,
       scanned: targets.filter((t) => t.last_scan?.status === "completed")

@@ -678,14 +678,18 @@ because the UI renders it verbatim and never recomputes it:
   those statuses; `other` counts any terminal status not in that list (a
   future one), so nothing is silently dropped. Queued and running runs
   are not counted.
-- **`latest_suite_run`** — the most recently **started** run that came from
-  a suite, whatever its status (so it is often still running), or `null`
-  if there has never been one. `status`, `pass_rate` and `coverage` are
-  that run's own values, with the same rules as `Run` (`pass_rate` null
-  until terminal). `coverage` is the existing `Coverage` object, not a new
-  shape, so the pass rate and its coverage go through the same component
-  as everywhere else. `steps` counts the run's steps by status; `total` is
-  all of them, and may exceed the three named counts.
+- **`latest_suite_run`** — the most recently **finished** run that came
+  from a suite, by `finished_at`, whatever its terminal status (`passed`,
+  `failed`, `cancelled`, `timed_out`), or `null` if no suite run has ever
+  finished. A run still in progress is never shown here. `status`,
+  `pass_rate` and `coverage` are that run's own values (`pass_rate` is
+  non-null: the run has finished). `coverage` is the existing `Coverage`
+  object, not a new shape, so the pass rate and its coverage go through
+  the same component as everywhere else. `steps` counts the run's steps by
+  status; `total` is all of them (final, since the run has finished), and
+  may exceed the three named counts.
+- **`suite_runs_in_progress`** — how many suite runs are `queued` or
+  `running` right now. The card links them to the runs list.
 - **`targets`** — `total`; `scanned` = latest scan `completed`;
   `needs_attention` = latest scan `failed` or `parked`.
 - **`proofs`** — `live` = shared, enabled, not expired; `revoked` = share

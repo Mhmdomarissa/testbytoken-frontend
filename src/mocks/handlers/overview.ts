@@ -46,6 +46,7 @@ export const overviewHandlers = [
           other: 0,
         })),
         latest_suite_run: null,
+        suite_runs_in_progress: 0,
         targets: { total: 0, scanned: 0, needs_attention: 0 },
         proofs: { live: 0, revoked: 0 },
         attention: { total: 0, items: [] },
