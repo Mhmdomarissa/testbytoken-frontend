@@ -37,6 +37,22 @@ describe("PassRateCoverage", () => {
     expect(container.textContent).toContain("21 of 24 elements covered");
   });
 
+  it("separates the pair with a gap, never a character that could start a wrapped line", () => {
+    const { container } = render(
+      <PassRateCoverage
+        passRate={1}
+        coverage={{ basis: "inventory", generated: 21, candidate: 24 }}
+      />,
+    );
+    const pair = container.querySelector('[data-testid="pass-rate-coverage"]')!;
+    // Two whole units that may wrap: each part is its own flex item...
+    expect(pair.className).toMatch(/\bflex-wrap\b/);
+    expect(pair.children).toHaveLength(2);
+    // ...and neither begins or ends with a separator.
+    for (const part of pair.children)
+      expect(part.textContent!.trim()).not.toMatch(/^[·•|,-]|[·•|,-]$/);
+  });
+
   it("renders low coverage honestly even at a perfect pass rate - the exact case §1.2 exists for", () => {
     // A run can show 100% pass and still have covered almost nothing,
     // if most elements weren't uniquely locatable - the whole reason

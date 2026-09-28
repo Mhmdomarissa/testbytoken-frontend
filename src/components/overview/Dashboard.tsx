@@ -235,9 +235,7 @@ function LatestSuiteRunKpi({ data }: { data: Overview }) {
         passRate={run.pass_rate}
         coverage={run.coverage}
         pendingText="Pass rate is reported when the run finishes."
-        // Wrap whole: on a narrow card, coverage goes to the next line
-        // rather than both halves breaking into columns.
-        className="flex-wrap text-sm"
+        className="text-sm"
       />
       <StackedBar
         segments={segments}
