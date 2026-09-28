@@ -56,9 +56,7 @@ test("the entire spine, keyboard only, in one sitting: sign-in through share", a
   await page.keyboard.type("dev@example.com");
   await page.getByRole("button", { name: "Send magic link" }).focus();
   await page.keyboard.press("Enter");
-  await page
-    .getByRole("button", { name: "Continue (dev - no backend yet)" })
-    .focus();
+  await page.getByRole("button", { name: "Continue to the demo" }).focus();
   await page.keyboard.press("Enter");
   await page.waitForURL(/\/overview$/);
   await expectFocusNotLost(page, "sign-in");

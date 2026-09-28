@@ -1,20 +1,20 @@
 import { ImageResponse } from "next/og";
 import { OG_PALETTE } from "./og-palette";
-import { findProofByShareToken } from "@/mocks/handlers/proofs";
+import { apiGet } from "@/lib/api/client";
+import { isUnrecognised } from "@/lib/api/tolerant";
+import { PublicProofSchema } from "@/lib/contract";
+
+// Mock-backed build? Written out here, not imported: Next inlines
+// process.env.NEXT_PUBLIC_* only at the use site, and only then can the
+// build drop the mock-only code below (docs/DEPLOYMENT.md).
+const MOCKING = process.env.NEXT_PUBLIC_API_MOCKING === "on";
 
 /**
- * Server-only: never ships a byte of JS to any client, so it is exempt
- * from src/app/route-boundary.test.ts's "nothing under (public) reaches
- * the console/mocks" rule (see that file's own comment on this
- * exemption). That's also why it's the ONE place in this route allowed
- * to import the mock's internals directly, by necessity rather than
- * choice: this route runs in the Next server process, which has no HTTP
- * path back into the mock (MSW's browser worker only intercepts
- * BROWSER-side requests - a server-side `fetch()` here would hit nothing
- * and 404). A real backend wouldn't have this problem - this route would
- * do an ordinary server-side fetch to its own API, which works fine
- * against a real server; the direct import is a mock-phase-only
- * concession, not the intended shape.
+ * Server-only: never ships a byte of JS to any client (and is the one file
+ * under (public) exempt from the mock-import rule in
+ * src/app/route-boundary.test.ts, for that reason). It reads the proof
+ * through loadOgProof below: the mock store in a mock-backed build, the
+ * API's GET /p/{token} otherwise.
  *
  * Phase B B9 + section 1.2: an OG image showing a pass rate MUST carry
  * coverage alongside it, same as everywhere else pass rate appears - so
@@ -38,13 +38,69 @@ const VERDICT_LABEL: Record<string, string> = {
   timed_out: "Timed out",
 };
 
+/** What the OG card draws - a finished proof's headline, nothing more. */
+interface OgProof {
+  targetName: string;
+  /** The raw verdict, known or not (an unknown one is shown as sent). */
+  verdict: string;
+  passRate: number;
+  generated: number;
+  candidate: number;
+}
+
+/**
+ * The shared proof behind an OG image, or null if the token doesn't
+ * resolve (invalid, expired or revoked). Server-side only.
+ *
+ * With mocking on, it reads the mock's proof store directly: this route
+ * runs in the Next server, and MSW only intercepts in the browser, so a
+ * fetch here would reach nothing - a mock-phase concession. With mocking
+ * off, that branch and its import of the mock layer are dead code and are
+ * removed from the build (scripts/check-mocks-in-build.mjs), and the
+ * image is built the intended way: GET /p/{token} from the API, parsed
+ * through the contract like every other response.
+ */
+async function loadOgProof(token: string): Promise<OgProof | null> {
+  if (MOCKING) {
+    const { findProofByShareToken } = await import("@/mocks/handlers/proofs");
+    const snapshot = findProofByShareToken(token)?.snapshot;
+    if (!snapshot) return null;
+    return {
+      targetName: snapshot.target.name,
+      verdict: snapshot.verdict,
+      passRate: snapshot.pass_rate,
+      generated: snapshot.coverage.generated,
+      candidate: snapshot.coverage.candidate,
+    };
+  }
+  try {
+    const { snapshot } = await apiGet(
+      `/p/${encodeURIComponent(token)}`,
+      PublicProofSchema,
+    );
+    return {
+      targetName: snapshot.target.name,
+      verdict: isUnrecognised(snapshot.verdict)
+        ? snapshot.verdict.raw
+        : snapshot.verdict,
+      passRate: snapshot.pass_rate,
+      generated: snapshot.coverage.generated,
+      candidate: snapshot.coverage.candidate,
+    };
+  } catch {
+    // Not found, revoked, or the API unreachable: the generic card, which
+    // claims nothing about any run.
+    return null;
+  }
+}
+
 export default async function Image({
   params,
 }: {
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const proof = findProofByShareToken(token);
+  const proof = await loadOgProof(token);
 
   if (!proof) {
     return new ImageResponse(
@@ -66,11 +122,10 @@ export default async function Image({
     );
   }
 
-  const { snapshot } = proof;
-  const verdict = snapshot.verdict;
+  const verdict = proof.verdict;
   const verdictColor = VERDICT_COLOR[verdict] ?? CREAM;
   const verdictLabel = VERDICT_LABEL[verdict] ?? verdict;
-  const percent = Math.round(snapshot.pass_rate * 100);
+  const percent = Math.round(proof.passRate * 100);
 
   return new ImageResponse(
     <div
@@ -90,9 +145,7 @@ export default async function Image({
         <div style={{ fontSize: 24, color: GOLD, letterSpacing: 2 }}>
           TEST BY TOKEN — AUDITABLE PROOF
         </div>
-        <div style={{ fontSize: 56, display: "flex" }}>
-          {snapshot.target.name}
-        </div>
+        <div style={{ fontSize: 56, display: "flex" }}>{proof.targetName}</div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
@@ -129,7 +182,7 @@ export default async function Image({
             display: "flex",
           }}
         >
-          {snapshot.coverage.generated} of {snapshot.coverage.candidate} covered
+          {proof.generated} of {proof.candidate} covered
         </div>
       </div>
     </div>,

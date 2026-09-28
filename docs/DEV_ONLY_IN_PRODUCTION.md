@@ -90,3 +90,30 @@ first step is a report of the options for a decision, covering at least:
 - **The Unsplash photographs**, served through `/_next/image` (`img-src
 'self'`), including the plain `<img>` on `/sign-in`, which uses the same
   optimizer URLs.
+
+## Status after D1 (2026-09-28)
+
+How each item stands once `NEXT_PUBLIC_API_MOCKING` exists
+(`docs/DEPLOYMENT.md`). "Mock-only" means present in `next dev` and the demo
+build, and absent from a real build's output where marked (checked by
+`scripts/check-mocks-in-build.mjs`).
+
+| #   | Item                          | Status                                                                                                                                                                                                                   |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | "Simulate error"              | **Done.** Rendered only with mocking on.                                                                                                                                                                                 |
+| 2   | "View a target with none"     | **Done.** Rendered only with mocking on.                                                                                                                                                                                 |
+| 3   | Mock sign-in button           | **Done.** Mocking on only, relabelled "Continue to the demo". Absent from a real build's output.                                                                                                                         |
+| 4   | `setMockSessionCookie()`      | **Done for D1.** Dynamically imported behind the flag, absent from a real build's output. Delete it once a backend exists.                                                                                               |
+| 5   | `/style-guide`                | **Done.** 404 unless mocking is on.                                                                                                                                                                                      |
+| 6   | `/dev/zod-messages`           | **Changed, per the D1 brief.** Now gated on the mocking flag, not `NODE_ENV`, so it is also served by the demo's production build. There, `e2e/zod-messages.spec.ts` checks the locale trim in a real production bundle. |
+| 7   | `/dev/job-events`             | **Changed (deviates from "keep as is").** Gated on the mocking flag like #6, so `e2e/job-events.spec.ts` proves MSW-served SSE works in a production build. 404 in a real build.                                         |
+| 8   | `public/mockServiceWorker.js` | **Done.** No longer committed. `next.config.ts` generates it from the installed msw only when mocking is on, and deletes it otherwise.                                                                                   |
+| 9   | Landing demo                  | Works with mocking on. Verified in the production-build e2e run (`landing.spec.ts`).                                                                                                                                     |
+| 10  | `/p/share_demo`               | Works with mocking on. Verified in the production-build e2e run.                                                                                                                                                         |
+| 11  | Engine report frame           | **Open.** Still an empty frame in the demo. The "not available in the demo" marking is left for the run-detail visual PR (V5).                                                                                           |
+| 12  | Screenshot placeholders       | Kept (mock data).                                                                                                                                                                                                        |
+| 13  | Engine pill                   | Kept.                                                                                                                                                                                                                    |
+| 14  | Landing footer placeholders   | **Open, needs an owner decision:** Privacy Policy and Terms have no pages. The demo is going public on a URL.                                                                                                            |
+| 15  | Unused create-next-app assets | Open. Deleted in D2.                                                                                                                                                                                                     |
+| 16  | Dev indicator                 | Not in production builds. Nothing to do.                                                                                                                                                                                 |
+| 17  | Dev-only console errors       | Kept, as designed.                                                                                                                                                                                                       |

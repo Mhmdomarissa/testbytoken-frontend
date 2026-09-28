@@ -119,13 +119,19 @@ test("the engine card says what this page last heard, and when", async ({
   await expect(card).toContainText(/Checked (just now|\d+ s ago)/);
 });
 
-test("with demo mode off (this build), there is no demo banner", async ({
+test("every e2e build runs on the mocks, so the demo banner is on every screen and can't be dismissed", async ({
   page,
 }) => {
-  await page.goto("/targets");
-  await expect(page.getByRole("note", { name: "Demonstration" })).toHaveCount(
-    0,
-  );
+  // Both e2e servers (next dev via .env.development, and the production
+  // build in test:e2e:prod) have NEXT_PUBLIC_API_MOCKING=on. The banner's
+  // off state is covered by DemoBanner.test.tsx.
+  for (const path of ["/targets", "/p/share_demo"]) {
+    await page.goto(path);
+    const banner = page.getByRole("note", { name: "Demonstration" });
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText("Demo · simulated data.");
+    await expect(banner.getByRole("button")).toHaveCount(0);
+  }
 });
 
 test("the user menu opens, offers the theme, and signs out", async ({

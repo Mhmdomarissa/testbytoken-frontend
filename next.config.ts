@@ -1,7 +1,34 @@
 import path from "node:path";
 import type { NextConfig } from "next";
+import { resolveMocking } from "./scripts/mocking-env.mjs";
+import { syncMswWorker } from "./scripts/msw-worker.mjs";
+
+// Fails the build (and `next dev`) on an invalid flag, or on mocking
+// together with a real API base URL - see scripts/mocking-env.mjs.
+const mocking = resolveMocking(process.env);
+// public/mockServiceWorker.js exists exactly when mocking is on.
+syncMswWorker(mocking);
 
 const nextConfig: NextConfig = {
+  // Always defined, "on" or "off", so every build inlines a constant at
+  // each `process.env.NEXT_PUBLIC_API_MOCKING === "on"` gate - an unset
+  // variable isn't inlined, and a runtime lookup would keep the mock layer
+  // in a real build (docs/DEPLOYMENT.md).
+  env: { NEXT_PUBLIC_API_MOCKING: mocking ? "on" : "off" },
+  async headers() {
+    return [
+      {
+        // The demo's mock service worker must never be served from a
+        // cache: a redeploy that upgrades msw has to reach the browser's
+        // update check at once (docs/DEPLOYMENT.md, "Service worker
+        // updates"). Browsers already bypass the HTTP cache for a worker's
+        // own script; this keeps any CDN or proxy in between from holding
+        // it too. Absent from a real build, where the file isn't served.
+        source: "/mockServiceWorker.js",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+    ];
+  },
   images: {
     // The landing page's stock photography (docs/PHASE_LANDING_POLISH.md,
     // L5): served through the image optimizer rather than vendored.

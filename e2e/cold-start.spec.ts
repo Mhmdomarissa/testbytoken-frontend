@@ -38,9 +38,7 @@ test("sign-in through a completed scan, cold, with no console or page errors alo
 
   await page.getByLabel("Email").fill("dev@example.com");
   await page.getByRole("button", { name: "Send magic link" }).click();
-  await page
-    .getByRole("button", { name: "Continue (dev - no backend yet)" })
-    .click();
+  await page.getByRole("button", { name: "Continue to the demo" }).click();
   await page.waitForURL(/\/overview$/);
 
   // The app home renders real content on the FIRST paint, not a

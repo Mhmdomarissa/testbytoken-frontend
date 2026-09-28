@@ -27,7 +27,9 @@
     "contract-drift": "node scripts/check-contract-drift.mjs",
     "test:e2e": "playwright test",
     "check:contract-prose": "node scripts/check-contract-prose.mjs",
-    "check:zod-trim": "node scripts/check-zod-trim.mjs"
+    "check:zod-trim": "node scripts/check-zod-trim.mjs",
+    "check:mocks-in-build": "node scripts/check-mocks-in-build.mjs",
+    "test:e2e:prod": "E2E_PRODUCTION_BUILD=1 playwright test"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
@@ -65,10 +67,5 @@
     "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.1"
-  },
-  "msw": {
-    "workerDirectory": [
-      "public"
-    ]
   }
 }

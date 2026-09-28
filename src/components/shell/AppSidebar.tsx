@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronsUpDownIcon, LogOutIcon, UserIcon } from "lucide-react";
-import { clearMockSessionCookie } from "@/mocks/session-cookie-workaround";
 import { Logomark } from "@/components/brand/Logomark";
 import { ThemeRadioItems } from "@/components/theme/ThemeToggle";
 import {
@@ -49,8 +48,16 @@ export function AppSidebar() {
 
   async function signOut() {
     await fetch("/auth/logout", { method: "POST" });
-    // See src/mocks/session-cookie-workaround.ts.
-    clearMockSessionCookie();
+    // Mock-backed builds only - see src/mocks/session-cookie-workaround.ts.
+    // Dead code (and not in the output) with mocking off, where the real
+    // response's Set-Cookie clears the httpOnly cookie.
+    // Mock-backed builds only. Written inline so the build can drop the
+    // import with mocking off (docs/DEPLOYMENT.md).
+    if (process.env.NEXT_PUBLIC_API_MOCKING === "on") {
+      const { clearMockSessionCookie } =
+        await import("@/mocks/session-cookie-workaround");
+      clearMockSessionCookie();
+    }
     router.push("/sign-in");
     router.refresh();
   }
