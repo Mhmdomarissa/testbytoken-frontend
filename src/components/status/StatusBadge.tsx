@@ -65,6 +65,17 @@ const STATUS_META: Record<
   timed_out: { label: "Timed out", icon: ClockAlertIcon },
 };
 
+/**
+ * A status's icon, for a surface that marks a status without a chip (the
+ * overview's attention list, its "scanned" count). Taking it from here
+ * rather than from lucide-react directly keeps one importer of these icon
+ * modules - a second one made Turbopack split them into separate modules
+ * in the chunk every route shares (+194 B gzip on /p/[token]).
+ */
+export function statusIcon(status: Status): LucideIcon {
+  return STATUS_META[status].icon;
+}
+
 export function StatusBadge({
   status,
   label,

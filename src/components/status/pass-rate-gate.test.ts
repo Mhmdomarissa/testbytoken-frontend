@@ -60,6 +60,8 @@ describe("a run's pass rate only reaches the screen through RunPassRate", () => 
         "app/(console)/(app)/runs/[id]/page.tsx",
         "app/(console)/(app)/runs/page.tsx",
         "app/(public)/_landing/demo.tsx",
+        "components/overview/Dashboard.tsx",
+        "components/overview/RecentRuns.tsx",
       ].sort(),
     );
   });

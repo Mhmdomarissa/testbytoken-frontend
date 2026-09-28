@@ -11,6 +11,7 @@ import { planHandlers } from "./plans";
 import { loginSessionHandlers } from "./loginSessions";
 import { proofHandlers } from "./proofs";
 import { usageHandlers } from "./usage";
+import { overviewHandlers } from "./overview";
 import { screenshotHandlers } from "./screenshots";
 
 /**
@@ -67,5 +68,6 @@ export const handlers = [
   ...loginSessionHandlers,
   ...proofHandlers,
   ...usageHandlers,
+  ...overviewHandlers,
   ...screenshotHandlers,
 ];

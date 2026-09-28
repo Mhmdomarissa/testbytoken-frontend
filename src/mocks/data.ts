@@ -469,7 +469,11 @@ export const runFailed: z.infer<typeof RunDetailSchema> = {
   login_session_id: null,
   report_url: reportUrl("run_fail_1"),
   status: "failed",
-  pass_rate: 0.75,
+  // Of the steps that RAN (2 passed, 1 failed; the skipped step didn't run),
+  // per the contract's pass_rate definition - was 0.75, which no count of
+  // these four steps produces. Fixed in UI v2 V2, where the dashboard shows
+  // this run's rate beside its step counts.
+  pass_rate: 2 / 3,
   coverage: { basis: "inventory", generated: 21, candidate: 24 },
   token_cost: 3.9,
   proof_id: "proof_fail_1",

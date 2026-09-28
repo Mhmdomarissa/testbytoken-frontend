@@ -12,6 +12,7 @@ import { registerPlanPaths } from "./plans";
 import { registerLoginSessionPaths } from "./login-sessions";
 import { registerProofPaths } from "./proofs";
 import { registerUsagePaths } from "./usage";
+import { registerOverviewPaths } from "./overview";
 
 export const registry = new OpenAPIRegistry();
 
@@ -38,3 +39,4 @@ registerPlanPaths(registry);
 registerLoginSessionPaths(registry);
 registerProofPaths(registry);
 registerUsagePaths(registry);
+registerOverviewPaths(registry);
