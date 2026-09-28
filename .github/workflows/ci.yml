@@ -105,3 +105,22 @@ jobs:
           cache: "npm"
       - run: npm ci
       - run: npm run contract-drift
+
+  # docs/PHASE_DEPLOY.md D1 (docs/DEPLOYMENT.md): a build made with mocking
+  # off must contain none of the mock layer, and a demo build must contain
+  # all of it. Reads the build output, not the source.
+  mocks-in-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+      - run: npm ci
+      - run: npm run build
+      - run: npm run check:mocks-in-build -- absent
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_MOCKING: "on"
+      - run: npm run check:mocks-in-build -- present
