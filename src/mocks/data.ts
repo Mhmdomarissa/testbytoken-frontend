@@ -30,7 +30,25 @@ import type {
 
 export const PAGE_XSS_TITLE = "<img src=x onerror=alert(1)>";
 
-const now = "2026-09-10T12:00:00Z";
+/**
+ * Every fixture date is relative to when this module loads, so the demo
+ * never ages: finished runs sit 1, 5 and 12 days back, so the overview's
+ * 7-day window always has two and the chart is never empty for want of a
+ * calendar. The live
+ * runs are already relative (lifecycle.ts starts their clock on first
+ * fetch). A test that needs exact dates fixes the clock
+ * (vi.setSystemTime) before importing this module, rather than hardcoding
+ * dates that drift.
+ */
+const LOADED_AT = Date.now();
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+/** An ISO timestamp `ms` before the demo's present. */
+const ago = (ms: number) => new Date(LOADED_AT - ms).toISOString();
+
+/** When the demo workspace, its targets, scans and suite were set up. */
+const setUpAt = ago(20 * DAY);
 
 // ---------------------------------------------------------------------
 // Workspace
@@ -40,8 +58,8 @@ export const workspace: z.infer<typeof WorkspaceSchema> = {
   id: "wksp_demo",
   status: "ready",
   error: null,
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 // ---------------------------------------------------------------------
@@ -56,8 +74,8 @@ export const targetCheckout: z.infer<typeof TargetSchema> = {
   // Overlaid with the real most-recent scan by handlers/targets.ts (a
   // fixture can't know about scans started after it was written).
   last_scan: null,
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 export const targetEmpty: z.infer<typeof TargetSchema> = {
@@ -66,8 +84,8 @@ export const targetEmpty: z.infer<typeof TargetSchema> = {
   base_url: "https://new.example.com",
   environment: "staging",
   last_scan: null, // genuinely never scanned - the "empty account" case
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 /**
@@ -80,8 +98,8 @@ export const targetUnreachable: z.infer<typeof TargetSchema> = {
   base_url: "https://legacy-admin.example.com",
   environment: "test",
   last_scan: null,
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 export const targets = [targetCheckout, targetEmpty, targetUnreachable];
@@ -134,8 +152,8 @@ export const scanCheckout: z.infer<typeof ScanSchema> = {
   failure: null,
   login_session_id: null,
   modules: [modCheckout, modSettings],
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 // A parked scan - the login-handoff case. No credentials anywhere in this
@@ -150,8 +168,8 @@ export const scanParked: z.infer<typeof ScanSchema> = {
   failure: null,
   login_session_id: null,
   modules: [modCheckout],
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 // A failed scan: the structured KIND is what decides what the user does
@@ -170,8 +188,8 @@ export const scanFailed: z.infer<typeof ScanSchema> = {
   },
   login_session_id: null,
   modules: [],
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 export const scans = [scanCheckout, scanParked, scanFailed];
@@ -363,8 +381,8 @@ export const suiteCheckout: z.infer<typeof SuiteSchema> = {
   target_id: targetCheckout.id,
   name: "Checkout — generated suite",
   latest_version: 2,
-  created_at: now,
-  updated_at: now,
+  created_at: setUpAt,
+  updated_at: setUpAt,
 };
 
 export const suites = [suiteCheckout];
@@ -376,7 +394,7 @@ export const suiteCheckoutVersions: z.infer<typeof SuiteVersionSchema>[] = [
     version: 2,
     source_scan_id: scanCheckout.id,
     scenario_count: 21,
-    created_at: now,
+    created_at: setUpAt,
   },
   {
     id: "sv_checkout_1",
@@ -384,7 +402,7 @@ export const suiteCheckoutVersions: z.infer<typeof SuiteVersionSchema>[] = [
     version: 1,
     source_scan_id: scanCheckout.id,
     scenario_count: 18,
-    created_at: "2026-08-20T09:00:00Z",
+    created_at: ago(34 * DAY),
   },
 ];
 
@@ -446,8 +464,8 @@ export const runPassed: z.infer<typeof RunDetailSchema> = {
   coverage: { basis: "inventory", generated: 21, candidate: 24 },
   token_cost: 4.2,
   proof_id: "proof_pass_1",
-  started_at: "2026-09-10T11:00:00Z",
-  finished_at: "2026-09-10T11:02:10Z",
+  started_at: ago(1 * DAY + 3 * HOUR),
+  finished_at: ago(1 * DAY + 3 * HOUR - (2 * MINUTE + 10_000)),
   steps: [
     step(0, {
       action: "navigate",
@@ -477,8 +495,8 @@ export const runFailed: z.infer<typeof RunDetailSchema> = {
   coverage: { basis: "inventory", generated: 21, candidate: 24 },
   token_cost: 3.9,
   proof_id: "proof_fail_1",
-  started_at: "2026-09-09T15:00:00Z",
-  finished_at: "2026-09-09T15:01:47Z",
+  started_at: ago(5 * DAY + 7 * HOUR),
+  finished_at: ago(5 * DAY + 7 * HOUR - (MINUTE + 47_000)),
   steps: [
     step(0, { action: "navigate", target: pageHome.url }),
     step(1, { action: "click", target: "#add-to-cart" }),
@@ -531,7 +549,7 @@ function liveRunBase(id: string): z.infer<typeof RunDetailSchema> {
     coverage: { basis: "inventory", generated: 21, candidate: 24 },
     token_cost: 1.1,
     proof_id: null,
-    started_at: now,
+    started_at: setUpAt,
     finished_at: null,
     steps: [],
   };
@@ -558,8 +576,8 @@ export const runLong: z.infer<typeof RunDetailSchema> = {
   coverage: { basis: "inventory", generated: 21, candidate: 24 },
   token_cost: 11.6,
   proof_id: "proof_long_1",
-  started_at: "2026-09-08T09:00:00Z",
-  finished_at: "2026-09-08T09:04:32Z",
+  started_at: ago(12 * DAY + 2 * HOUR),
+  finished_at: ago(12 * DAY + 2 * HOUR - (4 * MINUTE + 32_000)),
   steps: Array.from({ length: LONG_RUN_STEP_COUNT }, (_, i) => {
     if (i === 17) {
       return step(i, {
@@ -672,9 +690,9 @@ function snapshotFor(
     coverage: run.coverage,
     target: { name: targetCheckout.name, base_url: targetCheckout.base_url },
     started_at: run.started_at,
-    finished_at: run.finished_at ?? now,
+    finished_at: run.finished_at ?? setUpAt,
     duration_ms:
-      new Date(run.finished_at ?? now).getTime() -
+      new Date(run.finished_at ?? setUpAt).getTime() -
       new Date(run.started_at).getTime(),
     token_cost: run.token_cost,
     steps: run.steps,
@@ -693,7 +711,7 @@ function proofFor(
     run_id: run.id,
     hash,
     share: null,
-    created_at: run.finished_at ?? now,
+    created_at: run.finished_at ?? setUpAt,
     snapshot: snapshotFor(run),
   };
 }

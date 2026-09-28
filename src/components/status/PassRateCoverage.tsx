@@ -69,13 +69,15 @@ export function PassRateCoverage({
       data-basis={basisLabel}
       title={known?.explanation}
       className={cn(
-        "inline-flex items-baseline gap-1.5 tabular-nums",
+        // A gap, not a "·": the pair wraps as two whole units on a narrow
+        // column, and a separator would then start the second line.
+        "inline-flex flex-wrap items-baseline gap-x-2 tabular-nums",
         className,
       )}
     >
       <span className="font-medium">{percent}% pass</span>
       <span className="text-muted-foreground text-xs">
-        &middot; {coverage.generated} of {coverage.candidate}{" "}
+        {coverage.generated} of {coverage.candidate}{" "}
         {known ? known.unit : "covered"}
         {known
           ? " covered"
