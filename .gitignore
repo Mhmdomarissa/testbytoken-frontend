@@ -32,6 +32,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# Committed: dev runs on the mocks (there is no backend). Holds no secrets.
+!.env.development
 
 # vercel
 .vercel
@@ -43,3 +45,7 @@ next-env.d.ts
 # Playwright
 /test-results/
 /playwright-report/
+
+# The mock service worker is generated from the installed msw by
+# scripts/msw-worker.mjs, only when NEXT_PUBLIC_API_MOCKING=on.
+/public/mockServiceWorker.js
