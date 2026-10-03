@@ -182,9 +182,6 @@ shadow.
 - **Collapsed rail:** 68 px (a 50 px icon column plus the inset variant's
   16 px padding and 2 px edge). Every item keeps its accessible name and
   gets a tooltip.
-- **Demo banner:** `--status-warning-tint` ground, `--ink` text (15.89 /
-  11.67), amber icon (5.24 / 6.98). Its height is `--demo-banner-h` (0 when
-  off), and the fixed sidebar and the landing's sticky nav start below it.
 
 ### The OG image
 
